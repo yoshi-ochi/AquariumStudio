@@ -27,7 +27,7 @@ export class AllianceApi {
   async refresh() {
     if (!this.online.user) throw new Error('同盟機能にはログインが必要です');
     const me = this.online.user.id;
-    const rows = this._check(await this.sb.from('alliance_members').select('alliance_id').eq('user_id', me).limit(1));
+    const rows = this._check(await this.sb.from('alliance_members').select('alliance_id, joined_at').eq('user_id', me).limit(1));
     if (!rows.length) return (this.state = null);
     const id = rows[0].alliance_id;
     const [a, mem, runs] = await Promise.all([
@@ -41,7 +41,7 @@ export class AllianceApi {
     const contribs = runList.length
       ? this._check(await this.sb.from('joint_contribs').select('run_id, amount, claimed').eq('user_id', me).in('run_id', runList.map((r) => r.id)))
       : [];
-    this.state = { alliance: this._check(a), members, runs: runList, contribs };
+    this.state = { alliance: this._check(a), members, runs: runList, contribs, joinedAt: rows[0].joined_at };
     return this.state;
   }
 
@@ -72,6 +72,14 @@ export class AllianceApi {
     const taken = this._check(await this.sb.rpc('fund_joint', { p_project: project, p_amount: amount }));
     await this.refresh();
     return taken;
+  }
+
+  /** 完了した調査の成果を受け取れるか：完了時点で同盟にいて、まだ受け取っていない（出資の有無は問わない） */
+  canClaim(run, now = new Date()) {
+    const st = this.state;
+    if (!st || !run.done_at || new Date(run.done_at) > now) return false;
+    if (st.joinedAt && new Date(st.joinedAt) > new Date(run.done_at)) return false;
+    return !st.contribs.some((c) => c.run_id === run.id && c.claimed);
   }
 
   async claim(runId) {

@@ -46,16 +46,16 @@ export class AllianceView {
     this.mailbox?.add({ key: `ally:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, kind: 'ally', title, body, ...extra });
   }
 
-  /** 出資した合同調査が完了していたら、受け取りのメールを届ける */
+  /** 同盟の合同調査が完了していたら、メンバー全員に受け取りのメールを届ける */
   notifyRuns() {
     const st = this.api.state;
     if (!st || !this.mailbox) return;
     const now = new Date();
     for (const r of st.runs) {
-      if (!r.done_at || new Date(r.done_at) > now || !st.contribs.some((c) => c.run_id === r.id && !c.claimed)) continue;
+      if (!this.api.canClaim(r, now)) continue;
       const p = JOINT_PROJECTS.find((x) => x.id === r.project);
       if (!p) continue;
-      this.mailbox.add({ key: `allyrun:${r.id}`, kind: 'allyrun', title: `合同調査「${p.name}」が完了しました`, body: `同盟「${st.alliance.name}」で出資した合同調査が完了しました。成果を受け取ってください。`, data: { project: p.id, run: r.id }, actionable: true });
+      this.mailbox.add({ key: `allyrun:${r.id}`, kind: 'allyrun', title: `合同調査「${p.name}」が完了しました`, body: `同盟「${st.alliance.name}」の合同調査が完了しました。出資していないメンバーも成果を受け取れます。`, data: { project: p.id, run: r.id }, actionable: true });
     }
   }
 
@@ -109,13 +109,13 @@ export class AllianceView {
   _project(p, level, runs, contribs) {
     if (p.level > level) return `<div class="gs-row locked">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>同盟Lv${p.level}で解放 ・ 総額 ${yen(p.cost)}</small></div></div>`;
     const list = runs.filter((r) => r.project === p.id);
-    const claimable = list.find((r) => r.done_at && new Date(r.done_at) <= new Date() && contribs.some((c) => c.run_id === r.id && !c.claimed));
+    const claimable = list.find((r) => this.api.canClaim(r));
     const running = list.find((r) => r.done_at && new Date(r.done_at) > new Date());
     const open = list.find((r) => !r.done_at);
     const funded = open?.funded ?? 0;
     const species = p.pool.map((id) => getCreature(id).name).join('、');
-    const buttons = FUND_STEPS.map((n) => `<button data-act="ally-fund" data-id="${p.id}:${n}" ${this.economy.canAfford(n) ? '' : 'disabled'}>${n / 10000}万出資</button>`).join('');
-    return `<div class="gs-row wrap">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>${p.text}</small><small>発見できる生物：${species}</small>
+    const buttons = FUND_STEPS.map((n) => `<button data-act="ally-fund" data-repeat="300" data-id="${p.id}:${n}" ${this.economy.canAfford(n) ? '' : 'disabled'}>${n / 10000}万出資</button>`).join('');
+    return `<div class="gs-row wrap">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>${p.text}</small><small>発見できる生物：${species}</small><small>完了すると、同盟メンバー全員が成果を受け取れます</small>
         ${running ? `<small>調査中 ・ 残り <span data-until="${new Date(running.done_at).getTime()}"></span></small>` : ''}
         <div class="st-bar"><i style="width:${(funded / p.cost) * 100}%"></i></div><small>資金 ${yen(funded)} / ${yen(p.cost)}（${p.hours}時間）</small></div>
       <div class="gs-btns">${claimable ? `<button data-act="ally-claim" data-id="${p.id}:${claimable.id}" class="primary">成果を受け取る</button>` : ''}${buttons}</div></div>`;

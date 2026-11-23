@@ -1,6 +1,6 @@
 import { mulberry32 } from '../tanks/random.js';
 import { levelOf, xpForLevel, xpPerFish, fishToNext, MAX_LEVEL } from './growth.js';
-import { getCreature, getDestination, RARITY_WEIGHT, travelPlan } from './creatureData.js';
+import { getCreature, getDestination, RARITY_WEIGHT, travelPlan, inSeason } from './creatureData.js';
 import { SPECIES_METHODS } from './fishingData.js';
 
 /**
@@ -117,7 +117,7 @@ export class Expeditions extends EventTarget {
 
   /** 魚種のレベル（1〜999） */
   level(id) {
-    return levelOf(this.xp[id] ?? 0);
+    return levelOf(this.xp[id] ?? 0, id);
   }
 
   /**
@@ -140,7 +140,7 @@ export class Expeditions extends EventTarget {
     const from = this.level(id);
     this.creatures[id] -= n;
     const gained = xpPerFish(id) * n;
-    this.xp[id] = Math.min(xpForLevel(MAX_LEVEL), (this.xp[id] ?? 0) + gained);
+    this.xp[id] = Math.min(xpForLevel(MAX_LEVEL, id), (this.xp[id] ?? 0) + gained);
     this._emit();
     return { from, to: this.level(id), gained };
   }
@@ -174,7 +174,10 @@ export class Expeditions extends EventTarget {
 /** 2〜4匹をレア度の重みで抽選 */
 export function rollCatch(trip) {
   const rand = mulberry32(trip.seed);
-  const all = getDestination(trip.dest).pool;
+  const pool0 = getDestination(trip.dest).pool.filter((id) => getCreature(id));
+  // 季節外の生き物は捕れない（全部が季節外なら季節を問わない）
+  const fresh = pool0.filter((id) => inSeason(getCreature(id), trip.doneAt));
+  const all = fresh.length ? fresh : pool0;
   const usable = trip.method ? all.filter((id) => SPECIES_METHODS[id]?.includes(trip.method)) : all;
   const pool = (usable.length ? usable : all).map(getCreature);
   const total = pool.reduce((s, c) => s + RARITY_WEIGHT[c.rarity], 0);

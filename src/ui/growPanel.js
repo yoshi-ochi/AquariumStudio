@@ -10,7 +10,7 @@ export const shownCount = (manager, id) => manager.tanks.reduce((s, t) => s + (t
 
 /** レベルと次のレベルまでのバー */
 export function growBar(expeditions, id) {
-  const p = progressOf(expeditions.xp[id] ?? 0);
+  const p = progressOf(expeditions.xp[id] ?? 0, id);
   const size = Math.round(sizeOf(p.lv) * 100);
   const rest = p.need ? `次まで ${num(p.need - p.have)}（あと${num(fishToNext(id, expeditions.xp[id] ?? 0))}匹） ・ 1匹 +${num(xpPerFish(id))}` : '最大レベル';
   return `<div class="cg-grow"><b>Lv ${p.lv}</b><div class="mo-bar"><span style="width:${p.need ? (p.have / p.need) * 100 : 100}%"></span></div><small>体の大きさ ${size}% ・ ${rest}</small></div>`;

@@ -2,7 +2,7 @@ import { creatureThumb } from './creatureThumb.js';
 import { creatureGrid, qtyPanel, updateQty, creatureInfo } from './creatureGrid.js';
 import { tankLabel } from '../tanks/tankLabel.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-import { CREATURES, RARITY, getCreature, getDestination, travelPlan } from '../expedition/creatureData.js';
+import { CREATURES, RARITY, SEASONS, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
 import { getMethod, methodsAt } from '../expedition/fishingData.js';
 
@@ -41,7 +41,8 @@ export class ExpeditionView {
     const tabs = methods.map(({ method: m }) => `<button data-act="method" data-id="${m.id}" class="${m.id === this.methodId ? 'active' : ''}">${m.name}</button>`).join('');
     const species = sel.catches.map((id) => {
       const c = getCreature(id);
-      return `<div class="ex-sp">${creatureThumb(this.previews, id)}<small>${c.name}</small><small>${RARITY[c.rarity]}</small></div>`;
+      const off = !inSeason(c);
+      return `<div class="ex-sp${off ? ' off' : ''}">${creatureThumb(this.previews, id)}<small>${c.name}</small><small>${off ? `季節外（${c.seasons.map((i) => SEASONS[i]).join('・')}）` : RARITY[c.rarity]}</small></div>`;
     }).join('');
     const locked = d.stage > level;
     const full = ex.usedSlots >= this.getCapacity();
@@ -103,7 +104,7 @@ export class ExpeditionView {
 
 /** アイテムの「生物」タブ：所持している生物と水槽への展示 */
 /** 食堂（カフェ）で料理として出したときの売上（1匹） */
-export const dishPrice = (c) => Math.round(((150 + c.len * 2500) * [1, 1.6, 3][c.rarity - 1]) / 10) * 10;
+export const dishPrice = (c) => Math.round(((150 + Math.min(c.len, 3.5) * 2500) * [1, 1.6, 3][c.rarity - 1]) / 10) * 10;
 
 export class CreatureView {
   constructor({ manager, expeditions, previews, toast, onChanged, economy, hasCafe }) {

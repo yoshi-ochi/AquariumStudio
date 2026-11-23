@@ -42,16 +42,49 @@ function perDay(id) {
   return best || 1;
 }
 
-/** 1匹を成長に使ったときの経験値 */
-export const XP_PER_FISH = Object.fromEntries(CREATURES.map((c) => [c.id, Math.max(1, Math.min(50000, Math.round(DAILY_XP / perDay(c.id))))]));
+/**
+ * レア度ごとの調整（管理者の設定で上書き。creatureConfig.js）
+ *   xpMul    … 1匹の経験値（自動計算）にかける倍率
+ *   xpMin    … 1匹の経験値の下限（捕りやすい漁法がある激レアが、コモンより安くならないように）
+ *   xpFixed  … 1匹の経験値を固定する値（0 なら自動）
+ *   levelMul … レベルアップに要る経験値にかける倍率
+ */
+export const GROWTH_RULES = {
+  xpMul: { 1: 1, 2: 1, 3: 1 },
+  xpMin: { 1: 1, 2: 50, 3: 250 },
+  xpFixed: { 1: 0, 2: 0, 3: 0 },
+  levelMul: { 1: 1, 2: 1, 3: 1 },
+};
+/** 魚種ごとに固定した1匹の経験値（管理者の設定。無ければレア度の規則で決める） */
+export const XP_OVERRIDE = {};
+
+const rarityOf = (id) => getCreature(id)?.rarity ?? 1;
+const rule = (key, id) => {
+  const v = GROWTH_RULES[key][rarityOf(id)] ?? (key === 'xpMul' || key === 'levelMul' ? 1 : 0);
+  return key === 'levelMul' ? Math.max(0.05, v) : v; // 0 にすると全レベルが一度に上がるため下限を置く
+};
+
+/** 1匹を成長に使ったときの経験値（自動計算は捕れやすさから。rebuildGrowth で作り直す） */
+export const XP_AUTO = {};
+export const XP_PER_FISH = {};
 export const xpPerFish = (id) => XP_PER_FISH[id] ?? 1;
 
-/** 1レベルの経験値の下限：星2までの魚の「1匹の経験値」の最大×2 */
-const FLOOR = MIN_FISH * Math.max(...CREATURES.filter((c) => c.stars <= 2).map((c) => XP_PER_FISH[c.id]));
+/** 累計の表。CUM[lv] = Lv1 から lv までに必要な経験値（レア度の倍率をかける前） */
+let CUM = [0, 0];
 
-/** 累計の表。CUM[lv] = Lv1 から lv までに必要な経験値。Lv300 までの累計が DAILY_XP×30 になる a を探す */
-const CUM = (() => {
-  const step = (a, k) => Math.max(FLOOR, Math.round(a * k ** CURVE));
+/** 経験値の表を作り直す（起動時と、管理者の設定を反映したとき） */
+export function rebuildGrowth() {
+  for (const k of Object.keys(XP_PER_FISH)) delete XP_PER_FISH[k];
+  for (const c of CREATURES) {
+    XP_AUTO[c.id] = Math.max(1, Math.min(50000, Math.round(DAILY_XP / perDay(c.id))));
+    const fixed = XP_OVERRIDE[c.id] || rule('xpFixed', c.id);
+    XP_PER_FISH[c.id] = fixed > 0 ? Math.round(fixed) : Math.max(1, Math.min(50000, Math.max(rule('xpMin', c.id), Math.round(XP_AUTO[c.id] * rule('xpMul', c.id)))));
+  }
+  // 1レベルの経験値の下限：星2までの魚の「1匹の経験値」の最大×2
+  const low = CREATURES.filter((c) => c.stars <= 2 && !c.retired).map((c) => XP_PER_FISH[c.id]);
+  const floor = MIN_FISH * Math.max(1, ...low);
+  // Lv300 までの累計が DAILY_XP×30 になる a を探す
+  const step = (a, k) => Math.max(floor, Math.round(a * k ** CURVE));
   const total = (a) => {
     let s = 0;
     for (let k = 1; k < 300; k++) s += step(a, k);
@@ -68,32 +101,34 @@ const CUM = (() => {
   }
   const cum = [0, 0];
   for (let lv = 1; lv < MAX_LEVEL; lv++) cum.push(cum[lv] + step(hi, lv));
-  return cum;
-})();
+  CUM = cum;
+}
+rebuildGrowth();
 
-export const xpForLevel = (lv) => CUM[Math.min(MAX_LEVEL, Math.max(1, lv))];
-export function levelOf(xp = 0) {
+/** 魚種 id の Lv に達するまでの累計経験値（id を省くとコモンの基準） */
+const cumAt = (lv, id) => Math.round(CUM[Math.min(MAX_LEVEL, Math.max(1, lv))] * (id ? rule('levelMul', id) : 1));
+export const xpForLevel = (lv, id) => cumAt(lv, id);
+export function levelOf(xp = 0, id) {
   let lo = 1;
   let hi = MAX_LEVEL;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    if (CUM[mid] <= xp) lo = mid;
+    if (cumAt(mid, id) <= xp) lo = mid;
     else hi = mid - 1;
   }
   return lo;
 }
 /** 今のレベルの中での進み具合 { lv, have, need }（経験値） */
-export function progressOf(xp = 0) {
-  const lv = levelOf(xp);
+export function progressOf(xp = 0, id) {
+  const lv = levelOf(xp, id);
   if (lv >= MAX_LEVEL) return { lv, have: 0, need: 0 };
-  return { lv, have: xp - CUM[lv], need: CUM[lv + 1] - CUM[lv] };
+  return { lv, have: xp - cumAt(lv, id), need: cumAt(lv + 1, id) - cumAt(lv, id) };
 }
 /** 次のレベルまでに要る匹数（最大レベルなら Infinity） */
 export function fishToNext(id, xp = 0) {
-  const p = progressOf(xp);
+  const p = progressOf(xp, id);
   return p.need ? Math.ceil((p.need - p.have) / xpPerFish(id)) : Infinity;
 }
-
 /** 体の大きさの倍率（Lv1 で 0.6、Lv999 で 1） */
 export const sizeOf = (lv) => 0.6 + 0.4 * Math.sqrt((lv - 1) / (MAX_LEVEL - 1));
 /** 集客力の倍率（Lv1 で 1、Lv300 で約1.15、Lv999 で 1.5） */

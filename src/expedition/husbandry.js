@@ -20,14 +20,16 @@ export const WATER = {
   cold: { label: '冷水 8℃' },
 };
 
-const REGION_ZONE = { iso: 'temperate', sanriku: 'temperate', reef: 'tropical', gbr: 'tropical', ocean: 'tropical', galapagos: 'tropical', okhotsk: 'cold', deep: 'cold' };
-const JOINT_ZONE = { seela: 'cold', demenigisu: 'cold', daiou: 'cold', koori: 'cold', greenland: 'cold' };
+export const REGION_ZONE = { iso: 'temperate', sanriku: 'temperate', reef: 'tropical', gbr: 'tropical', ocean: 'tropical', galapagos: 'tropical', okhotsk: 'cold', deep: 'cold' };
+export const JOINT_ZONE = { seela: 'cold', demenigisu: 'cold', daiou: 'cold', koori: 'cold', greenland: 'cold' };
 const PREDATOR_FORMS = new Set(['shark', 'hammer', 'eel', 'squid', 'whale']);
 
 export function zoneOf(id) {
+  const z = getCreature(id)?.zone; // 管理者が設定した生息環境
+  if (WATER[z]) return z;
   if (JOINT_ZONE[id]) return JOINT_ZONE[id];
   const d = DESTINATIONS.find((x) => x.pool.includes(id));
-  return REGION_ZONE[d?.id] ?? 'temperate';
+  return (WATER[d?.zone] && d.zone) || REGION_ZONE[d?.id] || 'temperate';
 }
 
 const speciesIn = (tank) => Object.entries(tank.userData.creatures ?? {}).filter(([id, n]) => n > 0 && getCreature(id));
@@ -51,7 +53,7 @@ export function waterMismatch(tank) {
 /** 大型の捕食者と、食べられてしまう小さな生物が同居しているか */
 export function predatorConflict(tank) {
   const list = speciesIn(tank).map(([id]) => getCreature(id));
-  const hunters = list.filter((c) => PREDATOR_FORMS.has(c.form));
+  const hunters = list.filter((c) => PREDATOR_FORMS.has(c.form) && !c.plankton); // ジンベエザメなどプランクトン食は除く
   return hunters.some((h) => list.some((c) => c !== h && c.len < h.len / 4));
 }
 

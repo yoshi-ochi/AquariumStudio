@@ -384,6 +384,7 @@ body.map-open #side-actions, body.map-open #hint { display: none; }
 .ex-species { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .ex-sp { display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
 .ex-sp img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; }
+.ex-sp.off { opacity: 0.45; }
 .ex-sp small { max-width: 100%; font-size: 10px; line-height: 1.25; }
 .al-new { display: flex; gap: 6px; }
 .al-new input { flex: 1; min-width: 0; min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; }
@@ -633,3 +634,7 @@ body.tutorial-on #goal-card { display: none; }
 /* ---- 小さな通知バッジ（数は出さず点だけ。数は読み上げ用に残す） ---- */
 .sa-badge, #clean-badge { top: 3px; right: 3px; min-width: 0; width: 10px; height: 10px; padding: 0; border-width: 1.5px; border-radius: 50%; font-size: 0; line-height: 0; }
 .zk-up { position: absolute; right: 4px; bottom: 22px; width: 9px; height: 9px; border: 1.5px solid #fff; border-radius: 50%; background: #ef3b3b; }
+
+/* 長押しで連続タップするボタン（holdRepeat.js） */
+button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.admin-link { display: block; padding: 10px; border-radius: 8px; text-align: center; text-decoration: none; background: #1f6fb2; color: #fff; }
