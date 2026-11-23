@@ -2,7 +2,7 @@ import { CREATURES, RARITY, SEASONS, getCreature } from '../expedition/creatureD
 import { METHODS, SPECIES_METHODS } from '../expedition/fishingData.js';
 import { NOTES } from '../expedition/creatureNotes.js';
 import { WATER, zoneOf } from '../expedition/husbandry.js';
-import { XP_AUTO, xpPerFish } from '../expedition/growth.js';
+import { xpPerFish } from '../expedition/growth.js';
 import { baseCreature } from '../expedition/creatureConfig.js';
 import { speciesEntry, allPools, setInPool, validId, idTaken } from './adminState.js';
 import { esc, num, hex, unhex, field, select, checks, readFields, readChecks } from './adminUi.js';
@@ -54,7 +54,7 @@ export class SpeciesTab {
         ${field('標準体長(m)', 'len', c.len, { type: 'number', step: 0.01, min: 0.01 })}
         ${field('集客力', 'appeal', c.appeal, { type: 'number', step: 0.1, min: 0 })}
         ${select('生息環境（水温）', 'zone', e.zone ?? '', ZONES)}
-        ${field('1匹の経験値（空欄で自動）', 'xp', e.xp || '', { type: 'number', min: 1, placeholder: `自動 ${XP_AUTO[c.id] ?? ''}` })}
+        ${field('1匹の経験値（空欄でレア度の値）', 'xp', e.xp || '', { type: 'number', min: 1, placeholder: `レア度の値 ${xpPerFish(c.id)}` })}
       </div>
       ${checks('季節（どれも選ばない＝通年）', 'season', SEASONS.map((s, i) => [String(i), s]), (c.seasons ?? []).map(String))}
       ${checks('漁法（採取地で捕るのに必要）', 'method', METHODS.map((m) => [m.id, m.name]), SPECIES_METHODS[c.id] ?? [])}

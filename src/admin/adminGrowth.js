@@ -1,62 +1,71 @@
 import { RARITY, RARITY_WEIGHT, activeCreatures } from '../expedition/creatureData.js';
-import { GROWTH_RULES, xpPerFish, xpForLevel, MAX_LEVEL } from '../expedition/growth.js';
+import { GROWTH_RULES, XP_OVERRIDE, xpPerFish, xpForRarityLevel, MAX_LEVEL } from '../expedition/growth.js';
 import { baseRules } from '../expedition/creatureConfig.js';
 import { esc, num } from './adminUi.js';
+import { xpChartHtml, bindXpChart } from './xpChart.js';
 
-/** 編集できるレア度ごとの規則 */
-const ROWS = [
-  ['weight', '出現の重み', '採取で選ばれる確率の重み（大きいほど捕れやすい）', 1],
-  ['xpMul', '1匹の経験値の倍率', '捕れやすさから自動で決めた経験値にかける', 0.05],
-  ['xpMin', '1匹の経験値の下限', '自動の経験値がこれより小さければ引き上げる', 1],
-  ['xpFixed', '1匹の経験値を固定', '0 なら自動。魚種ごとの固定（魚種タブ）が優先', 1],
-  ['levelMul', 'レベルアップの必要経験値の倍率', '1 で標準。2 なら同じレベルに2倍の経験値が要る', 0.05],
-];
 const LEVELS = [2, 10, 50, 100, 300, MAX_LEVEL];
 const current = (key) => (key === 'weight' ? RARITY_WEIGHT : GROWTH_RULES[key]);
+/** レア度ごとの入力欄（data-rule にキー、data-r にレア度） */
+const input = (key, r, step) => {
+  const base = baseRules();
+  const b = (key === 'weight' ? base.weight : base[key])[r];
+  const v = current(key)[r];
+  return `<input type="number" data-rule="${key}" data-r="${r}" value="${v}" step="${step}" min="0"><small>${v === b ? '標準' : `標準 ${b}`}</small>`;
+};
 
-/** レア度・経験値タブ：出現率・1匹の経験値・レベルアップに要る経験値をレア度ごとに調整し、結果を確かめる */
+/** レア度・経験値タブ：1匹あたりの経験値（レア度ごとに統一）の表と、レベルアップに要る経験値のグラフ */
 export class GrowthTab {
   constructor(state, changed) {
     Object.assign(this, { state, changed });
+    this.mode = 'step';
   }
 
   html() {
-    const base = baseRules();
-    const head = `<tr><th>項目</th>${[1, 2, 3].map((r) => `<th>${RARITY[r]}</th>`).join('')}</tr>`;
-    const rows = ROWS.map(([key, label, help, step]) => `<tr><td>${label}<small>${help}</small></td>${[1, 2, 3].map((r) => {
-      const v = current(key)[r];
-      const b = (key === 'weight' ? base.weight : base[key])[r];
-      return `<td><input type="number" data-rule="${key}" data-r="${r}" value="${v}" step="${step}" min="0"><small>${v === b ? '標準' : `標準 ${b}`}</small></td>`;
-    }).join('')}</tr>`).join('');
-    return `<section class="ad-card"><h3>レア度ごとの調整</h3><p class="ad-note">変更するとすぐ下の試算に反映されます。プレイヤーの経験値（累計）はそのままで、レベルの区切りだけが変わります。</p>
-        <div class="ad-scroll"><table class="ad-table ad-rules">${head}${rows}</table></div>
+    const live = activeCreatures();
+    const rows = [1, 2, 3].map((r) => {
+      const list = live.filter((c) => c.rarity === r);
+      const own = list.filter((c) => XP_OVERRIDE[c.id]);
+      const xs = list.map((c) => xpPerFish(c.id));
+      const range = GROWTH_RULES.xpFixed[r] > 0 ? '' : `<small>自動：${num(Math.min(...xs))}〜${num(Math.max(...xs))}</small>`;
+      return `<tr><th>${RARITY[r]}<small>${list.length}種</small></th>
+        <td>${input('xpFixed', r, 1)}${range}</td>
+        <td>${own.length ? `${own.length}種<small>${esc(own.map((c) => `${c.name} ${num(XP_OVERRIDE[c.id])}`).join('、'))}</small>` : 'なし'}</td>
+        <td>${input('weight', r, 1)}</td><td>${input('levelMul', r, 0.05)}</td></tr>`;
+    }).join('');
+    const auto = [1, 2, 3].map((r) => `<tr><th>${RARITY[r]}</th><td>${input('xpMul', r, 0.05)}</td><td>${input('xpMin', r, 1)}</td></tr>`).join('');
+    const tab = (id, label) => `<button data-mode="${id}" class="${this.mode === id ? 'active' : ''}">${label}</button>`;
+    return `<section class="ad-card"><h3>1匹あたりの経験値（レア度ごと）</h3>
+        <p class="ad-note">同じレア度の魚は、成長に使ったときの経験値がすべて同じになります。0 にするとそのレア度は捕れやすさからの自動計算になります。魚種ごとの例外は魚種タブで設定します。</p>
+        <div class="ad-scroll"><table class="ad-table ad-rules"><thead><tr><th>レア度</th><th>1匹の経験値</th><th>魚種ごとの例外</th><th>出現の重み</th><th>レベルアップの必要経験値の倍率</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <details class="ad-more"><summary>自動計算の設定（1匹の経験値を 0 にしたレア度だけに使う）</summary>
+          <table class="ad-table ad-rules"><thead><tr><th>レア度</th><th>倍率</th><th>下限</th></tr></thead><tbody>${auto}</tbody></table></details>
         <div class="ad-acts"><button id="ad-rules-reset">標準に戻す</button></div></section>
-      ${this._preview()}`;
+      <section class="ad-card"><h3>レベルアップに要る経験値</h3>
+        <div class="ad-bar"><div class="ad-seg">${tab('step', '次のレベルまで')}${tab('cum', 'Lv1 からの累計')}</div><span class="ad-note">グラフをなぞると、そのレベルの値と要る匹数が出ます。倍率が同じレア度は線が重なります。</span></div>
+        ${xpChartHtml(this.mode)}
+        ${this._table()}</section>`;
   }
 
-  _preview() {
-    const live = activeCreatures();
-    const stat = (r) => {
-      const xs = live.filter((c) => c.rarity === r).map((c) => xpPerFish(c.id)).sort((a, b) => a - b);
-      if (!xs.length) return null;
-      return { n: xs.length, min: xs[0], mid: xs[xs.length >> 1], max: xs.at(-1), list: live.filter((c) => c.rarity === r) };
-    };
-    const totalW = [1, 2, 3].reduce((s, r) => s + RARITY_WEIGHT[r], 0) || 1;
+  /** 区切りのレベルまでの累計と、要る匹数（そのレア度の1匹の経験値で） */
+  _table() {
+    const head = `<tr><th>レア度</th><th>1匹</th>${LEVELS.map((lv) => `<th>Lv${lv}まで</th>`).join('')}</tr>`;
     const rows = [1, 2, 3].map((r) => {
-      const s = stat(r);
-      if (!s) return `<tr><td>${RARITY[r]}</td><td colspan="${3 + LEVELS.length}">魚種なし</td></tr>`;
-      const id = s.list.find((c) => xpPerFish(c.id) === s.mid).id;
+      const per = this._fish(r);
       const cells = LEVELS.map((lv) => {
-        const need = xpForLevel(lv, id);
-        return `<td>${num(need)}<small>中央値で${num(Math.ceil(need / s.mid))}匹</small></td>`;
+        const need = xpForRarityLevel(lv, r);
+        return `<td>${num(need)}<small>${num(Math.ceil(need / per))}匹</small></td>`;
       }).join('');
-      return `<tr><td>${RARITY[r]}<small>${s.n}種 ・ 出現 ${Math.round((RARITY_WEIGHT[r] / totalW) * 100)}%（同数のとき）</small></td><td>${num(s.min)}</td><td>${num(s.mid)}</td><td>${num(s.max)}</td>${cells}</tr>`;
+      return `<tr><th>${RARITY[r]}</th><td>${num(per)}</td>${cells}</tr>`;
     }).join('');
-    const head = `<tr><th>レア度</th><th>1匹の経験値 最小</th><th>中央値</th><th>最大</th>${LEVELS.map((lv) => `<th>Lv${lv}まで</th>`).join('')}</tr>`;
-    const odd = [2, 3].flatMap((r) => live.filter((c) => c.rarity === r && xpPerFish(c.id) < (stat(r - 1)?.mid ?? 0)).map((c) => `${c.name}（${RARITY[r]}・${num(xpPerFish(c.id))}）`));
-    return `<section class="ad-card"><h3>試算</h3><p class="ad-note">「Lvまで」は Lv1 からの累計経験値と、中央値の魚で要る匹数です。</p>
-      <div class="ad-scroll"><table class="ad-table">${head}${rows}</table></div>
-      ${odd.length ? `<p class="ad-warn">ひとつ下のレア度の中央値より1匹の経験値が少ない魚種：${esc(odd.join('、'))}</p>` : ''}</section>`;
+    return `<h4>区切りのレベルまで（累計）</h4><div class="ad-scroll"><table class="ad-table">${head}${rows}</table></div>`;
+  }
+
+  /** そのレア度の1匹の経験値（自動計算なら中央値） */
+  _fish(r) {
+    if (GROWTH_RULES.xpFixed[r] > 0) return GROWTH_RULES.xpFixed[r];
+    const xs = activeCreatures().filter((c) => c.rarity === r && !XP_OVERRIDE[c.id]).map((c) => xpPerFish(c.id)).sort((a, b) => a - b);
+    return xs[xs.length >> 1] ?? 1;
   }
 
   bind(root) {
@@ -69,9 +78,16 @@ export class GrowthTab {
         this.changed();
       };
     }
+    for (const b of root.querySelectorAll('[data-mode]')) {
+      b.onclick = () => {
+        this.mode = b.dataset.mode;
+        this.changed();
+      };
+    }
     root.querySelector('#ad-rules-reset').onclick = () => {
       delete this.state.cfg.rarity;
       this.changed();
     };
+    bindXpChart(root, (r) => this._fish(r));
   }
 }
