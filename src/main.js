@@ -47,15 +47,18 @@ import { AllianceApi } from './online/allianceApi.js';
 import { AllianceView } from './ui/allianceView.js';
 import { MapPage } from './ui/mapPage.js';
 import { LifeSystems } from './game/lifeSystems.js';
-import { START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter } from './building/blueprint.js';
+import { BUILDING_VERSION, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter } from './building/blueprint.js';
 import { ViewModes } from './building/viewModes.js';
 import { OutdoorScenery } from './building/outdoorScenery.js';
 import { WallInteraction } from './interaction/wallInteraction.js';
 import { pickLayout } from './ui/layoutPicker.js';
 import { ZoneLabels } from './building/zoneLabels.js';
 import { DolphinPool } from './building/dolphinPool.js';
+import { SeaPen } from './building/seaPen.js';
+import { SeaPenScene } from './building/seaPenScene.js';
+import { SeaPenView } from './ui/seaPenView.js';
 import { ZoneView } from './building/buildingViews.js';
-import { migrateToLayout, relocateInvalid, zonesForLegacyStage } from './building/migrate.js';
+import { migrateToLayout, relocateInvalid, migrateLayoutV4, zonesForLegacyStage } from './building/migrate.js';
 import { FishingScene } from './expedition/fishingScene.js';
 import { zoneOf } from './expedition/husbandry.js';
 import { isHungry } from './expedition/husbandry.js';
@@ -141,6 +144,11 @@ async function boot() {
   const zoneLabels = new ZoneLabels(sceneMgr.scene);
   const pool = new DolphinPool(sceneMgr.scene);
   const scenery = new OutdoorScenery(sceneMgr.scene);
+  // 屋外生け簀（レベル5で解放。100m×100m を区切って展示）
+  const seaPen = new SeaPen();
+  const penScene = new SeaPenScene(sceneMgr.scene, seaPen);
+  manager.extraExhibitAppeal = () => seaPen.appeal();
+  manager.extraExhibits = () => seaPen.exhibits;
   manager.themeBonus = (tank) => {
     const theme = zoneAt(tank.userData.floor, tank.position.x, tank.position.z)?.theme;
     const ids = Object.keys(tank.userData.creatures ?? {});
@@ -189,6 +197,7 @@ async function boot() {
     room.setUnderground(under);
     pool.setUnlocked(unlocked.has('pool') && !away);
     scenery.group.visible = !away;
+    penScene.setVisible(!away);
     scenery.sync(LAYOUT.id, unlocked);
     manager.extraAppeal = (unlocked.has('pool') ? POOL_APPEAL : 0) + Object.entries(OUTDOOR_APPEAL).reduce((s, [id, n]) => s + (unlocked.has(id) ? n : 0), 0);
     ensureAtriumTank();
@@ -495,7 +504,7 @@ async function boot() {
 
   /** 現在の状態を保存用データにする */
   function snapshot() {
-    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), ...(home && { home }), room: { ...roomSettings, building: 3, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
+    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
   }
 
   let pendingLayout = null; // 初期設定で選んだ間取り
@@ -529,13 +538,16 @@ async function boot() {
     if (mode !== 'home') goHome();
     views.setMode('floor');
     setLayout(data.room?.layout ?? pendingLayout ?? DEFAULT_LAYOUT);
-    setWallEdits(data.room?.layout ? data.room.walls : null);
+    // 間取りを広げる前（版4未満）の壁の編集は、壁の位置が変わるので使わない
+    const oldBuilding = data.room?.layout && (data.room.building ?? 0) < BUILDING_VERSION;
+    setWallEdits(data.room?.layout && !oldBuilding ? data.room.walls : null);
     // 建造した水槽の定義を先に登録する（ID に寸法が入っている）
     registerCustomIds([...(data.objects ?? []).map((o) => o.defId), ...Object.keys(data.inventory?.stock ?? {}), ...(data.inventory?.orders ?? []).map((o) => o.defId)]);
     economy.fromJSON(data.economy);
     inventory.fromJSON(data.inventory);
     expeditions.fromJSON(data.expedition);
     ops.fromJSON(data.ops);
+    seaPen.fromJSON(data.seaPen);
     if (!visiting) home = data.home ?? null;
     roomSettings = { ...defaultRoomSettings(), ...(data.room ?? {}) };
     roomSettings.lights = roomSettings.lights.map(normalizeLight);
@@ -550,9 +562,11 @@ async function boot() {
       migrateToLayout({ manager, unlocked, wasBuilding: !!data.room?.building, inventory, expeditions, economy });
       resetLights();
       economy.setFloor(0);
-    } else if ((data.room.building ?? 0) < 3) {
-      // 管理通路の追加で置けなくなった物を移す
+    } else if (oldBuilding) {
+      // 間取りを広げた：物を元のエリアの新しい位置へ移し、置けない物だけ空いている場所へ（照明は置き直す）
+      migrateLayoutV4({ manager });
       relocateInvalid({ manager, unlocked, inventory, expeditions, economy });
+      resetLights();
     }
     delete roomSettings.plan;
     manager.setFloor(economy.floor);
@@ -803,10 +817,23 @@ async function boot() {
       shop: { title: '店舗運営', live: true, view: new ShopView({ ops, economy, inventory, onPlace: (id) => { gameSheet.close(); mapPage.close(); if (mode !== 'hall-edit') enterHallEdit(); hall.startPlacement(id); } }) },
       ...life.panels,
       mail: { title: 'メール', live: true, view: mailView },
+      seapen: {
+        title: '屋外生け簀',
+        view: new SeaPenView({
+          pen: seaPen, economy, expeditions, previews, toast,
+          onLook: () => {
+            gameSheet.close();
+            mapPage.close();
+            if (mode !== 'home') goHome();
+            if (economy.floor !== 0) changeFloor(0);
+            cameraCtl.frameBounds(penScene.bounds());
+          },
+        }),
+      },
       zones: {
         title: '館内エリア',
         view: new ZoneView({
-          economy, getUnlocked: () => unlocked, onUnlock: unlockZone,
+          economy, getUnlocked: () => unlocked, onUnlock: unlockZone, seaPen, onSeaPen: () => gameSheet.openPanel('seapen'),
           getLook: (id) => ({ floor: roomSettings.floor.color, wall: roomSettings.wall.color, ...roomSettings.zoneLook?.[id] }),
           onLook: (id, kind, color) => {
             const all = { ...roomSettings.zoneLook };
@@ -909,7 +936,7 @@ async function boot() {
     $('care-badge').textContent = hungry;
     // 在庫で次のレベルに上げられる魚種がある（図鑑で育てられる）
     const shownBy = {};
-    for (const t of manager.tanks) for (const [id, n] of Object.entries(t.userData.creatures ?? {})) shownBy[id] = (shownBy[id] ?? 0) + n;
+    for (const t of manager.exhibits) for (const [id, n] of Object.entries(t.userData.creatures ?? {})) shownBy[id] = (shownBy[id] ?? 0) + n;
     const growable = CREATURES.filter((c) => expeditions.canLevelUp(c.id, shownBy[c.id] ?? 0)).length;
     $('zukan-badge').hidden = !growable;
     $('zukan-badge').textContent = growable;
@@ -1001,6 +1028,7 @@ async function boot() {
     manager.updateClips();
     manager.updateAeration(clock.elapsedTime);
     manager.updateLife(clock.elapsedTime);
+    penScene.update(clock.elapsedTime);
     pool.update(clock.elapsedTime);
     scenery.update(clock.elapsedTime);
     interior.update();

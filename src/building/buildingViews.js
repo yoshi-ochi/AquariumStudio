@@ -10,8 +10,8 @@ const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 
 /** 館内エリアの解放と、解放済みエリアの名前・床と壁の色 */
 export class ZoneView {
-  constructor({ economy, getUnlocked, onUnlock, getLook, onLook, onRename }) {
-    Object.assign(this, { economy, getUnlocked, onUnlock, getLook, onLook, onRename });
+  constructor({ economy, getUnlocked, onUnlock, getLook, onLook, onRename, onSeaPen, seaPen }) {
+    Object.assign(this, { economy, getUnlocked, onUnlock, getLook, onLook, onRename, onSeaPen, seaPen });
     this.editing = null;
   }
 
@@ -36,13 +36,15 @@ export class ZoneView {
           const row = `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small></div><button data-act="zone-edit" data-id="${z.id}">編集</button></div>`;
           return this.editing === z.id ? row + this._editor(z) : row;
         }
-        const lack = z.stage > level ? (z.wing ? `最大レベル（Lv${z.stage}）で建設できます` : `ステージ${z.stage}で解放`) : z.requires && !unlocked.has(z.requires) ? `先に${esc(getZone(z.requires).name)}を解放` : '';
+        const lack = z.stage > level ? (z.wing ? `レベル${z.stage}で建設できます` : `ステージ${z.stage}で解放`) : z.requires && !unlocked.has(z.requires) ? `先に${esc(getZone(z.requires).name)}を解放` : '';
         const ok = !lack && this.economy.canAfford(z.cost);
         return `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small>${lack ? `<small>${lack}</small>` : ''}</div><button data-act="zone-open" data-id="${z.id}" class="primary" ${ok ? '' : 'disabled'}>${z.wing ? (z.requires ? '増築 ' : '建設 ') : ''}${yen(z.cost)}</button></div>`;
       });
       return `<h4 class="gs-sub">${floorLabel(floor)}</h4>${items.join('')}`;
     });
-    return rows.join('');
+    const pen = this.seaPen;
+    const penRow = pen ? `<h4 class="gs-sub">屋外</h4><div class="gs-row"><div class="gs-info"><b>屋外生け簀</b><small>100m×100m の海の生け簀。自由に区切って大型の生き物を展示できる</small>${pen.unlocked ? `<small>区画 ${pen.sections.length}</small>` : `<small>水族館レベル5で解放</small>`}</div><button data-act="zone-seapen" class="primary">${pen.unlocked ? '開く' : '見る'}</button></div>` : '';
+    return rows.join('') + penRow;
   }
 
   /** 色の選択はその場で建物に反映する */
@@ -56,6 +58,10 @@ export class ZoneView {
     else if (act === 'zone-edit-done') this.editing = null;
     else if (act === 'zone-rename') this.onRename(id, b?.closest('.gs-list')?.querySelector('#zn-name')?.value ?? '');
     else if (act === 'zone-color-reset') this.onLook(id, null);
+    else if (act === 'zone-seapen') {
+      this.onSeaPen?.();
+      return false;
+    }
     if (act.startsWith('zone-') && act !== 'zone-open') return true;
     if (act !== 'zone-open') return false;
     const z = getZone(id);

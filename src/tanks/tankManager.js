@@ -23,6 +23,8 @@ export class TankManager {
     this.currentFloor = 0;
     this.nextUid = 1;
     this.extraAppeal = 0; // 屋外プールなど建物の魅力
+    this.extraExhibitAppeal = () => 0; // 屋外生け簀などの展示の魅力
+    this.extraExhibits = () => []; // 水槽以外の展示（{ userData: { creatures } }。ランキング・成長の判定用）
     this.themeBonus = () => 1; // エリアのテーマに合った展示のボーナス
   }
 
@@ -246,8 +248,13 @@ export class TankManager {
     return n;
   }
 
+  /** 水槽と、それ以外の展示（屋外生け簀など） */
+  get exhibits() {
+    return [...this.tanks, ...this.extraExhibits()];
+  }
+
   totalAppeal() {
-    let sum = this.extraAppeal;
+    let sum = this.extraAppeal + this.extraExhibitAppeal();
     for (const o of this.objects.values()) {
       let value = this.defOf(o).appeal ?? 0;
       if (o.userData.clip) {

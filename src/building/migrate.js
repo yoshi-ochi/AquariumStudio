@@ -1,7 +1,11 @@
 import { TankManager } from '../tanks/tankManager.js';
 import { CATEGORY } from '../tanks/tankData.js';
 import { FloorPlan, CELL } from '../room/floorPlan.js';
-import { ZONES, FLOOR_COUNT, BASEMENT, PLAN_FLOORS, WING_FLOORS, isWing, ATRIUM_TANK_POS, getZone, oldZoneOffset, zoneCenter } from './blueprint.js';
+import { ZONES, FLOOR_COUNT, BASEMENT, PLAN_FLOORS, WING_FLOORS, isWing, ATRIUM_TANK_POS, LAYOUT, WING_GRID_CENTER, getZone, inRect, oldZoneOffset, zoneCenter, zoneRectCenter } from './blueprint.js';
+import { LEGACY_V3 } from './legacyLayoutV3.js';
+
+/** 版3の別棟の区画（格子 72×46） */
+const OLD_WING_RECT = [19, 6, 52, 39];
 
 /** 自由な床形状の時代に使えていた広さに相当するエリア */
 export function zonesForLegacyStage(level) {
@@ -115,4 +119,53 @@ function stow(o, { manager, inventory, expeditions, economy }) {
   if (def.category === CATEGORY.TANK) inventory.add(def.id);
   else economy.earn(def.price);
   manager.remove(o);
+}
+
+/**
+ * 間取りを広げた（建物の版4）ときの移行：物を元いたエリアの新しい位置へ、エリア内の並びを保ったまま移す。
+ * 壁に埋め込んだ水槽は、壁の位置が変わるので床置きに戻す。大水槽は新しい吹き抜けの中央へ。
+ * 置けなくなった物は、続けて relocateInvalid で空いている場所へ移す。
+ */
+export function migrateLayoutV4({ manager }) {
+  const old = LEGACY_V3.layouts[LAYOUT.id] ?? LEGACY_V3.layouts.spiral;
+  const [GX, GZ] = LEGACY_V3.grid;
+  const C = LEGACY_V3.cell;
+  const oldCell = (x, z) => [Math.floor(x / C + GX / 2), Math.floor(z / C + GZ / 2)];
+  const center = ([x0, z0, x1, z1], gx, gz, c) => ({ x: ((x0 + x1 + 1) / 2 - gx / 2) * c, z: ((z0 + z1 + 1) / 2 - gz / 2) * c });
+  const oldCenter = (r) => center(r, GX, GZ, C);
+  const all = [...manager.objects.values()];
+  const riders = new Map(all.map((o) => [o, manager.getRiders(o)]));
+  const carried = new Set([...riders.values()].flat());
+  for (const o of all) {
+    if (carried.has(o)) continue;
+    const def = manager.defOf(o);
+    const group = [o, ...riders.get(o)];
+    for (const item of group) delete item.userData.embed;
+    if (def.atrium) {
+      Object.assign(o.position, { x: ATRIUM_TANK_POS.x, z: ATRIUM_TANK_POS.z });
+      continue;
+    }
+    const floor = o.userData.floor;
+    let delta = null;
+    if (isWing(floor)) {
+      const a = oldCenter(OLD_WING_RECT);
+      delta = { x: WING_GRID_CENTER.x - a.x, z: WING_GRID_CENTER.z - a.z };
+    } else {
+      const [i, j] = oldCell(o.position.x, o.position.z);
+      for (const [id, rects] of Object.entries(old.rects)) {
+        const zone = getZone(id);
+        const k = zone?.floor === floor ? rects.findIndex((r) => inRect(r, i, j)) : -1;
+        if (k < 0) continue;
+        const a = oldCenter(rects[k]);
+        const b = zoneRectCenter(zone.rects[k] ?? zone.rects[0]);
+        delta = { x: b.x - a.x, z: b.z - a.z };
+        break;
+      }
+    }
+    if (!delta) continue;
+    for (const item of group) {
+      item.position.x += delta.x;
+      item.position.z += delta.z;
+    }
+  }
 }

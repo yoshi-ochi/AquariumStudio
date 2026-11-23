@@ -2,7 +2,7 @@ import { creatureThumb } from './creatureThumb.js';
 import { creatureGrid, qtyPanel, updateQty, creatureInfo } from './creatureGrid.js';
 import { tankLabel } from '../tanks/tankLabel.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-import { CREATURES, SEASONS, RARITY_NAME, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
+import { CREATURES, SEASONS, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
 import { getMethod, methodsAt } from '../expedition/fishingData.js';
 
@@ -42,7 +42,7 @@ export class ExpeditionView {
     const species = sel.catches.map((id) => {
       const c = getCreature(id);
       const off = !inSeason(c);
-      return `<div class="ex-sp${off ? ' off' : ''}">${creatureThumb(this.previews, id)}<small>${c.name}</small><small>${off ? `季節外（${c.seasons.map((i) => SEASONS[i]).join('・')}）` : `レア度 ${RARITY_NAME[c.rarity]}`}</small></div>`;
+      return `<div class="ex-sp${off ? ' off' : ''}">${creatureThumb(this.previews, id)}<small>${c.name}</small><small>${off ? `季節外（${c.seasons.map((i) => SEASONS[i]).join('・')}）` : ''}</small></div>`;
     }).join('');
     const locked = d.stage > level;
     const full = ex.usedSlots >= this.getCapacity();

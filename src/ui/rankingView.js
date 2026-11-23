@@ -7,7 +7,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const num = (n) => Math.round(n).toLocaleString('ja-JP');
 
 /**
- * 総合レベルのランキング。自分の総合レベルの内訳（魚種ごとの（ピース＋1）×レア度の重み）と、全国の上位100人。
+ * 総合レベルのランキング。自分の総合レベルの内訳（展示中の魚種ごとの ピース数×レア度の倍率）と、全国の上位100人。
  * 点数は5分ごと（と、この画面を開いたとき）にサーバーへ送る。
  */
 export class RankingView {
@@ -20,13 +20,13 @@ export class RankingView {
   }
 
   get score() {
-    return totalScore(this.manager.tanks, (id) => this.expeditions.pieces(id));
+    return totalScore(this.manager.exhibits, (id) => this.expeditions.pieces(id));
   }
 
   /** 展示している魚種ごとの点数（多い順） */
   _parts() {
     const ids = new Set();
-    for (const t of this.manager.tanks) for (const [id, n] of Object.entries(t.userData.creatures ?? {})) if (n > 0 && getCreature(id)) ids.add(id);
+    for (const t of this.manager.exhibits) for (const [id, n] of Object.entries(t.userData.creatures ?? {})) if (n > 0 && getCreature(id)) ids.add(id);
     return [...ids].map((id) => {
       const c = getCreature(id);
       const pieces = this.expeditions.pieces(id);
@@ -65,7 +65,7 @@ export class RankingView {
     const me = this.online.user?.id;
     const rank = this.data?.rank;
     const head = `<div class="mo-card"><small>あなたの総合レベル${rank ? ` ・ 全国 ${num(rank)}位` : ''}</small><b>${num(score)}</b>
-      <small>展示している ${parts.length}種の「（埋めたピース＋1）×レア度の重み」の合計。同じ魚種を育ててピースを埋めると上がります。</small></div>`;
+      <small>展示している ${parts.length}種の「ピース数×レア度の倍率（金10・紫5・青3・緑1）」の合計。同じ魚種を育ててピースを埋めると上がります。</small></div>`;
     const top = parts.slice(0, 5).map((p) => `<div class="gs-row">${creatureThumb(this.previews, p.id)}<div class="gs-info"><b>${p.c.name}</b>${octagrams(p.pieces, { mini: true })}<small>${p.pieces}/${MAX_PIECES}ピース ・ レア度 ${RARITY_NAME[p.c.rarity]} ×${RANK_WEIGHT[p.c.rarity]} ＝ ${num(p.pts)}</small></div></div>`).join('');
     let board;
     if (!me) board = '<p class="gs-empty">ログインするとランキングに参加できます。</p>';

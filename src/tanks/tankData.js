@@ -23,7 +23,8 @@ export const TANK_DEFS = [
   { id: 'tank180', name: '180cm水槽', shape: 'box', size: { w: 1.8, h: 0.6, d: 0.6 }, price: 90000, appeal: 15 },
   { id: 'round', name: '円形水槽', shape: 'cylinder', size: { w: 1.2, h: 1.2, d: 1.2 }, price: 80000, appeal: 14 },
   { id: 'tunnel', name: '大型トンネル水槽', shape: 'tunnel', size: { w: 4, h: 3, d: 5 }, price: 600000, appeal: 120, requiredStage: 2 },
-  { id: 'atriumTank', name: '吹き抜け大水槽', shape: 'box', size: { w: 8, h: 6.4, d: 7 }, price: 0, appeal: 120, hidden: true, atrium: true },
+  // 世界の大型水族館の主水槽の上位約5%（約12,000m³）に合わせた 幅40×奥行30×高さ10m
+  { id: 'atriumTank', name: '吹き抜け大水槽', shape: 'box', size: { w: 40, h: 10, d: 30 }, price: 0, appeal: 400, hidden: true, atrium: true },
   { id: 'mammal', name: '海生哺乳類用水槽', shape: 'mammal', size: { w: 5, h: 1.6, d: 4 }, landRatio: 0.35, price: 900000, appeal: 160, requiredStage: 2 },
 ].map(withCategory(CATEGORY.TANK));
 
