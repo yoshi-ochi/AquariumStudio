@@ -115,7 +115,7 @@ export class ZukanView {
       const rowEnd = at >= 0 ? Math.min(g.ids.length - 1, Math.floor(at / 4) * 4 + 3) : -1;
       const cells = g.ids.map((id, i) => {
         const cell = seen(id)
-          ? `<button class="zk-cell ${this.pick === id ? 'sel' : ''}" data-act="zk-pick" data-id="${id}">${creatureThumb(this.previews, id)}<i class="zk-lv">${octagrams(ex.pieces(id), { mini: true })}</i>${ex.canLevelUp(id, shownCount(this.manager, id)) ? '<i class="zk-up" aria-label="成長できます"></i>' : ''}<small>${getCreature(id).name}</small></button>`
+          ? `<button class="zk-cell ${this.pick === id ? 'sel' : ''}" data-act="zk-pick" data-id="${id}">${creatureThumb(this.previews, id, `<i class="oct-badge">${octagrams(ex.pieces(id), { mini: true })}</i>`)}${ex.canLevelUp(id, shownCount(this.manager, id)) ? '<i class="zk-up" aria-label="成長できます"></i>' : ''}<small>${getCreature(id).name}</small></button>`
           : '<div class="zk-cell unknown"><span>？</span><small>未発見</small></div>';
         return i === rowEnd ? cell + this._pop(this.pick, at % 4) : cell;
       }).join('');
