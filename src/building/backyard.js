@@ -90,7 +90,6 @@ export class Backyard {
       else if (job.until <= now) {
         delete this.jobs[uid];
         this.expeditions.discover(job.id);
-        this.toast(`${getCreature(job.id).name} の赤ちゃんが生まれました`);
       }
     }
   }

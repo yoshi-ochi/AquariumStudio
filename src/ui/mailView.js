@@ -16,7 +16,6 @@ const when = (t) => {
   return sameDay ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
 };
 const KIND_ICON = { trip: 'expedition', offline: 'coin', daily: 'mail', clean: 'clean', feed: 'care', ally: 'ally', allyrun: 'ally', discovery: 'coin' };
-const label = (list) => [...new Set(list)].map((c) => `${getCreature(c).name}×${list.filter((x) => x === c).length}`).join('、');
 const TABS = [['system', 'システム'], ['report', '報告'], ['ally', '同盟']];
 
 /**
@@ -95,10 +94,6 @@ export class MailView {
         this.mailbox.finish(mail.id, got.length || released.length ? '受け取りました' : '持ち帰れる生き物はいませんでした');
       }
     }
-    if (all.trips) {
-      const text = `${label(all.got) || '持ち帰れる生き物はいませんでした'}${all.released.length ? `／満杯のため放流：${label(all.released)}` : ''}`;
-      this.toast(`採取結果を受け取りました：${text}`, { duration: 4000 });
-    }
     return { got: countIds(all.got), released: countIds(all.released), trips: all.trips };
   }
 
@@ -172,10 +167,7 @@ export class MailView {
     } finally {
       this.busy = false;
     }
-    if (runs) {
-      this.lastAlly = { got: countIds(got), runs };
-      this.toast(`合同調査の成果を受け取りました：${label(got)}`, { duration: 4000 });
-    }
+    if (runs) this.lastAlly = { got: countIds(got), runs };
     rerender?.();
   }
 

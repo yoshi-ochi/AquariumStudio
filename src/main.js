@@ -890,11 +890,10 @@ async function boot() {
   // 外注の完成チェック（閉じている間に完成した分も受け取る）
   setInterval(() => {
     if (visiting) return;
-    for (const id of inventory.collect()) toast(`外注の ${getDef(id).name} が完成しました`);
+    inventory.collect();
     $('nav-map').classList.toggle('has-badge', expeditions.trips.some((t) => expeditions.isDone(t)));
     mapPage.refresh();
     for (const t of finishCleaning(manager.tanks)) {
-      toast(`${tankLabel(manager, t)} の掃除が終わりました`);
       life.mail.count('cleans');
     }
     mailView.scan();

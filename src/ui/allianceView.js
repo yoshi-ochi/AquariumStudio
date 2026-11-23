@@ -67,7 +67,6 @@ export class AllianceView {
     const project = JOINT_PROJECTS.find((p) => p.id === pid);
     const got = rollReward(project, runId, this.online.user.id);
     got.forEach((c) => this.expeditions.discover(c));
-    if (!quiet) this.toast(`発見：${got.map((c) => getCreature(c).name).join('、')}`, { duration: 4000 });
     const mail = this.mailbox?.items.find((m) => m.key === `allyrun:${runId}`);
     if (mail) {
       mail.data.got = countIds(got);
@@ -167,13 +166,8 @@ export class AllianceView {
       const amount = +n;
       if (!this.economy.spend(amount)) return;
       try {
-        const before = this._runsOf(pid, api.state?.runs ?? []).running.length;
         const taken = await api.fund(pid, amount);
         if (taken < amount) this.economy.earn(amount - taken); // 99回分が調査中で受け付けられなかった分は返金
-        const started = Math.max(0, this._runsOf(pid, api.state?.runs ?? []).running.length - before);
-        const extra = started ? `（調査を${started}回開始）` : '';
-        const back = taken < amount ? ` ・ ${yen(amount - taken)} は上限のため返金` : '';
-        this.toast(`${yen(taken)} を出資しました${extra}${back}`, { duration: back ? 4000 : undefined });
       } catch (err) {
         this.economy.earn(amount);
         throw err;
@@ -184,7 +178,6 @@ export class AllianceView {
       const got = [];
       for (const r of claimable) got.push(...(await this.claimRun(id, r.id, { quiet: true, refresh: false })));
       await api.refresh();
-      if (got.length) this.toast(`${claimable.length}回分の成果：${Object.entries(countIds(got)).map(([c, n]) => `${getCreature(c).name}×${n}`).join('、')}`, { duration: 5000 });
     }
   }
 }
