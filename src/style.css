@@ -658,3 +658,4 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 .oct-col .oct { width: 100%; max-width: 40px; height: auto; aspect-ratio: 1; }
 .oct-col small { font-size: 9px; color: var(--muted, #5d7381); }
 .rk-oct { display: block; margin: 2px 0; }
+.al-runs b { color: #1f6f9c; }
