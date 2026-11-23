@@ -116,12 +116,12 @@ export class AllianceView {
     const species = p.pool.map((id) => getCreature(id).name).join('、');
     const buttons = FUND_STEPS.map((n) => `<button data-act="ally-fund" data-repeat="300" data-id="${p.id}:${n}" ${!full && this.economy.canAfford(n) ? '' : 'disabled'}>${n / 10000}万出資</button>`).join('');
     const status = running.length
-      ? `<small class="al-runs"><b>調査中 ${running.length}回</b>（同時に最大${MAX_PARALLEL}回） ・ 次の完了まで <span data-until="${new Date(running[0].done_at).getTime()}"></span></small>`
-      : '<small>調査中の回はありません</small>';
-    return `<div class="gs-row wrap">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>${p.text}</small><small>発見できる生物：${species}</small><small>完了すると、同盟メンバー全員が成果を受け取れます。目標額を超えた出資は次の回に繰り越し、続けて調査を始めます</small>
+      ? `<small class="al-runs"><b>調査中 ${running.length}回</b> ・ 次の完了まで <span data-until="${new Date(running[0].done_at).getTime()}"></span></small>`
+      : '';
+    return `<div class="gs-row wrap">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>発見：${species}</small>
         ${status}
-        <div class="st-bar"><i style="width:${(funded / p.cost) * 100}%"></i></div><small>次の回の資金 ${yen(funded)} / ${yen(p.cost)}（1回 ${p.hours}時間）</small>
-        ${full ? `<small class="gs-alert">${MAX_PARALLEL}回分が調査中のため、完了するまで出資できません</small>` : ''}</div>
+        <div class="st-bar"><i style="width:${(funded / p.cost) * 100}%"></i></div><small>${yen(funded)} / ${yen(p.cost)} ・ ${p.hours}時間</small>
+        ${full ? `<small class="gs-alert">上限（${MAX_PARALLEL}回）まで調査中</small>` : ''}</div>
       <div class="gs-btns">${claimable.length ? `<button data-act="ally-claim" data-id="${p.id}" class="primary">成果を受け取る（${claimable.length}回分）</button>` : ''}${buttons}</div></div>`;
   }
 
@@ -172,10 +172,8 @@ export class AllianceView {
         if (taken < amount) this.economy.earn(amount - taken); // 99回分が調査中で受け付けられなかった分は返金
         const started = Math.max(0, this._runsOf(pid, api.state?.runs ?? []).running.length - before);
         const extra = started ? `（調査を${started}回開始）` : '';
-        const back = taken < amount ? ` ・ ${yen(amount - taken)} は同時${MAX_PARALLEL}回の上限のため返金` : '';
+        const back = taken < amount ? ` ・ ${yen(amount - taken)} は上限のため返金` : '';
         this.toast(`${yen(taken)} を出資しました${extra}${back}`, { duration: back ? 4000 : undefined });
-        const p = JOINT_PROJECTS.find((x) => x.id === pid);
-        this._log(`合同調査「${p?.name ?? pid}」に出資しました`, `${yen(taken)} を出資しました${extra}。目標額を超えた分は次の回に繰り越されます。`, { data: { amount: taken } });
       } catch (err) {
         this.economy.earn(amount);
         throw err;

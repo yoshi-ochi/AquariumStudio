@@ -23,7 +23,7 @@ const TABS = [['system', 'システム'], ['report', '報告'], ['ally', '同盟
  * メール画面。タブで分ける：
  *   システム … 1日の報告（評価・まとめ）・留守中の報告・掃除やエサの依頼
  *   報告     … 調査隊の採取結果（プレゼント）。1隊ずつ、またはすべてまとめて受け取る
- *   同盟     … 同盟の活動記録（設立・加入・出資・合同調査の完了と受け取り）
+ *   同盟     … 同盟の活動記録（設立・加入・合同調査の完了と受け取り）
  * scan() を毎秒呼ぶと、帰還した調査隊・汚れた水槽・空腹の水槽をメールで知らせる。
  */
 export class MailView {
@@ -121,7 +121,7 @@ export class MailView {
     const empty = {
       system: '1日の報告（評価・まとめ）や留守中の報告、水槽の掃除・エサやりの依頼が届きます。',
       report: '調査隊が帰還すると、採取結果がここに届きます。',
-      ally: '同盟の設立・加入・出資や、合同調査の完了と成果の受け取りが記録されます。',
+      ally: '同盟の設立・加入や、合同調査の完了と成果の受け取りが記録されます。',
     }[this.tab];
     const rows = list.map((m) => this._row(m)).join('');
     return `<div class="gs-tabs ml-tabs">${tabs}</div>${top}${tools}${rows || (this.tab === 'report' && this.readyTrips.length ? '' : `<p class="gs-empty">${empty}</p>`)}`;
