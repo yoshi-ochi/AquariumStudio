@@ -51,10 +51,10 @@ export const sizeOf = (pieces) => 0.6 + 0.4 * Math.sqrt(Math.min(MAX_PIECES, pie
 /** 集客力の倍率（0ピースで 1、48ピースで 1.5） */
 export const appealOf = (pieces) => 1 + 0.5 * (Math.min(MAX_PIECES, pieces) / MAX_PIECES);
 
-/** ランキングでレア度にかける重み */
-export const RANK_WEIGHT = { 1: 1, 2: 2.5, 3: 6, 4: 10 };
-/** 魚種の点数：（埋まったピース＋1）×レア度の重み */
-export const speciesPoints = (id, pieces) => (pieces + 1) * RANK_WEIGHT[getCreature(id)?.rarity ?? 1];
+/** ランキングでレア度にかける倍率（緑1・青3・紫5・金10） */
+export const RANK_WEIGHT = { 1: 1, 2: 3, 3: 5, 4: 10 };
+/** 魚種の点数：埋まったピースの数×レア度の倍率 */
+export const speciesPoints = (id, pieces) => pieces * RANK_WEIGHT[getCreature(id)?.rarity ?? 1];
 
 /** 総合レベル：展示している魚種ごとの点数の合計（同じ魚種は何匹でも1回） */
 export function totalScore(tanks, piecesOfId) {

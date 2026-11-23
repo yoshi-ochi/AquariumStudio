@@ -7,7 +7,7 @@ import { qtyPanel, creatureInfo } from './creatureGrid.js';
 const num = (n) => Math.round(n).toLocaleString('ja-JP');
 
 /** 展示している匹数（全水槽） */
-export const shownCount = (manager, id) => manager.tanks.reduce((s, t) => s + (t.userData.creatures?.[id] ?? 0), 0);
+export const shownCount = (manager, id) => manager.exhibits.reduce((s, t) => s + (t.userData.creatures?.[id] ?? 0), 0);
 
 /** 6つの8角星形と、次のピースまでのバー */
 export function growBar(expeditions, id) {

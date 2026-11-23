@@ -10,9 +10,13 @@ import { polyArea, isSimplePoly } from './polyTank.js';
 /** 描いた形の範囲（10cm単位） */
 export const DRAW_GRID = { w: 100, d: 100, unit: 10 };
 
+/**
+ * 寸法の上限（cm）。世界の大型水族館の主水槽のうち上位約5%（約20基）の平均は約1,200万L（約12,000m³）で、
+ * 沖縄美ら海水族館「黒潮の海」（7,500m³）級より一回り大きい。そこで幅40m×奥行30m を上限にする（高さは以前のセーブとの互換のため15mのまま）。
+ */
 export const BUILD_SHAPES = {
-  box: { label: '四角', limits: { w: [20, 1000], h: [20, 1500], d: [20, 1000] } },
-  cylinder: { label: '円形', limits: { w: [30, 1000], h: [30, 1500] } },
+  box: { label: '四角', limits: { w: [20, 4000], h: [20, 1500], d: [20, 3000] } },
+  cylinder: { label: '円形', limits: { w: [30, 3500], h: [30, 1500] } },
   poly: { label: '自由に描く', limits: { h: [20, 1500] } },
 };
 const ID_RE = /^cx_(box|cylinder)_(\d+)_(\d+)_(\d+)$/;
