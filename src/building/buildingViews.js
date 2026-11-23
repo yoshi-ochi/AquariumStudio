@@ -111,7 +111,7 @@ export class BackyardView {
     } else if (act === 'lab-up') b.upgrade(id);
     else if (act === 'breed') {
       const [uid, cid] = id.split(':');
-      if (b.startBreeding(+uid, cid)) this.toast(`${getCreature(cid).name} の繁殖を始めました`);
+      b.startBreeding(+uid, cid);
     } else return false;
     return true;
   }

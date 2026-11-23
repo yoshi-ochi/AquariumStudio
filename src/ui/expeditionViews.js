@@ -84,7 +84,6 @@ export class ExpeditionView {
       // 漁の作業を再現してから、待ち時間に入る
       this.fishing.play(method.id).then(() => {
         ex.depart(d, plan.seconds, method.id);
-        this.toast(`${d.name} で${method.name}を開始しました`);
       });
       return true;
     }
@@ -95,7 +94,6 @@ export class ExpeditionView {
       const released = ex.released.length ? `／満杯のため放流：${label(ex.released)}` : '';
       const text = `${label(caught) || '持ち帰れる生き物はいませんでした'}${released}`;
       if (trip?.method) this.fishing.play(trip.method, text);
-      else this.toast(`採取成功：${text}`, { duration: 4000 });
       return true;
     }
     return false;

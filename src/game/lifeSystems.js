@@ -36,16 +36,13 @@ export class LifeSystems {
 
   /** 新種を初めて発見したら、レア度に応じた報酬を渡す */
   _rewardDiscovery(ids) {
-    let total = 0;
     for (const id of new Set(ids)) {
       const c = getCreature(id);
       const yen = DISCOVERY_REWARD[c?.rarity] ?? 0;
       if (!c || !yen) continue;
-      total += yen;
       this.economy.earn(yen);
       this.mail.add({ key: `discovery:${id}`, kind: 'discovery', title: `新種発見：${c.name}`, body: `図鑑に${c.name}（レア度 ${RARITY_NAME[c.rarity]}）が載りました。発見の報酬 ¥${yen.toLocaleString('ja-JP')} を受け取りました。`, data: { id, yen } });
     }
-    if (total) this.toast(`新種発見！ 報酬 ¥${total.toLocaleString('ja-JP')}（${[...new Set(ids)].map((id) => getCreature(id)?.name).join('、')}）`, { duration: 4500 });
   }
 
   stats() {
@@ -145,7 +142,6 @@ export class LifeSystems {
       body: `${h ? `${h}時間` : ''}${m}分の営業結果です。${net > 0 ? '収入を受け取ってください。' : ''}`,
       data: { visitors, income: Math.floor(income), wages: Math.floor(wages), net, capped: away > OFFLINE_MAX_HOURS * 3600 ? OFFLINE_MAX_HOURS : 0 },
     });
-    this.toast('留守中の報告がメールで届きました');
   }
 
   // ---- 保存 ------------------------------------------------------------------
