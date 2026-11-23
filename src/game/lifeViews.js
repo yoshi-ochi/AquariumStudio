@@ -1,7 +1,8 @@
 import { creatureThumb } from '../ui/creatureThumb.js';
 import { tankLabel } from '../tanks/tankLabel.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, MAX_STARS, getCreature } from '../expedition/creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RARITY_LIST, RARITY_NAME, getCreature } from '../expedition/creatureData.js';
+import { octagrams } from '../ui/octagram.js';
 import { NOTES } from '../expedition/creatureNotes.js';
 import { WATER, ensureCare, feed, feedCost, hasLife, isHungry, predatorConflict, tankHealth, waterMismatch, nextFeedIn, crowdFactor, zoneOf, FEED_INTERVAL } from '../expedition/husbandry.js';
 import { EVENTS } from './gameData.js';
@@ -58,8 +59,8 @@ export class CareView {
 }
 
 /**
- * 生き物図鑑。発見した魚種のレベルを表示し、タップした魚種のすぐ下に説明と育成カードを出す。
- * 育成（成長）はここで行う（在庫の同じ魚種を使う）。並べ方は 地域別 / 星の数別 / 育成（レベルの高い順）。
+ * 生き物図鑑。発見した魚種の成長（8角星形のピース）を表示し、タップした魚種のすぐ下に説明と育成カードを出す。
+ * 育成（成長）はここで行う（在庫の同じ魚種を使う）。並べ方は 地域別 / レア度別 / 育成（ピースの多い順）。
  */
 export class ZukanView {
   constructor({ expeditions, manager, previews, economy, state, toast }) {
@@ -69,10 +70,10 @@ export class ZukanView {
     this.qty = 1;
   }
 
-  /** 星の数ごとのまとまり。報酬はなし */
+  /** レア度ごとのまとまり（金→緑）。報酬はなし */
   get starGroups() {
-    return Array.from({ length: MAX_STARS }, (_, i) => MAX_STARS - i).map((n) => ({
-      id: `star${n}`, name: `${'★'.repeat(n)}（星${n}つ）`, ids: CREATURES.filter((c) => c.stars === n && (!c.retired || this.expeditions.seenCount(c.id) > 0)).map((c) => c.id),
+    return [...RARITY_LIST].reverse().map((n) => ({
+      id: `rarity${n}`, name: `レア度 ${RARITY_NAME[n]}`, ids: CREATURES.filter((c) => c.rarity === n && (!c.retired || this.expeditions.seenCount(c.id) > 0)).map((c) => c.id),
     })).filter((g) => g.ids.length);
   }
 
@@ -81,12 +82,12 @@ export class ZukanView {
     return [...DESTINATIONS.map((d) => ({ id: d.id, name: d.name, ids: d.pool, reward: d.cost * 5 })), { id: 'joint', name: '合同調査', ids: joint, reward: 3000000 }];
   }
 
-  /** 育成：在庫があるか展示している魚種を、レベルの高い順に */
+  /** 育成：在庫があるか展示している魚種を、ピースの多い順に */
   get growGroups() {
     const ex = this.expeditions;
     const ids = CREATURES.filter((c) => ex.count(c.id) > 0 || shownCount(this.manager, c.id) > 0)
-      .sort((a, b) => ex.level(b.id) - ex.level(a.id) || b.stars - a.stars).map((c) => c.id);
-    return [{ id: 'grow', name: '育てられる魚種（レベルの高い順）', ids }];
+      .sort((a, b) => ex.pieces(b.id) - ex.pieces(a.id) || b.rarity - a.rarity).map((c) => c.id);
+    return [{ id: 'grow', name: '育てられる魚種（ピースの多い順）', ids }];
   }
 
   _pop(id, col) {
@@ -102,7 +103,7 @@ export class ZukanView {
     if (this.pick && !seen(this.pick)) this.pick = null;
     const mode = this.mode;
     const tab = (id, label) => `<button data-act="zk-mode" data-id="${id}" class="${mode === id ? 'active' : ''}">${label}</button>`;
-    const tabs = `<div class="sp-seg zk-mode">${tab('area', '地域別')}${tab('star', '星の数別')}${tab('grow', '育成')}</div>`;
+    const tabs = `<div class="sp-seg zk-mode">${tab('area', '地域別')}${tab('star', 'レア度別')}${tab('grow', '育成')}</div>`;
     const list = mode === 'star' ? this.starGroups : mode === 'grow' ? this.growGroups : this.groups;
     let opened = false; // 同じ魚種が複数の地域にあっても、カードは最初の1か所だけ
     const sections = list.map((g) => {
@@ -114,7 +115,7 @@ export class ZukanView {
       const rowEnd = at >= 0 ? Math.min(g.ids.length - 1, Math.floor(at / 4) * 4 + 3) : -1;
       const cells = g.ids.map((id, i) => {
         const cell = seen(id)
-          ? `<button class="zk-cell ${this.pick === id ? 'sel' : ''}" data-act="zk-pick" data-id="${id}">${creatureThumb(this.previews, id)}<i class="zk-lv">Lv${ex.level(id)}</i>${ex.canLevelUp(id, shownCount(this.manager, id)) ? '<i class="zk-up" aria-label="成長できます"></i>' : ''}<small>${getCreature(id).name}</small></button>`
+          ? `<button class="zk-cell ${this.pick === id ? 'sel' : ''}" data-act="zk-pick" data-id="${id}">${creatureThumb(this.previews, id)}<i class="zk-lv">${octagrams(ex.pieces(id), { mini: true })}</i>${ex.canLevelUp(id, shownCount(this.manager, id)) ? '<i class="zk-up" aria-label="成長できます"></i>' : ''}<small>${getCreature(id).name}</small></button>`
           : '<div class="zk-cell unknown"><span>？</span><small>未発見</small></div>';
         return i === rowEnd ? cell + this._pop(this.pick, at % 4) : cell;
       }).join('');

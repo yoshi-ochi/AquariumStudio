@@ -61,7 +61,7 @@ import { zoneOf } from './expedition/husbandry.js';
 import { isHungry } from './expedition/husbandry.js';
 import { allianceBonus, allianceLevel } from './expedition/creatureData.js';
 import { CREATURES, DEFAULT_HOME, relocateCost } from './expedition/creatureData.js';
-import { setLevelSource } from './expedition/growth.js';
+import { setGrowthSource } from './expedition/growth.js';
 import { buildCreature } from './expedition/creatureBuilder.js';
 import { loadCreatureConfig } from './expedition/creatureConfig.js';
 import { installHoldRepeat } from './ui/holdRepeat.js';
@@ -104,7 +104,7 @@ async function boot() {
   const economy = new Economy();
   const inventory = new Inventory();
   const expeditions = new Expeditions();
-  setLevelSource((id) => expeditions.level(id)); // 展示の大きさ・集客は在庫側のレベルで決める
+  setGrowthSource((id) => expeditions.pieces(id)); // 展示の大きさ・集客は在庫側の成長（ピース）で決める
   const ops = new Operations();
   let home = null; // 自分の立地 { lat, lon }
   const manager = new TankManager(sceneMgr.scene);
@@ -113,7 +113,7 @@ async function boot() {
 
   // ---- 事前準備（スプラッシュの裏で）：サムネイル撮影と水面モーション ----------
   // 配信サムネイル（GitHub Pages）を使い、無い物・形が変わった物だけ端末で撮影する
-  // 管理者が編集した生物の設定（星の数・採取地・経験値など）を先に反映する
+  // 管理者が編集した生物の設定（レア度・採取地・成長など）を先に反映する
   splash.setProgress(0, '生き物のデータを読み込み中…');
   await loadCreatureConfig();
   const manifest = await loadThumbManifest();
@@ -124,7 +124,7 @@ async function boot() {
   const shoot = objThumbs.missing.length + fishThumbs.missing.length;
   const progress = (off) => (i, n, def) => splash.setProgress((off + i) / shoot, `${def.name} を撮影中… (${off + i}/${shoot})`);
   for (const [id, url] of await generatePreviews(objThumbs.missing, buildObject, { dispose: disposeObject, onProgress: progress(0) })) previews.set(id, url);
-  const creatureShots = await generatePreviews(fishThumbs.missing, buildCreature, { dispose: disposeObject, onProgress: progress(objThumbs.missing.length) });
+  const creatureShots = await generatePreviews(fishThumbs.missing, buildCreature, { dispose: disposeObject, transparent: true, onProgress: progress(objThumbs.missing.length) });
   for (const [id, url] of creatureShots) previews.set(`creature:${id}`, url);
   const waveKey = waveCacheKey();
   let waves = await loadCached(waveKey);

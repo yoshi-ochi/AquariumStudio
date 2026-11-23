@@ -1,24 +1,25 @@
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, CATCH_WEIGHT, STAR_LIST, RETIRED_PLACES, recomputeDerived } from './creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, CATCH_WEIGHT, RARITY_LIST, RETIRED_PLACES, recomputeDerived } from './creatureData.js';
 import { SPECIES_METHODS } from './fishingData.js';
 import { NOTES } from './creatureNotes.js';
-import { GROWTH_RULES, XP_OVERRIDE, rebuildGrowth } from './growth.js';
+import { PIECE_FISH, BASE_PIECE_FISH, rebuildGrowth } from './growth.js';
 
 /**
  * 管理者が編集する生物の設定（Supabase の game_config 表、key = 'creatures'）。
  * 起動時に読み込み、組み込みのデータ（creatureData.js など）へ上書きする。何度反映しても同じ結果になる。
  *
  * {
- *   species: { [id]: { name, stars, len, appeal, zone, seasons, methods, note, xp, removed } },
- *   added:   [{ id, name, form, len, stars, appeal, colors: { body, belly, fin }, pat, mark, zone, seasons, methods, note }],
+ *   species: { [id]: { name, rarity, len, appeal, zone, seasons, methods, note, removed } },
+ *   added:   [{ id, name, form, len, rarity, appeal, colors: { body, belly, fin }, pat, mark, zone, seasons, methods, note }],
  *   places:  { [id]: { name, text, stage, cost, lat, lon, zone, pool, removed } },
  *   addedPlaces: [{ id, name, text, stage, cost, lat, lon, zone, pool }],
  *   joint:   { [id]: { pool } },
- *   stars:   { weight, xpMul, xpMin, xpFixed, levelMul }（それぞれ星の数 { 1〜6 }）
+ *   rarity:  { weight: { 1〜4 } }（レア度ごとの採取の重み）
+ *   growth:  { pieceFish: [6] }（8角星形ごとの1ピースの匹数）
  * }
  */
 export const CONFIG_KEY = 'creatures';
 const CACHE = 'aq-creature-config';
-const SPECIES_KEYS = ['name', 'stars', 'len', 'appeal', 'zone', 'seasons'];
+const SPECIES_KEYS = ['name', 'rarity', 'len', 'appeal', 'zone', 'seasons'];
 const PLACE_KEYS = ['name', 'text', 'stage', 'cost', 'lat', 'lon', 'zone', 'pool'];
 
 // 組み込みの値（反映のたびにここから作り直す）
@@ -30,13 +31,12 @@ const BASE = {
   methods: clone(SPECIES_METHODS),
   notes: { ...NOTES },
   weight: { ...CATCH_WEIGHT },
-  rules: clone(GROWTH_RULES),
 };
 export const baseCreature = (id) => BASE.creatures.find((c) => c.id === id);
 export const basePlace = (id) => BASE.places.find((d) => d.id === id);
 export const baseMethods = (id) => BASE.methods[id] ?? [];
 export const baseNote = (id) => BASE.notes[id] ?? '';
-export const baseRules = () => ({ weight: { ...BASE.weight }, ...clone(BASE.rules) });
+export const baseRules = () => ({ weight: { ...BASE.weight }, pieceFish: [...BASE_PIECE_FISH] });
 
 const pick = (src, keys) => Object.fromEntries(keys.filter((k) => src?.[k] != null && src[k] !== '').map((k) => [k, clone(src[k])]));
 const reset = (arr, base) => {
@@ -56,17 +56,15 @@ export function applyConfig(cfg = {}) {
   JOINT_PROJECTS.forEach((p, i) => (p.pool = [...BASE.joint[i]]));
   resetObj(SPECIES_METHODS, BASE.methods);
   resetObj(NOTES, BASE.notes);
-  for (const k of Object.keys(XP_OVERRIDE)) delete XP_OVERRIDE[k];
 
   // 追加した魚種
   for (const a of cfg.added ?? []) {
     if (!a?.id || CREATURES.some((c) => c.id === a.id)) continue;
-    CREATURES.push({ id: a.id, name: a.name || a.id, form: a.form || 'perch', len: +a.len || 0.2, stars: +a.stars || 1, slots: 1, appeal: +a.appeal || 1, colors: { body: 0x888888, belly: 0xdddddd, fin: 0x666666, ...a.colors }, ...(a.pat ? { pat: a.pat, mark: a.mark ?? 0x222222 } : {}), added: true });
+    CREATURES.push({ id: a.id, name: a.name || a.id, form: a.form || 'perch', len: +a.len || 0.2, rarity: +a.rarity || 1, slots: 1, appeal: +a.appeal || 1, colors: { body: 0x888888, belly: 0xdddddd, fin: 0x666666, ...a.colors }, ...(a.pat ? { pat: a.pat, mark: a.mark ?? 0x222222 } : {}), added: true });
     if (a.methods?.length) SPECIES_METHODS[a.id] = [...a.methods];
     if (a.note) NOTES[a.id] = a.note;
     for (const k of ['zone', 'seasons']) if (a[k]?.length) CREATURES.at(-1)[k] = clone(a[k]);
     if (a.removed) CREATURES.at(-1).retired = true;
-    if (+a.xp > 0) XP_OVERRIDE[a.id] = +a.xp;
   }
   // 魚種ごとの上書き
   for (const [id, o] of Object.entries(cfg.species ?? {})) {
@@ -76,7 +74,6 @@ export function applyConfig(cfg = {}) {
     if (o.removed) c.retired = true;
     if (o.methods?.length) SPECIES_METHODS[id] = [...o.methods];
     if (o.note) NOTES[id] = o.note;
-    if (+o.xp > 0) XP_OVERRIDE[id] = +o.xp;
   }
   // 採取地
   for (const a of cfg.addedPlaces ?? []) {
@@ -94,16 +91,18 @@ export function applyConfig(cfg = {}) {
   const alive = new Set(CREATURES.filter((c) => !c.retired).map((c) => c.id));
   for (const d of [...DESTINATIONS, ...JOINT_PROJECTS]) d.pool = [...new Set(d.pool.filter((id) => alive.has(id)))];
 
-  // 星の数ごとの規則
-  const r = cfg.stars ?? {};
+  // レア度ごとの採取の重み
+  const r = cfg.rarity ?? {};
   resetObj(CATCH_WEIGHT, BASE.weight);
   Object.assign(CATCH_WEIGHT, nums(r.weight));
-  for (const k of Object.keys(GROWTH_RULES)) GROWTH_RULES[k] = { ...BASE.rules[k], ...nums(r[k]) };
+  // 8角星形ごとの1ピースの匹数
+  const fish = cfg.growth?.pieceFish ?? [];
+  BASE_PIECE_FISH.forEach((n, i) => (PIECE_FISH[i] = Number.isFinite(+fish[i]) && +fish[i] >= 1 ? Math.round(+fish[i]) : n));
 
   recomputeDerived();
   rebuildGrowth();
 }
-const nums = (o) => Object.fromEntries(Object.entries(o ?? {}).filter(([k, v]) => STAR_LIST.includes(+k) && Number.isFinite(+v) && v !== '' && v != null).map(([k, v]) => [k, +v]));
+const nums = (o) => Object.fromEntries(Object.entries(o ?? {}).filter(([k, v]) => RARITY_LIST.includes(+k) && Number.isFinite(+v) && v !== '' && v != null).map(([k, v]) => [k, +v]));
 
 const readCache = () => {
   try {

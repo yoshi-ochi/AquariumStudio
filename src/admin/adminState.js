@@ -1,6 +1,6 @@
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RETIRED_PLACES, STAR_LIST, getCreature } from '../expedition/creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RETIRED_PLACES, RARITY_LIST, getCreature } from '../expedition/creatureData.js';
 import { SPECIES_METHODS, getMethod } from '../expedition/fishingData.js';
-import { baseCreature, basePlace, baseMethods, baseNote } from '../expedition/creatureConfig.js';
+import { baseCreature, basePlace, baseMethods, baseNote, baseRules } from '../expedition/creatureConfig.js';
 
 /**
  * 下書きの設定（cfg）を書き換える関数と、保存前の整理・点検。
@@ -53,8 +53,8 @@ export function pruneConfig(cfg) {
     }
     for (const k of Object.keys(o)) {
       const v = o[k];
-      const base = k === 'methods' ? baseMethods(id) : k === 'note' ? baseNote(id) : k === 'xp' ? 0 : k === 'removed' ? false : b[k];
-      if (v === '' || v == null || same(v, base) || (k === 'seasons' && !v.length && !base) || (k === 'zone' && !v)) delete o[k];
+      const base = k === 'methods' ? baseMethods(id) : k === 'note' ? baseNote(id) : k === 'removed' ? false : b[k];
+      if (k === 'xp' || k === 'stars' || v === '' || v == null || same(v, base) || (k === 'seasons' && !v.length && !base) || (k === 'zone' && !v)) delete o[k];
     }
     if (!Object.keys(o).length) delete out.species[id];
   }
@@ -72,13 +72,15 @@ export function pruneConfig(cfg) {
     if (i < 0 || !o.pool?.length) delete out.joint[id];
   }
   for (const k of ['species', 'places', 'joint', 'added', 'addedPlaces']) if (out[k] && !Object.keys(out[k]).length) delete out[k];
-  if (out.stars) {
-    for (const [k, v] of Object.entries(out.stars)) {
+  if (out.rarity) {
+    for (const [k, v] of Object.entries(out.rarity)) {
       for (const r of Object.keys(v)) if (v[r] === '' || v[r] == null) delete v[r];
-      if (!Object.keys(v).length) delete out.stars[k];
+      if (!Object.keys(v).length) delete out.rarity[k];
     }
-    if (!Object.keys(out.stars).length) delete out.stars;
+    if (!Object.keys(out.rarity).length) delete out.rarity;
   }
+  delete out.stars; // 旧版の設定
+  if (out.growth && (!out.growth.pieceFish || same(out.growth.pieceFish.map(Number), baseRules().pieceFish))) delete out.growth;
   return out;
 }
 
@@ -97,7 +99,7 @@ export function auditConfig() {
     if (at.some((p) => !p.joint) && !methods.length) err(`${c.name}：漁法が無いため、採取地で捕れません`);
     for (const m of methods) if (!getMethod(m)) err(`${c.name}：不明な漁法「${m}」`);
     if (!(c.len > 0)) err(`${c.name}：体長が0以下です`);
-    if (!STAR_LIST.includes(c.stars)) err(`${c.name}：星の数が1〜6ではありません`);
+    if (!RARITY_LIST.includes(c.rarity)) err(`${c.name}：レア度が1〜4ではありません`);
     if (!(c.appeal >= 0)) err(`${c.name}：集客力が正しくありません`);
     if (c.seasons?.length === 4) warn(`${c.name}：季節が4つとも選ばれています（空欄＝通年と同じ）`);
     if (names.has(c.name)) warn(`${c.name}：同じ名前の魚種があります（${names.get(c.name)} と ${c.id}）`);

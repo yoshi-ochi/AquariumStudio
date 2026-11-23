@@ -5,16 +5,18 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 /**
  * 全定義のサムネイルをオフスクリーンで撮影し、Map<defId, dataURL> を返す。
  * オブジェクトの BoundingBox 中心を注視し、外接球が視野に収まる距離にカメラを置く。
+ * transparent: 背景を透明にする（生き物：カードの背景色でレア度を表すため）
  */
-export async function generatePreviews(defs, build, { dispose, width = 256, height = 192, onProgress, type = 'image/png', quality } = {}) {
+export async function generatePreviews(defs, build, { dispose, width = 256, height = 192, onProgress, type = 'image/png', quality, transparent = false } = {}) {
   const canvas = document.createElement('canvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, alpha: transparent });
   renderer.setPixelRatio(1);
   renderer.setSize(width, height, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xdbe9f3);
+  scene.background = transparent ? null : new THREE.Color(0xdbe9f3);
+  if (transparent) renderer.setClearColor(0x000000, 0);
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
   const key = new THREE.DirectionalLight(0xffffff, 1.4);
   key.position.set(3, 5, 4);

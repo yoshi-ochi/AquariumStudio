@@ -1,93 +1,64 @@
-import { CATCH_WEIGHT, STAR_LIST, starLabel, activeCreatures } from '../expedition/creatureData.js';
-import { GROWTH_RULES, XP_OVERRIDE, xpPerFish, xpForStarLevel, MAX_LEVEL } from '../expedition/growth.js';
+import { CATCH_WEIGHT, RARITY_LIST, RARITY_NAME, activeCreatures } from '../expedition/creatureData.js';
+import { PIECE_FISH, PIECES_PER_STAR, STAR_COUNT, MAX_PIECES, fishForPieces } from '../expedition/growth.js';
 import { baseRules } from '../expedition/creatureConfig.js';
-import { esc, num } from './adminUi.js';
-import { xpChartHtml, bindXpChart } from './xpChart.js';
+import { num } from './adminUi.js';
+import { growthChartHtml, bindGrowthChart } from './growthChart.js';
 
-const LEVELS = [2, 10, 50, 100, 300, MAX_LEVEL];
-const current = (key) => (key === 'weight' ? CATCH_WEIGHT : GROWTH_RULES[key]);
-/** 星の数ごとの入力欄（data-rule にキー、data-r に星の数） */
-const input = (key, r, step) => {
-  const base = baseRules();
-  const b = (key === 'weight' ? base.weight : base[key])[r];
-  const v = current(key)[r];
-  return `<input type="number" data-rule="${key}" data-r="${r}" value="${v}" step="${step}" min="0"><small>${v === b ? '標準' : `標準 ${b}`}</small>`;
-};
-
-/** 星・経験値タブ：1匹あたりの経験値（星の数ごとに統一）の表と、レベルアップに要る経験値のグラフ */
+/** レア度・成長タブ：レア度（カードの色）ごとの採取の重みと、8角星形ごとの1ピースの匹数 */
 export class GrowthTab {
   constructor(state, changed) {
     Object.assign(this, { state, changed });
-    this.mode = 'step';
   }
 
   html() {
+    const base = baseRules();
     const live = activeCreatures();
-    const rows = STAR_LIST.map((r) => {
-      const list = live.filter((c) => c.stars === r);
-      const own = list.filter((c) => XP_OVERRIDE[c.id]);
-      const xs = list.map((c) => xpPerFish(c.id));
-      const range = GROWTH_RULES.xpFixed[r] > 0 ? '' : `<small>自動：${num(Math.min(...xs))}〜${num(Math.max(...xs))}</small>`;
-      return `<tr><th>${starLabel(r)}<small>${list.length}種</small></th>
-        <td>${input('xpFixed', r, 1)}${range}</td>
-        <td>${own.length ? `${own.length}種<small>${esc(own.map((c) => `${c.name} ${num(XP_OVERRIDE[c.id])}`).join('、'))}</small>` : 'なし'}</td>
-        <td>${input('weight', r, 1)}</td><td>${input('levelMul', r, 0.05)}</td></tr>`;
+    const totalW = RARITY_LIST.reduce((s, r) => s + CATCH_WEIGHT[r], 0) || 1;
+    const rarity = [...RARITY_LIST].reverse().map((r) => {
+      const v = CATCH_WEIGHT[r];
+      return `<tr><th><i class="ad-rar r${r}">${RARITY_NAME[r]}</i><small>${live.filter((c) => c.rarity === r).length}種</small></th>
+        <td><input type="number" data-weight="${r}" value="${v}" min="0" step="1"><small>${v === base.weight[r] ? '標準' : `標準 ${base.weight[r]}`}</small></td>
+        <td>${Math.round((v / totalW) * 100)}%<small>各レア度が同じ種数のとき</small></td></tr>`;
     }).join('');
-    const auto = STAR_LIST.map((r) => `<tr><th>${starLabel(r)}</th><td>${input('xpMul', r, 0.05)}</td><td>${input('xpMin', r, 1)}</td></tr>`).join('');
-    const tab = (id, label) => `<button data-mode="${id}" class="${this.mode === id ? 'active' : ''}">${label}</button>`;
-    return `<section class="ad-card"><h3>1匹あたりの経験値（星の数ごと）</h3>
-        <p class="ad-note">星の数が同じ魚は、成長に使ったときの経験値がすべて同じになります。0 にするとその星の数は捕れやすさからの自動計算になります。魚種ごとの例外は魚種タブで設定します。</p>
-        <div class="ad-scroll"><table class="ad-table ad-rules"><thead><tr><th>星の数</th><th>1匹の経験値</th><th>魚種ごとの例外</th><th>出現の重み</th><th>レベルアップの必要経験値の倍率</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <details class="ad-more"><summary>自動計算の設定（1匹の経験値を 0 にした星の数だけに使う）</summary>
-          <table class="ad-table ad-rules"><thead><tr><th>星の数</th><th>倍率</th><th>下限</th></tr></thead><tbody>${auto}</tbody></table></details>
-        <div class="ad-acts"><button id="ad-rules-reset">標準に戻す</button></div></section>
-      <section class="ad-card"><h3>レベルアップに要る経験値</h3>
-        <div class="ad-bar"><div class="ad-seg">${tab('step', '次のレベルまで')}${tab('cum', 'Lv1 からの累計')}</div><span class="ad-note">グラフをなぞると、そのレベルの値と要る匹数が出ます。倍率が同じ星の数は線が重なります。</span></div>
-        ${xpChartHtml(this.mode)}
-        ${this._table()}</section>`;
-  }
-
-  /** 区切りのレベルまでの累計と、要る匹数（その星の数の1匹の経験値で） */
-  _table() {
-    const head = `<tr><th>星の数</th><th>1匹</th>${LEVELS.map((lv) => `<th>Lv${lv}まで</th>`).join('')}</tr>`;
-    const rows = STAR_LIST.map((r) => {
-      const per = this._fish(r);
-      const cells = LEVELS.map((lv) => {
-        const need = xpForStarLevel(lv, r);
-        return `<td>${num(need)}<small>${num(Math.ceil(need / per))}匹</small></td>`;
-      }).join('');
-      return `<tr><th>${starLabel(r)}</th><td>${num(per)}</td>${cells}</tr>`;
+    const pieces = Array.from({ length: STAR_COUNT }, (_, k) => {
+      const v = PIECE_FISH[k];
+      return `<tr><th>${k + 1}つ目の星</th>
+        <td><input type="number" data-piece="${k}" value="${v}" min="1" step="1"><small>${v === base.pieceFish[k] ? '標準' : `標準 ${base.pieceFish[k]}`}</small></td>
+        <td>${num(v * PIECES_PER_STAR)}匹</td><td>${num(fishForPieces((k + 1) * PIECES_PER_STAR))}匹</td></tr>`;
     }).join('');
-    return `<h4>区切りのレベルまで（累計）</h4><div class="ad-scroll"><table class="ad-table">${head}${rows}</table></div>`;
-  }
-
-  /** その星の数の1匹の経験値（自動計算なら中央値） */
-  _fish(r) {
-    if (GROWTH_RULES.xpFixed[r] > 0) return GROWTH_RULES.xpFixed[r];
-    const xs = activeCreatures().filter((c) => c.stars === r && !XP_OVERRIDE[c.id]).map((c) => xpPerFish(c.id)).sort((a, b) => a - b);
-    return xs[xs.length >> 1] ?? 1;
+    return `<section class="ad-card"><h3>レア度（カードの背景色）</h3>
+        <p class="ad-note">アイテムカードの背景色でレア度を表します（緑→青→紫→金）。採取の重みが大きいほど捕れやすくなります。</p>
+        <div class="ad-scroll"><table class="ad-table ad-rules"><thead><tr><th>レア度</th><th>採取の重み</th><th>出現率の目安</th></tr></thead><tbody>${rarity}</tbody></table></div></section>
+      <section class="ad-card"><h3>成長（6つの8角星形 × 8ピース）</h3>
+        <p class="ad-note">同じ魚種を成長に使うと、1つ目の星形から順にピースが埋まります。1ピースの匹数は星形ごとに設定します（全魚種・全レア度で共通）。全部で ${MAX_PIECES}ピース、すべて埋めるには ${num(fishForPieces(MAX_PIECES))}匹です。</p>
+        <div class="ad-scroll"><table class="ad-table ad-rules"><thead><tr><th>星形</th><th>1ピースの匹数</th><th>8ピース</th><th>ここまでの累計</th></tr></thead><tbody>${pieces}</tbody></table></div>
+        <h4>ピースごとの累計の匹数</h4><p class="ad-note">グラフをなぞると、そのピースの匹数と累計が出ます。</p>
+        ${growthChartHtml()}
+        <div class="ad-acts"><button id="ad-rules-reset">標準に戻す</button></div></section>`;
   }
 
   bind(root) {
-    for (const el of root.querySelectorAll('[data-rule]')) {
+    const cfg = this.state.cfg;
+    for (const el of root.querySelectorAll('[data-weight]')) {
       el.onchange = () => {
-        const v = el.value === '' ? '' : Math.max(0, +el.value);
-        const cfg = this.state.cfg;
-        cfg.stars ??= {};
-        cfg.stars[el.dataset.rule] = { ...cfg.stars[el.dataset.rule], [el.dataset.r]: v };
+        cfg.rarity ??= {};
+        cfg.rarity.weight = { ...cfg.rarity.weight, [el.dataset.weight]: el.value === '' ? '' : Math.max(0, +el.value) };
         this.changed();
       };
     }
-    for (const b of root.querySelectorAll('[data-mode]')) {
-      b.onclick = () => {
-        this.mode = b.dataset.mode;
+    for (const el of root.querySelectorAll('[data-piece]')) {
+      el.onchange = () => {
+        const list = [...PIECE_FISH];
+        list[+el.dataset.piece] = Math.max(1, Math.round(+el.value) || 1);
+        cfg.growth = { pieceFish: list };
         this.changed();
       };
     }
     root.querySelector('#ad-rules-reset').onclick = () => {
-      delete this.state.cfg.stars;
+      delete cfg.rarity;
+      delete cfg.growth;
       this.changed();
     };
-    bindXpChart(root, (r) => this._fish(r));
+    bindGrowthChart(root);
   }
 }

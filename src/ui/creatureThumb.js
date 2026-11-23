@@ -1,8 +1,8 @@
-import { getCreature, MAX_STARS } from '../expedition/creatureData.js';
+import { getCreature, RARITY_NAME } from '../expedition/creatureData.js';
 
-/** 生き物のサムネイル。右上に星の数（最大6つ）を重ねる */
+/** 生き物のサムネイル。カードの背景色でレア度を表す（緑・青・紫・金） */
 export function creatureThumb(previews, id) {
-  const n = getCreature(id)?.stars ?? 1;
-  const label = `星${n}つ（${MAX_STARS}段階）`;
-  return `<span class="cthumb"><img src="${previews.get(`creature:${id}`) ?? ''}" alt=""><i class="cstars" title="${label}" aria-label="${label}">${'★'.repeat(n)}</i></span>`;
+  const r = getCreature(id)?.rarity ?? 1;
+  const label = `レア度 ${RARITY_NAME[r]}`;
+  return `<span class="cthumb r${r}" title="${label}"><img src="${previews.get(`creature:${id}`) ?? ''}" alt="${label}"></span>`;
 }
