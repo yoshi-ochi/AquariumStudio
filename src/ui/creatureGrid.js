@@ -15,7 +15,7 @@ export function creatureGrid(previews, items, { sel = null, panel = '' } = {}) {
   const out = [];
   items.forEach(({ id, n, pieces }, i) => {
     const c = getCreature(id);
-    out.push(`<button class="cg-cell ${sel === id ? 'sel' : ''}" data-act="cg-pick" data-id="${id}" aria-label="${c?.name ?? id} ${n}匹" aria-expanded="${sel === id}">${creatureThumb(previews, id)}<i class="cg-n">×${n}</i>${pieces != null ? `<i class="cg-lv">${octagrams(pieces, { mini: true })}</i>` : ''}<small>${c?.name ?? id}</small></button>`);
+    out.push(`<button class="cg-cell ${sel === id ? 'sel' : ''}" data-act="cg-pick" data-id="${id}" aria-label="${c?.name ?? id} ${n}匹" aria-expanded="${sel === id}">${creatureThumb(previews, id, pieces != null ? `<i class="oct-badge">${octagrams(pieces, { mini: true })}</i>` : '')}<i class="cg-n">×${n}</i><small>${c?.name ?? id}</small></button>`);
     // 選んだアイコンの行の最後（または一覧の最後）にカードを入れる
     const rowEnd = Math.min(items.length - 1, Math.floor(at / COLS) * COLS + COLS - 1);
     if (at >= 0 && panel && i === rowEnd) {

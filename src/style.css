@@ -618,7 +618,6 @@ body.sheet-full #view-rail, body.sheet-full #side-actions, body.sheet-full #goal
 body.tutorial-on #goal-card { display: none; }
 
 /* ---- 成長（魚種ごとのレベル） ---- */
-.cg-lv { position: absolute; left: 6px; top: 22px; padding: 2px 3px; border-radius: 6px; background: rgba(10, 30, 45, .62); line-height: 0; }
 .cg-grow { display: grid; grid-template-columns: 1fr; align-items: center; gap: 4px; margin: 6px 0; }
 .cg-grow .oct-detail { margin: 0; }
 .cg-grow b { font-size: 15px; color: #1f6f9c; }
@@ -632,7 +631,6 @@ body.tutorial-on #goal-card { display: none; }
 .rk-row.me { background: #fff4d6; }
 .zk-cell { position: relative; }
 .zk-cell.sel { border-color: #2f8fd0; }
-.zk-lv { position: absolute; left: 5px; top: 5px; padding: 2px 3px; border-radius: 6px; background: rgba(10, 30, 45, .62); line-height: 0; }
 .zk-note { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 6px; }
 .zk-note small { color: var(--muted); font-size: 11px; line-height: 1.5; }
 
@@ -644,6 +642,8 @@ body.tutorial-on #goal-card { display: none; }
 button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 
 /* 成長：6つの8角星形（octagram.js）。ピースは上から時計回りに埋まる */
+/* カード（サムネイル）の下部中央に重ねる成長の星形 */
+.oct-badge { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); padding: 2px 3px; border-radius: 6px; background: rgba(10, 30, 45, .62); line-height: 0; pointer-events: none; }
 .oct-row { display: inline-flex; gap: 2px; vertical-align: middle; }
 .oct { width: 22px; height: 22px; display: block; }
 .oct path { fill: #e3eaef; stroke: #9fb1bd; stroke-width: .5; stroke-linejoin: round; }
