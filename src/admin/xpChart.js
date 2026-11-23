@@ -1,17 +1,17 @@
-import { RARITY } from '../expedition/creatureData.js';
-import { MAX_LEVEL, GROWTH_RULES, xpForRarityLevel } from '../expedition/growth.js';
+import { STAR_LIST } from '../expedition/creatureData.js';
+import { MAX_LEVEL, GROWTH_RULES, xpForStarLevel } from '../expedition/growth.js';
 import { num } from './adminUi.js';
 
 /**
- * レベルアップに要る経験値のグラフ（SVG の折れ線、レア度ごとに1本）。
+ * レベルアップに要る経験値のグラフ（SVG の折れ線、星の数ごとに1本）。
  * mode: 'step'（次のレベルまで）/ 'cum'（Lv1 からの累計）。ホバーで十字線とツールチップ。
  */
 const W = 760;
 const H = 300;
 const PAD = { l: 64, r: 72, t: 16, b: 36 };
-const RARITIES = [1, 2, 3];
+const SERIES = STAR_LIST;
 
-const valueAt = (mode, lv, r) => (mode === 'cum' ? xpForRarityLevel(lv, r) : xpForRarityLevel(lv + 1, r) - xpForRarityLevel(lv, r));
+const valueAt = (mode, lv, r) => (mode === 'cum' ? xpForStarLevel(lv, r) : xpForStarLevel(lv + 1, r) - xpForStarLevel(lv, r));
 const lastLevel = (mode) => (mode === 'cum' ? MAX_LEVEL : MAX_LEVEL - 1);
 
 /** 目盛りのきりのよい間隔 */
@@ -24,7 +24,7 @@ const short = (n) => (n >= 1e8 ? `${+(n / 1e8).toFixed(1)}億` : n >= 1e4 ? `${+
 
 export function xpChartHtml(mode) {
   const end = lastLevel(mode);
-  const max = Math.max(...RARITIES.map((r) => valueAt(mode, end, r)), 1);
+  const max = Math.max(...SERIES.map((r) => valueAt(mode, end, r)), 1);
   const step = niceStep(max);
   const top = Math.ceil(max / step) * step;
   const x = (lv) => PAD.l + ((lv - 1) / (MAX_LEVEL - 1)) * (W - PAD.l - PAD.r);
@@ -33,16 +33,16 @@ export function xpChartHtml(mode) {
   for (let v = 0; v <= top; v += step) grid.push(`<line class="xc-grid" x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(v)}" y2="${y(v)}"/><text class="xc-tick" x="${PAD.l - 8}" y="${y(v) + 4}" text-anchor="end">${short(v)}</text>`);
   const xs = [1, 100, 200, 300, 400, 500, 600, 700, 800, 900, MAX_LEVEL].map((lv) => `<text class="xc-tick" x="${x(lv)}" y="${H - PAD.b + 18}" text-anchor="middle">${lv === 1 ? 'Lv1' : lv}</text>`);
   // 同じ値の線が重なる（倍率が同じ）ときは、ラベルを縦にずらす
-  const ends = RARITIES.map((r) => ({ r, y: y(valueAt(mode, end, r)) })).sort((a, b) => a.y - b.y);
+  const ends = SERIES.map((r) => ({ r, y: y(valueAt(mode, end, r)) })).sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 14);
-  const lines = RARITIES.map((r) => {
+  const lines = SERIES.map((r) => {
     const pts = [];
     for (let lv = 1; lv <= end; lv += lv < 20 ? 1 : 4) pts.push(`${x(lv).toFixed(1)},${y(valueAt(mode, lv, r)).toFixed(1)}`);
     pts.push(`${x(end).toFixed(1)},${y(valueAt(mode, end, r)).toFixed(1)}`);
     const ly = ends.find((e) => e.r === r).y;
-    return `<polyline class="xc-line s${r}" points="${pts.join(' ')}"/><text class="xc-label" x="${W - PAD.r + 6}" y="${ly + 4}">${RARITY[r]}</text>`;
+    return `<polyline class="xc-line s${r}" points="${pts.join(' ')}"/><text class="xc-label" x="${W - PAD.r + 6}" y="${ly + 4}">星${r}</text>`;
   }).join('');
-  const legend = RARITIES.map((r) => `<span><i class="xc-key s${r}"></i>${RARITY[r]}（×${Math.max(0.05, GROWTH_RULES.levelMul[r] ?? 1)}）</span>`).join('');
+  const legend = SERIES.map((r) => `<span><i class="xc-key s${r}"></i>星${r}（×${Math.max(0.05, GROWTH_RULES.levelMul[r] ?? 1)}）</span>`).join('');
   return `<div class="xc" data-mode="${mode}">
       <div class="xc-legend">${legend}</div>
       <div class="xc-plot"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="レベルごとの${mode === 'cum' ? '累計' : '必要'}経験値">
@@ -68,9 +68,9 @@ export function bindXpChart(root, fishFor) {
     cross.setAttribute('x1', px);
     cross.setAttribute('x2', px);
     cross.setAttribute('visibility', 'visible');
-    const rows = RARITIES.map((r) => {
+    const rows = SERIES.map((r) => {
       const v = valueAt(mode, lv, r);
-      return `<div><i class="xc-key s${r}"></i>${RARITY[r]} <b>${num(v)}</b> <small>${num(Math.ceil(v / fishFor(r)))}匹</small></div>`;
+      return `<div><i class="xc-key s${r}"></i>星${r} <b>${num(v)}</b> <small>${num(Math.ceil(v / fishFor(r)))}匹</small></div>`;
     }).join('');
     tip.innerHTML = `<b>${mode === 'cum' ? `Lv${lv} まで（累計）` : `Lv${lv} → ${lv + 1}`}</b>${rows}`;
     tip.hidden = false;

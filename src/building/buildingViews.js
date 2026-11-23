@@ -3,7 +3,7 @@ import { PLAN_FLOORS, WING_FLOORS, ZONES, ZONE_TYPE, MAX_ZONE_NAME, defaultZoneN
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 import { EXPAND_COST, EXPAND_SLOTS } from './backyardData.js';
-import { CREATURES, RARITY, getCreature } from '../expedition/creatureData.js';
+import { CREATURES, starLabel, getCreature } from '../expedition/creatureData.js';
 import { RESEARCH, BREED_HOURS, researchCost, breedHours } from './backyardData.js';
 
 const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
@@ -100,7 +100,7 @@ export class BackyardView {
       return `<div class="gs-row">${creatureThumb(this.previews, job.id)}<div class="gs-info"><b>繁殖水槽${i + 1}：${c.name}</b><small>誕生まで <span data-until="${job.until}"></span></small></div></div>`;
     }
     const opts = CREATURES.filter((c) => this.expeditions.count(c.id) >= 2 && b.canBreed(c));
-    const rows = opts.map((c) => `<button data-act="breed" data-id="${uid}:${c.id}">${c.name}（${RARITY[c.rarity]}・${breedHours(c.rarity, b.level('breeding'))}時間）</button>`);
+    const rows = opts.map((c) => `<button data-act="breed" data-id="${uid}:${c.id}">${c.name}（${starLabel(c.stars)}・${breedHours(c.stars, b.level('breeding'))}時間）</button>`);
     return `<div class="gs-row wrap"><div class="gs-info"><b>繁殖水槽${i + 1}：空き</b><small>同じ種類を2匹以上持っている生き物を選びます（基本${BREED_HOURS[1]}〜${BREED_HOURS[3]}時間）</small></div><div class="gs-btns">${rows.join('') || '<small>繁殖できる生き物がいません</small>'}</div></div>`;
   }
 

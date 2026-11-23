@@ -1,4 +1,4 @@
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RARITY_WEIGHT, DEFAULT_HOME, travelPlan, getCreature } from './creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, CATCH_WEIGHT, DEFAULT_HOME, travelPlan, getCreature } from './creatureData.js';
 import { SPECIES_METHODS, METHODS } from './fishingData.js';
 
 /**
@@ -6,7 +6,7 @@ import { SPECIES_METHODS, METHODS } from './fishingData.js';
  * レベルが上がるほど体が大きくなり（成魚の60%→100%）、集客力も上がる。
  *
  * 目安：やり込む人（調査隊10隊・1日8時間ほど遊ぶ）が1つの魚種に集中して、Lv300 まで約30日。
- *   1匹あたりの経験値はレア度ごとに揃える（GROWTH_RULES.xpFixed。管理者ツールで変更可。0 なら捕れやすさから自動計算）。
+ *   1匹あたりの経験値は星の数ごとに揃える（GROWTH_RULES.xpFixed。管理者ツールで変更可。0 なら捕れやすさから自動計算）。
  *   1日に得られる経験値が DAILY_XP、Lv300 までの累計が DAILY_XP×30 になるよう、全魚種共通の曲線を作る。
  *   星2までの魚は、Lv1→2 でも2匹分以上の経験値が要るように、1レベルの経験値に下限を設ける。
  */
@@ -31,8 +31,8 @@ function perDay(id) {
     for (const m of [null, ...METHODS]) {
       if (m && !SPECIES_METHODS[id]?.includes(m.id)) continue;
       const usable = m ? d.pool.filter((x) => SPECIES_METHODS[x]?.includes(m.id)) : d.pool;
-      const total = usable.reduce((s, x) => s + RARITY_WEIGHT[getCreature(x).rarity], 0);
-      const share = RARITY_WEIGHT[getCreature(id).rarity] / total;
+      const total = usable.reduce((s, x) => s + CATCH_WEIGHT[getCreature(x).stars], 0);
+      const share = CATCH_WEIGHT[getCreature(id).stars] / total;
       const trips = (ACTIVE_HOURS * 3600) / Math.max(trip, CHECK_SEC) + 1; // 寝ている間に1回
       best = Math.max(best, TEAMS * trips * FISH_PER_TRIP * share);
     }
@@ -43,24 +43,24 @@ function perDay(id) {
 }
 
 /**
- * レア度ごとの調整（管理者の設定で上書き。creatureConfig.js）
- *   xpFixed  … 1匹の経験値（レア度ごとに揃える。0 にすると捕れやすさからの自動計算）
+ * 星の数ごとの調整（管理者の設定で上書き。creatureConfig.js）。キーは星の数 1〜6
+ *   xpFixed  … 1匹の経験値（星の数ごとに揃える。0 にすると捕れやすさからの自動計算）
  *   xpMul    … 1匹の経験値（自動計算）にかける倍率
- *   xpMin    … 1匹の経験値の下限（捕りやすい漁法がある激レアが、コモンより安くならないように）
+ *   xpMin    … 1匹の経験値の下限（捕りやすい漁法がある星の多い魚が、星の少ない魚より安くならないように）
  *   levelMul … レベルアップに要る経験値にかける倍率
  */
 export const GROWTH_RULES = {
-  xpMul: { 1: 1, 2: 1, 3: 1 },
-  xpMin: { 1: 1, 2: 50, 3: 250 },
-  xpFixed: { 1: 50, 2: 200, 3: 800 },
-  levelMul: { 1: 1, 2: 1, 3: 1 },
+  xpMul: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 },
+  xpMin: { 1: 1, 2: 1, 3: 50, 4: 50, 5: 250, 6: 250 },
+  xpFixed: { 1: 50, 2: 75, 3: 150, 4: 250, 5: 500, 6: 800 },
+  levelMul: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 },
 };
-/** 魚種ごとに固定した1匹の経験値（管理者の設定。無ければレア度の規則で決める） */
+/** 魚種ごとに固定した1匹の経験値（管理者の設定。無ければ星の数の規則で決める） */
 export const XP_OVERRIDE = {};
 
-const rarityOf = (id) => getCreature(id)?.rarity ?? 1;
+const starsOf = (id) => getCreature(id)?.stars ?? 1;
 const rule = (key, id) => {
-  const v = GROWTH_RULES[key][rarityOf(id)] ?? (key === 'xpMul' || key === 'levelMul' ? 1 : 0);
+  const v = GROWTH_RULES[key][starsOf(id)] ?? (key === 'xpMul' || key === 'levelMul' ? 1 : 0);
   return key === 'levelMul' ? Math.max(0.05, v) : v; // 0 にすると全レベルが一度に上がるため下限を置く
 };
 
@@ -69,7 +69,7 @@ export const XP_AUTO = {};
 export const XP_PER_FISH = {};
 export const xpPerFish = (id) => XP_PER_FISH[id] ?? 1;
 
-/** 累計の表。CUM[lv] = Lv1 から lv までに必要な経験値（レア度の倍率をかける前） */
+/** 累計の表。CUM[lv] = Lv1 から lv までに必要な経験値（星の数の倍率をかける前） */
 let CUM = [0, 0];
 
 /** 経験値の表を作り直す（起動時と、管理者の設定を反映したとき） */
@@ -105,11 +105,11 @@ export function rebuildGrowth() {
 }
 rebuildGrowth();
 
-/** 魚種 id の Lv に達するまでの累計経験値（id を省くとコモンの基準） */
+/** 魚種 id の Lv に達するまでの累計経験値（id を省くと倍率1の基準） */
 const cumAt = (lv, id) => Math.round(CUM[Math.min(MAX_LEVEL, Math.max(1, lv))] * (id ? rule('levelMul', id) : 1));
 export const xpForLevel = (lv, id) => cumAt(lv, id);
-/** レア度 r の魚が Lv に達するまでの累計経験値（管理者ツールのグラフ用） */
-export const xpForRarityLevel = (lv, r) => Math.round(CUM[Math.min(MAX_LEVEL, Math.max(1, lv))] * Math.max(0.05, GROWTH_RULES.levelMul[r] ?? 1));
+/** 星 n の魚が Lv に達するまでの累計経験値（管理者ツールのグラフ用） */
+export const xpForStarLevel = (lv, r) => Math.round(CUM[Math.min(MAX_LEVEL, Math.max(1, lv))] * Math.max(0.05, GROWTH_RULES.levelMul[r] ?? 1));
 export function levelOf(xp = 0, id) {
   let lo = 1;
   let hi = MAX_LEVEL;

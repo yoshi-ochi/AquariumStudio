@@ -1,4 +1,4 @@
-import { getCreature, RARITY } from '../expedition/creatureData.js';
+import { getCreature, starLabel } from '../expedition/creatureData.js';
 import { creatureThumb } from './creatureThumb.js';
 
 const COLS = 4;
@@ -68,8 +68,8 @@ export function updateQty(el) {
   return n;
 }
 
-/** 名前の横に出す短い説明（レア度・枠） */
+/** 名前の横に出す短い説明（星の数・枠） */
 export const creatureInfo = (id, extra = '') => {
   const c = getCreature(id);
-  return `${RARITY[c.rarity]} ・ 1匹 ${c.slots}枠${extra ? ` ・ ${extra}` : ''}`;
+  return `${starLabel(c.stars)} ・ 1匹 ${c.slots}枠${extra ? ` ・ ${extra}` : ''}`;
 };

@@ -1,4 +1,4 @@
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RETIRED_PLACES, getCreature } from '../expedition/creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RETIRED_PLACES, STAR_LIST, getCreature } from '../expedition/creatureData.js';
 import { SPECIES_METHODS, getMethod } from '../expedition/fishingData.js';
 import { baseCreature, basePlace, baseMethods, baseNote } from '../expedition/creatureConfig.js';
 
@@ -72,12 +72,12 @@ export function pruneConfig(cfg) {
     if (i < 0 || !o.pool?.length) delete out.joint[id];
   }
   for (const k of ['species', 'places', 'joint', 'added', 'addedPlaces']) if (out[k] && !Object.keys(out[k]).length) delete out[k];
-  if (out.rarity) {
-    for (const [k, v] of Object.entries(out.rarity)) {
+  if (out.stars) {
+    for (const [k, v] of Object.entries(out.stars)) {
       for (const r of Object.keys(v)) if (v[r] === '' || v[r] == null) delete v[r];
-      if (!Object.keys(v).length) delete out.rarity[k];
+      if (!Object.keys(v).length) delete out.stars[k];
     }
-    if (!Object.keys(out.rarity).length) delete out.rarity;
+    if (!Object.keys(out.stars).length) delete out.stars;
   }
   return out;
 }
@@ -97,7 +97,7 @@ export function auditConfig() {
     if (at.some((p) => !p.joint) && !methods.length) err(`${c.name}：漁法が無いため、採取地で捕れません`);
     for (const m of methods) if (!getMethod(m)) err(`${c.name}：不明な漁法「${m}」`);
     if (!(c.len > 0)) err(`${c.name}：体長が0以下です`);
-    if (![1, 2, 3].includes(c.rarity)) err(`${c.name}：レア度が1〜3ではありません`);
+    if (!STAR_LIST.includes(c.stars)) err(`${c.name}：星の数が1〜6ではありません`);
     if (!(c.appeal >= 0)) err(`${c.name}：集客力が正しくありません`);
     if (c.seasons?.length === 4) warn(`${c.name}：季節が4つとも選ばれています（空欄＝通年と同じ）`);
     if (names.has(c.name)) warn(`${c.name}：同じ名前の魚種があります（${names.get(c.name)} と ${c.id}）`);

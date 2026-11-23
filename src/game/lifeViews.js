@@ -1,7 +1,7 @@
 import { creatureThumb } from '../ui/creatureThumb.js';
 import { tankLabel } from '../tanks/tankLabel.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RARITY, MAX_STARS, getCreature } from '../expedition/creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, MAX_STARS, getCreature } from '../expedition/creatureData.js';
 import { NOTES } from '../expedition/creatureNotes.js';
 import { WATER, ensureCare, feed, feedCost, hasLife, isHungry, predatorConflict, tankHealth, waterMismatch, nextFeedIn, crowdFactor, zoneOf, FEED_INTERVAL } from '../expedition/husbandry.js';
 import { EVENTS } from './gameData.js';
@@ -59,7 +59,7 @@ export class CareView {
 
 /**
  * 生き物図鑑。発見した魚種のレベルを表示し、タップした魚種のすぐ下に説明と育成カードを出す。
- * 育成（成長）はここで行う（在庫の同じ魚種を使う）。並べ方は 地域別 / レア度別 / 育成（レベルの高い順）。
+ * 育成（成長）はここで行う（在庫の同じ魚種を使う）。並べ方は 地域別 / 星の数別 / 育成（レベルの高い順）。
  */
 export class ZukanView {
   constructor({ expeditions, manager, previews, economy, state, toast }) {
@@ -69,7 +69,7 @@ export class ZukanView {
     this.qty = 1;
   }
 
-  /** レア度（星の数）ごとのまとまり。報酬はなし */
+  /** 星の数ごとのまとまり。報酬はなし */
   get starGroups() {
     return Array.from({ length: MAX_STARS }, (_, i) => MAX_STARS - i).map((n) => ({
       id: `star${n}`, name: `${'★'.repeat(n)}（星${n}つ）`, ids: CREATURES.filter((c) => c.stars === n && (!c.retired || this.expeditions.seenCount(c.id) > 0)).map((c) => c.id),
@@ -102,7 +102,7 @@ export class ZukanView {
     if (this.pick && !seen(this.pick)) this.pick = null;
     const mode = this.mode;
     const tab = (id, label) => `<button data-act="zk-mode" data-id="${id}" class="${mode === id ? 'active' : ''}">${label}</button>`;
-    const tabs = `<div class="sp-seg zk-mode">${tab('area', '地域別')}${tab('star', 'レア度別')}${tab('grow', '育成')}</div>`;
+    const tabs = `<div class="sp-seg zk-mode">${tab('area', '地域別')}${tab('star', '星の数別')}${tab('grow', '育成')}</div>`;
     const list = mode === 'star' ? this.starGroups : mode === 'grow' ? this.growGroups : this.groups;
     let opened = false; // 同じ魚種が複数の地域にあっても、カードは最初の1か所だけ
     const sections = list.map((g) => {

@@ -5,7 +5,7 @@ import { creatureThumb } from './creatureThumb.js';
 export const countIds = (list) => list.reduce((o, id) => ((o[id] = (o[id] ?? 0) + 1), o), {});
 
 /**
- * 受け取った生き物をブロックで並べる：サムネイル（右上にレア度の星）と ×匹数、名前。
+ * 受け取った生き物をブロックで並べる：サムネイル（右上に星の数）と ×匹数、名前。
  * released は満杯で放流した分（灰色で表示）
  */
 export function catchBlocks(previews, got = {}, released = {}) {

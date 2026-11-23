@@ -1,6 +1,6 @@
 import { mulberry32 } from '../tanks/random.js';
 import { levelOf, xpForLevel, xpPerFish, fishToNext, MAX_LEVEL } from './growth.js';
-import { getCreature, getDestination, RARITY_WEIGHT, travelPlan, inSeason } from './creatureData.js';
+import { getCreature, getDestination, CATCH_WEIGHT, travelPlan, inSeason } from './creatureData.js';
 import { SPECIES_METHODS } from './fishingData.js';
 
 /**
@@ -171,7 +171,7 @@ export class Expeditions extends EventTarget {
   }
 }
 
-/** 2〜4匹をレア度の重みで抽選 */
+/** 2〜4匹を星の数の重みで抽選 */
 export function rollCatch(trip) {
   const rand = mulberry32(trip.seed);
   const pool0 = getDestination(trip.dest).pool.filter((id) => getCreature(id));
@@ -180,12 +180,12 @@ export function rollCatch(trip) {
   const all = fresh.length ? fresh : pool0;
   const usable = trip.method ? all.filter((id) => SPECIES_METHODS[id]?.includes(trip.method)) : all;
   const pool = (usable.length ? usable : all).map(getCreature);
-  const total = pool.reduce((s, c) => s + RARITY_WEIGHT[c.rarity], 0);
+  const total = pool.reduce((s, c) => s + CATCH_WEIGHT[c.stars], 0);
   const n = 2 + Math.floor(rand() * 3);
   return Array.from({ length: n }, () => {
     let r = rand() * total;
     for (const c of pool) {
-      r -= RARITY_WEIGHT[c.rarity];
+      r -= CATCH_WEIGHT[c.stars];
       if (r < 0) return c.id;
     }
     return pool[0].id;
