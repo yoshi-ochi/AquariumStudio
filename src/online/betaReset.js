@@ -2,7 +2,7 @@
  * β版の生物データのリセット（レベル廃止・レア度の変更で整合しなくなった捕獲データを消す）。
  * セーブを読み込んだときに1回だけ行い、セーブに creatureReset の版を記録する。
  * 残すもの：レイアウト（水槽・設備・部屋）・資金・在庫の物品・スタッフ・調査隊の数・同盟の所属。
- * 消すもの：在庫と展示中の生き物・図鑑の発見記録・成長・航海中の調査隊・繁殖中の生き物・採集と合同調査のメール。
+ * 消すもの：在庫と展示中の生き物・図鑑（発見記録と達成報酬の受け取り記録）・成長・航海中の調査隊・繁殖中の生き物・採集と合同調査のメール。
  * 合同調査の回と出資の記録は、サーバー側で消す（supabase/beta_reset_creatures.sql）。
  */
 export const CREATURE_RESET = 1;
@@ -18,6 +18,7 @@ export function applyCreatureReset(data) {
   for (const o of data.objects ?? []) delete o.creatures;
   const life = data.life;
   if (life) {
+    life.zukan = []; // 図鑑の地域の達成報酬も、もう一度受け取れる
     if (life.backyard) life.backyard.jobs = {};
     if (life.mail) {
       life.mail.items = (life.mail.items ?? []).filter((m) => !MAIL_KINDS.has(m.kind));

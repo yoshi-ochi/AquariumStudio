@@ -7,6 +7,8 @@ export const RARITY_LIST = [1, 2, 3, 4];
 export const RARITY_NAME = { 1: '緑', 2: '青', 3: '紫', 4: '金' };
 /** 採取で選ばれる重み（レア度ごと。管理者ツールで変更可） */
 export const CATCH_WEIGHT = { 1: 60, 2: 30, 3: 10, 4: 5 };
+/** 新種を初めて発見したときの報酬（円。レア度ごと。管理者ツールで変更可） */
+export const DISCOVERY_REWARD = { 1: 5000, 2: 30000, 3: 200000, 4: 1000000 };
 
 const c = (id, name, form, len, rarity, slots, appeal, body, belly, fin, extra = {}) => ({
   id, name, form, len, rarity, slots, appeal, colors: { body, belly, fin }, ...extra,

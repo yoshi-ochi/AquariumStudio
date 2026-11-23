@@ -1,4 +1,4 @@
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, CATCH_WEIGHT, RARITY_LIST, RETIRED_PLACES, recomputeDerived } from './creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, CATCH_WEIGHT, DISCOVERY_REWARD, RARITY_LIST, RETIRED_PLACES, recomputeDerived } from './creatureData.js';
 import { SPECIES_METHODS } from './fishingData.js';
 import { NOTES } from './creatureNotes.js';
 import { PIECE_FISH, BASE_PIECE_FISH, rebuildGrowth } from './growth.js';
@@ -13,7 +13,7 @@ import { PIECE_FISH, BASE_PIECE_FISH, rebuildGrowth } from './growth.js';
  *   places:  { [id]: { name, text, stage, cost, lat, lon, zone, pool, removed } },
  *   addedPlaces: [{ id, name, text, stage, cost, lat, lon, zone, pool }],
  *   joint:   { [id]: { pool } },
- *   rarity:  { weight: { 1〜4 } }（レア度ごとの採取の重み）
+ *   rarity:  { weight: { 1〜4 }, reward: { 1〜4 } }（レア度ごとの採取の重みと、新種発見の報酬）
  *   growth:  { pieceFish: [6] }（8角星形ごとの1ピースの匹数）
  * }
  */
@@ -31,12 +31,13 @@ const BASE = {
   methods: clone(SPECIES_METHODS),
   notes: { ...NOTES },
   weight: { ...CATCH_WEIGHT },
+  reward: { ...DISCOVERY_REWARD },
 };
 export const baseCreature = (id) => BASE.creatures.find((c) => c.id === id);
 export const basePlace = (id) => BASE.places.find((d) => d.id === id);
 export const baseMethods = (id) => BASE.methods[id] ?? [];
 export const baseNote = (id) => BASE.notes[id] ?? '';
-export const baseRules = () => ({ weight: { ...BASE.weight }, pieceFish: [...BASE_PIECE_FISH] });
+export const baseRules = () => ({ weight: { ...BASE.weight }, reward: { ...BASE.reward }, pieceFish: [...BASE_PIECE_FISH] });
 
 const pick = (src, keys) => Object.fromEntries(keys.filter((k) => src?.[k] != null && src[k] !== '').map((k) => [k, clone(src[k])]));
 const reset = (arr, base) => {
@@ -95,6 +96,8 @@ export function applyConfig(cfg = {}) {
   const r = cfg.rarity ?? {};
   resetObj(CATCH_WEIGHT, BASE.weight);
   Object.assign(CATCH_WEIGHT, nums(r.weight));
+  resetObj(DISCOVERY_REWARD, BASE.reward);
+  Object.assign(DISCOVERY_REWARD, nums(r.reward));
   // 8角星形ごとの1ピースの匹数
   const fish = cfg.growth?.pieceFish ?? [];
   BASE_PIECE_FISH.forEach((n, i) => (PIECE_FISH[i] = Number.isFinite(+fish[i]) && +fish[i] >= 1 ? Math.round(+fish[i]) : n));

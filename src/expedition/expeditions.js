@@ -39,8 +39,15 @@ export class Expeditions extends EventTarget {
 
   /** 新しく手に入れた生物を在庫に加える */
   discover(id) {
+    const fresh = this.seenCount(id) === 0;
     this.seen[id] = this.seenCount(id) + 1;
     this.give(id);
+    if (fresh) this._newSpecies([id]);
+  }
+
+  /** 初めて図鑑に載った魚種を知らせる（新種発見の報酬。lifeSystems が受け取る） */
+  _newSpecies(ids) {
+    if (ids.length) this.dispatchEvent(new CustomEvent('discovered', { detail: ids }));
   }
 
   count(id) {
@@ -94,7 +101,9 @@ export class Expeditions extends EventTarget {
     this.trips.splice(index, 1);
     this.released = [];
     const kept = [];
+    const fresh = [];
     for (const id of caught) {
+      if (this.seenCount(id) === 0) fresh.push(id);
       this.seen[id] = this.seenCount(id) + 1; // 放流しても図鑑には載る
       if (this.usedSlots + getCreature(id).slots > this.getCapacity()) {
         this.released.push(id);
@@ -104,6 +113,7 @@ export class Expeditions extends EventTarget {
       kept.push(id);
     }
     this.dispatchEvent(new CustomEvent('claimed', { detail: caught }));
+    this._newSpecies(fresh);
     this._emit();
     return kept;
   }

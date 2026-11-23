@@ -1,5 +1,5 @@
 import { INCOME_PER_VISITOR } from '../management/stageData.js';
-import { CREATURES } from '../expedition/creatureData.js';
+import { CREATURES, DISCOVERY_REWARD, RARITY_NAME, getCreature } from '../expedition/creatureData.js';
 import { feed, feedCost, isHungry, hasLife, setCareFacilities } from '../expedition/husbandry.js';
 import { Backyard } from '../building/backyard.js';
 import { setCleanIntervalBoost } from '../tanks/tankCleaning.js';
@@ -23,6 +23,7 @@ export class LifeSystems {
     this.monthly = new Monthly({ state: this.state, manager, expeditions });
     this.backyard = new Backyard({ manager, ops, economy, expeditions, toast, isUnlocked });
     expeditions.getCapacity = () => this.backyard.capacity;
+    expeditions.addEventListener('discovered', (e) => this._rewardDiscovery(e.detail));
     this.panels = {
       backyard: { title: 'バックヤード', live: true, view: new BackyardView({ backyard: this.backyard, expeditions, economy, previews, toast }) },
       care: { title: '飼育', live: true, view: new CareView({ manager, economy, toast, onFed: () => (this.state.flags.fed = true) }) },
@@ -31,6 +32,20 @@ export class LifeSystems {
     };
     goalEl.addEventListener('click', (e) => e.target.closest('button') && this._claimGoal());
     reportEl.addEventListener('click', (e) => e.target.closest('button') && (reportEl.hidden = true));
+  }
+
+  /** 新種を初めて発見したら、レア度に応じた報酬を渡す */
+  _rewardDiscovery(ids) {
+    let total = 0;
+    for (const id of new Set(ids)) {
+      const c = getCreature(id);
+      const yen = DISCOVERY_REWARD[c?.rarity] ?? 0;
+      if (!c || !yen) continue;
+      total += yen;
+      this.economy.earn(yen);
+      this.mail.add({ key: `discovery:${id}`, kind: 'discovery', title: `新種発見：${c.name}`, body: `図鑑に${c.name}（レア度 ${RARITY_NAME[c.rarity]}）が載りました。発見の報酬 ¥${yen.toLocaleString('ja-JP')} を受け取りました。`, data: { id, yen } });
+    }
+    if (total) this.toast(`新種発見！ 報酬 ¥${total.toLocaleString('ja-JP')}（${[...new Set(ids)].map((id) => getCreature(id)?.name).join('、')}）`, { duration: 4500 });
   }
 
   stats() {

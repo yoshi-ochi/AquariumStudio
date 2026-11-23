@@ -1,7 +1,7 @@
 import { creatureThumb } from '../ui/creatureThumb.js';
 import { tankLabel } from '../tanks/tankLabel.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RARITY_LIST, RARITY_NAME, getCreature } from '../expedition/creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RARITY_LIST, RARITY_NAME, DISCOVERY_REWARD, getCreature } from '../expedition/creatureData.js';
 import { octagrams } from '../ui/octagram.js';
 import { NOTES } from '../expedition/creatureNotes.js';
 import { WATER, ensureCare, feed, feedCost, hasLife, isHungry, predatorConflict, tankHealth, waterMismatch, nextFeedIn, crowdFactor, zoneOf, FEED_INTERVAL } from '../expedition/husbandry.js';
@@ -124,7 +124,8 @@ export class ZukanView {
       return `<h4 class="gs-sub">${g.name} ${count}${mode === 'area' && claimed ? ' ・ 達成' : ''}</h4><div class="zk-grid">${cells || '<p class="gs-empty">在庫か展示中の生き物がいません。</p>'}</div>${reward}`;
     });
     const hint = '<p class="gs-empty">魚種をタップすると、在庫の同じ魚種を使って育てられます。育つほど体が大きくなり、集客とランキングの点数が上がります。</p>';
-    return `<p class="gs-empty">発見 ${total}/${CREATURES.filter((c) => !c.retired).length}種</p>${tabs}${mode === 'grow' ? hint : ''}${sections.join('')}`;
+    const reward = [...RARITY_LIST].reverse().map((r) => `${RARITY_NAME[r]} ${yen(DISCOVERY_REWARD[r])}`).join(' ・ ');
+    return `<p class="gs-empty">発見 ${total}/${CREATURES.filter((c) => !c.retired).length}種 ・ 新種を発見すると報酬（${reward}）</p>${tabs}${mode === 'grow' ? hint : ''}${sections.join('')}`;
   }
 
   /** 数のスライダー（再描画しない） */
