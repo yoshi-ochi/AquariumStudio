@@ -6,7 +6,7 @@ import { SPECIES_METHODS, METHODS } from './fishingData.js';
  * レベルが上がるほど体が大きくなり（成魚の60%→100%）、集客力も上がる。
  *
  * 目安：やり込む人（調査隊10隊・1日8時間ほど遊ぶ）が1つの魚種に集中して、Lv300 まで約30日。
- *   1匹あたりの経験値は「その魚種がどれだけ捕れやすいか」から決める（捕れにくい魚ほど多い）。
+ *   1匹あたりの経験値はレア度ごとに揃える（GROWTH_RULES.xpFixed。管理者ツールで変更可。0 なら捕れやすさから自動計算）。
  *   1日に得られる経験値が DAILY_XP、Lv300 までの累計が DAILY_XP×30 になるよう、全魚種共通の曲線を作る。
  *   星2までの魚は、Lv1→2 でも2匹分以上の経験値が要るように、1レベルの経験値に下限を設ける。
  */
@@ -44,15 +44,15 @@ function perDay(id) {
 
 /**
  * レア度ごとの調整（管理者の設定で上書き。creatureConfig.js）
+ *   xpFixed  … 1匹の経験値（レア度ごとに揃える。0 にすると捕れやすさからの自動計算）
  *   xpMul    … 1匹の経験値（自動計算）にかける倍率
  *   xpMin    … 1匹の経験値の下限（捕りやすい漁法がある激レアが、コモンより安くならないように）
- *   xpFixed  … 1匹の経験値を固定する値（0 なら自動）
  *   levelMul … レベルアップに要る経験値にかける倍率
  */
 export const GROWTH_RULES = {
   xpMul: { 1: 1, 2: 1, 3: 1 },
   xpMin: { 1: 1, 2: 50, 3: 250 },
-  xpFixed: { 1: 0, 2: 0, 3: 0 },
+  xpFixed: { 1: 50, 2: 200, 3: 800 },
   levelMul: { 1: 1, 2: 1, 3: 1 },
 };
 /** 魚種ごとに固定した1匹の経験値（管理者の設定。無ければレア度の規則で決める） */
@@ -108,6 +108,8 @@ rebuildGrowth();
 /** 魚種 id の Lv に達するまでの累計経験値（id を省くとコモンの基準） */
 const cumAt = (lv, id) => Math.round(CUM[Math.min(MAX_LEVEL, Math.max(1, lv))] * (id ? rule('levelMul', id) : 1));
 export const xpForLevel = (lv, id) => cumAt(lv, id);
+/** レア度 r の魚が Lv に達するまでの累計経験値（管理者ツールのグラフ用） */
+export const xpForRarityLevel = (lv, r) => Math.round(CUM[Math.min(MAX_LEVEL, Math.max(1, lv))] * Math.max(0.05, GROWTH_RULES.levelMul[r] ?? 1));
 export function levelOf(xp = 0, id) {
   let lo = 1;
   let hi = MAX_LEVEL;

@@ -87,3 +87,35 @@ i { font-style: normal; font-size: 11px; padding: 0 4px; border-radius: 4px; bac
 .ad-issues .error { color: var(--danger); }
 .ad-issues .warn { color: var(--muted); }
 .ad-login { max-width: 420px; margin: 40px auto; display: grid; gap: 8px; }
+
+/* 経験値のグラフ（xpChart.js）。系列色は categorical の1〜3番 */
+:root { --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --grid: #e4ebf0; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --grid: #22384a; }
+}
+:root[data-theme='dark'] { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --grid: #22384a; }
+.ad-seg { display: inline-flex; gap: 4px; }
+.ad-more { margin-top: 10px; font-size: 13px; }
+.ad-more summary { cursor: pointer; color: var(--muted); }
+.ad-table th small, .ad-table td small { white-space: normal; }
+.xc-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin: 4px 0; }
+.xc-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.xc-key { display: inline-block; width: 14px; height: 3px; border-radius: 2px; padding: 0; vertical-align: middle; }
+.xc-key.s1 { background: var(--s1); }
+.xc-key.s2 { background: var(--s2); }
+.xc-key.s3 { background: var(--s3); }
+.xc-plot { position: relative; }
+.xc svg { display: block; width: 100%; height: auto; }
+.xc-grid { stroke: var(--grid); stroke-width: 1; }
+.xc-axis { stroke: var(--line); stroke-width: 1; }
+.xc-tick { fill: var(--muted); font-size: 11px; }
+.xc-label { fill: var(--fg); font-size: 12px; }
+.xc-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.xc-line.s1 { stroke: var(--s1); }
+.xc-line.s2 { stroke: var(--s2); }
+.xc-line.s3 { stroke: var(--s3); }
+.xc-cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.xc-hit { fill: transparent; cursor: crosshair; touch-action: none; }
+.xc-tip { position: absolute; top: 8px; min-width: 170px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 12px; pointer-events: none; }
+.xc-tip div { display: flex; align-items: center; gap: 6px; }
+.xc-tip small { display: inline; }
