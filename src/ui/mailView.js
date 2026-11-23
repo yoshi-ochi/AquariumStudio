@@ -15,7 +15,7 @@ const when = (t) => {
   const hm = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
   return sameDay ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
 };
-const KIND_ICON = { trip: 'expedition', offline: 'coin', daily: 'mail', clean: 'clean', feed: 'care', ally: 'ally', allyrun: 'ally' };
+const KIND_ICON = { trip: 'expedition', offline: 'coin', daily: 'mail', clean: 'clean', feed: 'care', ally: 'ally', allyrun: 'ally', discovery: 'coin' };
 const label = (list) => [...new Set(list)].map((c) => `${getCreature(c).name}×${list.filter((x) => x === c).length}`).join('、');
 const TABS = [['system', 'システム'], ['report', '報告'], ['ally', '同盟']];
 

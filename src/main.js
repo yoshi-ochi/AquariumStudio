@@ -65,6 +65,7 @@ import { setGrowthSource } from './expedition/growth.js';
 import { buildCreature } from './expedition/creatureBuilder.js';
 import { loadCreatureConfig } from './expedition/creatureConfig.js';
 import { installHoldRepeat } from './ui/holdRepeat.js';
+import { applyCreatureReset, CREATURE_RESET } from './online/betaReset.js';
 import { TankView } from './ui/tankView.js';
 import { BuildView } from './ui/buildView.js';
 import { MailView } from './ui/mailView.js';
@@ -494,7 +495,7 @@ async function boot() {
 
   /** 現在の状態を保存用データにする */
   function snapshot() {
-    return { version: LAYOUT_VERSION, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), ...(home && { home }), room: { ...roomSettings, building: 3, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
+    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), ...(home && { home }), room: { ...roomSettings, building: 3, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
   }
 
   let pendingLayout = null; // 初期設定で選んだ間取り
@@ -522,8 +523,9 @@ async function boot() {
     applyRoom(true);
   }
 
-  /** 保存用データから状態を復元する */
+  /** 保存用データから状態を復元する。β版の生物データのリセットを行ったら true */
   function applySnapshot(data) {
+    const reset = applyCreatureReset(data);
     if (mode !== 'home') goHome();
     views.setMode('floor');
     setLayout(data.room?.layout ?? pendingLayout ?? DEFAULT_LAYOUT);
@@ -563,6 +565,7 @@ async function boot() {
     applyRoom(true);
     views.syncRail();
     shell.update();
+    return reset;
   }
 
   // ---- オンライン：クラウド保存・フレンド・訪問 -------------------------------
@@ -1027,6 +1030,7 @@ async function boot() {
   let lastSavedAt = null;
   let layoutChosen = false;
   let restored = false; // 端末内の控えから戻した
+  let creatureResetDone = false; // β版の生物データのリセットを行った（すぐクラウドへ保存する）
   // ログイン必須：完了してそのアカウントのセーブを反映するまでスプラッシュを閉じない
   if (online.enabled) {
     await runLoginGate({
@@ -1045,13 +1049,15 @@ async function boot() {
         const kept = pendingJournal(online.user.id, data, online.rev);
         if (kept) restored = true;
         const use = kept ?? data;
-        if (use) applySnapshot(use);
-        else startNewAquarium(pendingLayout ?? DEFAULT_LAYOUT);
+        if (use && applySnapshot(use)) {
+          creatureResetDone = true;
+          life.mail.add({ key: `reset:creature${CREATURE_RESET}`, kind: 'room', title: '生き物のデータをリセットしました', body: 'β版の仕様変更（レア度・成長の見直し）にともない、捕まえた生き物・図鑑・成長と合同調査の記録をリセットしました。水族館のレイアウト・資金・同盟はそのまま残っています。' });
+        } else if (!use) startNewAquarium(pendingLayout ?? DEFAULT_LAYOUT);
         lastSavedAt = use?.savedAt ?? null;
       },
     });
     autoSave.start();
-    if (layoutChosen || restored) autoSave.saveNow().catch((err) => console.warn(err.message));
+    if (layoutChosen || restored || creatureResetDone) autoSave.saveNow().catch((err) => console.warn(err.message));
     if (lastSavedAt) {
       life.settleOffline(lastSavedAt, ops.visitorMult);
       autoSave.flush(); // 受け取った収入をすぐ保存（二重受け取りを防ぐ）
