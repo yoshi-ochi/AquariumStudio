@@ -637,4 +637,3 @@ body.tutorial-on #goal-card { display: none; }
 
 /* 長押しで連続タップするボタン（holdRepeat.js） */
 button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-.admin-link { display: block; padding: 10px; border-radius: 8px; text-align: center; text-decoration: none; background: #1f6fb2; color: #fff; }

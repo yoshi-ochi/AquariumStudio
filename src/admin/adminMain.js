@@ -8,7 +8,7 @@ import { GrowthTab } from './adminGrowth.js';
 import { esc } from './adminUi.js';
 
 /**
- * 管理者ツール（admin.html）。生物のレア度・季節・生息環境・採取地・経験値を編集し、
+ * 管理者ツール（ゲームとは別サイト：admin/。npm run admin で起動）。生物のレア度・季節・生息環境・採取地・経験値を編集し、
  * Supabase の game_config に保存する。プレイヤーは次に起動したときに反映される。
  * 書き込みは管理者だけ（supabase/admin_config.sql の行レベルセキュリティ）。
  */
@@ -78,11 +78,6 @@ $('ad-save').addEventListener('click', async () => {
   }
   state.saved = JSON.stringify(data);
   state.dirty = false;
-  try {
-    localStorage.setItem('aq-creature-config', JSON.stringify(data)); // この端末のゲームにもすぐ反映
-  } catch {
-    /* 保存できない環境 */
-  }
   render();
   alert('保存しました。プレイヤーは次にゲームを起動したときに反映されます。');
 });
@@ -96,7 +91,7 @@ function loginForm(message) {
     <input id="ad-email" type="email" placeholder="メールアドレス" autocomplete="email">
     <input id="ad-pass" type="password" placeholder="パスワード" autocomplete="current-password">
     <button id="ad-login" class="primary">ログイン</button>
-    <p class="ad-note">Google などでログインしている場合は、同じブラウザでゲームにログインしてからこのページを開き直してください。</p></section>`;
+    <p class="ad-note">管理者のアカウントにパスワードが無い場合は、ゲームのアカウント設定でパスワードを設定してください。</p></section>`;
   $('ad-login').onclick = async () => {
     const res = await sb.auth.signInWithPassword({ email: $('ad-email').value.trim(), password: $('ad-pass').value });
     if (res.error) return alert(res.error.message);

@@ -128,9 +128,6 @@ export class Online {
 
   async _loadProfile() {
     this.profile = this._check(await this.sb.from('profiles').select('*').eq('id', this.user.id).single());
-    // 管理者か（supabase/admin_config.sql。未設定なら管理者なし）
-    const admin = await this.sb.rpc('is_admin');
-    this.isAdmin = !admin.error && admin.data === true;
   }
 
   async rename(name) {

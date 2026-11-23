@@ -4,7 +4,6 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 export function accountHtml(online) {
   const hasPw = online.hasPassword;
   return `<button data-act="account-back">← 戻る</button>
-    ${online.isAdmin ? `<h4>管理者</h4><a class="primary admin-link" href="${import.meta.env.BASE_URL}admin.html">管理者ツールを開く（生物の設定）</a>` : ''}
     <h4>プレイヤー名</h4>
     <div class="fp-me"><input id="fp-rename" value="${esc(online.profile.name)}" maxlength="24" aria-label="プレイヤー名"><button data-act="rename" class="primary">変更</button></div>
     <p class="muted">はじめはプレイヤーID（${esc(online.profile.friend_code)}）です。好きな名前に変えられます。</p>
