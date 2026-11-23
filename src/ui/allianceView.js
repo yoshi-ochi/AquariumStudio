@@ -7,6 +7,8 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const FUND_STEPS = [100000, 1000000, 10000000];
 const REWARD_COUNT = 2;
+/** 同じ合同調査を同時に進められる回数（supabase/joint_carryover.sql と同じ値） */
+const MAX_PARALLEL = 99;
 
 /** 合同調査の成果（調査と本人ごとに固定） */
 function rollReward(project, runId, userId) {
@@ -60,8 +62,8 @@ export class AllianceView {
   }
 
   /** 合同調査の成果を受け取る（同盟画面・メールの両方から） */
-  async claimRun(pid, runId, { quiet = false } = {}) {
-    if (!(await this.api.claim(runId))) return [];
+  async claimRun(pid, runId, { quiet = false, refresh = true } = {}) {
+    if (!(await this.api.claim(runId, { refresh }))) return [];
     const project = JOINT_PROJECTS.find((p) => p.id === pid);
     const got = rollReward(project, runId, this.online.user.id);
     got.forEach((c) => this.expeditions.discover(c));
@@ -108,17 +110,29 @@ export class AllianceView {
 
   _project(p, level, runs, contribs) {
     if (p.level > level) return `<div class="gs-row locked">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>同盟Lv${p.level}で解放 ・ 総額 ${yen(p.cost)}</small></div></div>`;
-    const list = runs.filter((r) => r.project === p.id);
-    const claimable = list.find((r) => this.api.canClaim(r));
-    const running = list.find((r) => r.done_at && new Date(r.done_at) > new Date());
-    const open = list.find((r) => !r.done_at);
+    const { claimable, running, open } = this._runsOf(p.id, runs);
     const funded = open?.funded ?? 0;
+    const full = running.length >= MAX_PARALLEL;
     const species = p.pool.map((id) => getCreature(id).name).join('、');
-    const buttons = FUND_STEPS.map((n) => `<button data-act="ally-fund" data-repeat="300" data-id="${p.id}:${n}" ${this.economy.canAfford(n) ? '' : 'disabled'}>${n / 10000}万出資</button>`).join('');
-    return `<div class="gs-row wrap">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>${p.text}</small><small>発見できる生物：${species}</small><small>完了すると、同盟メンバー全員が成果を受け取れます</small>
-        ${running ? `<small>調査中 ・ 残り <span data-until="${new Date(running.done_at).getTime()}"></span></small>` : ''}
-        <div class="st-bar"><i style="width:${(funded / p.cost) * 100}%"></i></div><small>資金 ${yen(funded)} / ${yen(p.cost)}（${p.hours}時間）</small></div>
-      <div class="gs-btns">${claimable ? `<button data-act="ally-claim" data-id="${p.id}:${claimable.id}" class="primary">成果を受け取る</button>` : ''}${buttons}</div></div>`;
+    const buttons = FUND_STEPS.map((n) => `<button data-act="ally-fund" data-repeat="300" data-id="${p.id}:${n}" ${!full && this.economy.canAfford(n) ? '' : 'disabled'}>${n / 10000}万出資</button>`).join('');
+    const status = running.length
+      ? `<small class="al-runs"><b>調査中 ${running.length}回</b>（同時に最大${MAX_PARALLEL}回） ・ 次の完了まで <span data-until="${new Date(running[0].done_at).getTime()}"></span></small>`
+      : '<small>調査中の回はありません</small>';
+    return `<div class="gs-row wrap">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>${p.text}</small><small>発見できる生物：${species}</small><small>完了すると、同盟メンバー全員が成果を受け取れます。目標額を超えた出資は次の回に繰り越し、続けて調査を始めます</small>
+        ${status}
+        <div class="st-bar"><i style="width:${(funded / p.cost) * 100}%"></i></div><small>次の回の資金 ${yen(funded)} / ${yen(p.cost)}（1回 ${p.hours}時間）</small>
+        ${full ? `<small class="gs-alert">${MAX_PARALLEL}回分が調査中のため、完了するまで出資できません</small>` : ''}</div>
+      <div class="gs-btns">${claimable.length ? `<button data-act="ally-claim" data-id="${p.id}" class="primary">成果を受け取る（${claimable.length}回分）</button>` : ''}${buttons}</div></div>`;
+  }
+
+  /** 調査ごとの回：受け取れる回・調査中の回（完了が近い順）・資金集め中の回 */
+  _runsOf(pid, runs, now = new Date()) {
+    const list = runs.filter((r) => r.project === pid);
+    return {
+      claimable: list.filter((r) => this.api.canClaim(r, now)),
+      running: list.filter((r) => r.done_at && new Date(r.done_at) > now).sort((a, b) => new Date(a.done_at) - new Date(b.done_at)),
+      open: list.find((r) => !r.done_at),
+    };
   }
 
   act(act, id, btn, rerender) {
@@ -153,18 +167,26 @@ export class AllianceView {
       const amount = +n;
       if (!this.economy.spend(amount)) return;
       try {
+        const before = this._runsOf(pid, api.state?.runs ?? []).running.length;
         const taken = await api.fund(pid, amount);
-        if (taken < amount) this.economy.earn(amount - taken); // 目標額を超えた分は返金
-        this.toast(`${yen(taken)} を出資しました`);
+        if (taken < amount) this.economy.earn(amount - taken); // 99回分が調査中で受け付けられなかった分は返金
+        const started = Math.max(0, this._runsOf(pid, api.state?.runs ?? []).running.length - before);
+        const extra = started ? `（調査を${started}回開始）` : '';
+        const back = taken < amount ? ` ・ ${yen(amount - taken)} は同時${MAX_PARALLEL}回の上限のため返金` : '';
+        this.toast(`${yen(taken)} を出資しました${extra}${back}`, { duration: back ? 4000 : undefined });
         const p = JOINT_PROJECTS.find((x) => x.id === pid);
-        this._log(`合同調査「${p?.name ?? pid}」に出資しました`, `${yen(taken)} を出資しました。資金が集まると調査が始まります。`, { data: { amount: taken } });
+        this._log(`合同調査「${p?.name ?? pid}」に出資しました`, `${yen(taken)} を出資しました${extra}。目標額を超えた分は次の回に繰り越されます。`, { data: { amount: taken } });
       } catch (err) {
         this.economy.earn(amount);
         throw err;
       }
     } else if (act === 'ally-claim') {
-      const [pid, runId] = id.split(':');
-      await this.claimRun(pid, runId);
+      // その調査の受け取れる回をまとめて受け取る
+      const { claimable } = this._runsOf(id, api.state?.runs ?? []);
+      const got = [];
+      for (const r of claimable) got.push(...(await this.claimRun(id, r.id, { quiet: true, refresh: false })));
+      await api.refresh();
+      if (got.length) this.toast(`${claimable.length}回分の成果：${Object.entries(countIds(got)).map(([c, n]) => `${getCreature(c).name}×${n}`).join('、')}`, { duration: 5000 });
     }
   }
 }

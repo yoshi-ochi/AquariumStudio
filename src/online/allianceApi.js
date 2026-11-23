@@ -30,17 +30,24 @@ export class AllianceApi {
     const rows = this._check(await this.sb.from('alliance_members').select('alliance_id, joined_at').eq('user_id', me).limit(1));
     if (!rows.length) return (this.state = null);
     const id = rows[0].alliance_id;
-    const [a, mem, runs] = await Promise.all([
+    // 合同調査：資金集め中・調査中のすべてと、最近30日に完了したもの（同じ調査は同時に99回まで）
+    const now = new Date().toISOString();
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    const [a, mem, active, done] = await Promise.all([
       this.sb.from('alliances').select('*').eq('id', id).single(),
       this.sb.from('alliance_members').select('user_id').eq('alliance_id', id),
-      this.sb.from('joint_runs').select('*').eq('alliance_id', id).order('created_at', { ascending: false }).limit(20),
+      this.sb.from('joint_runs').select('*').eq('alliance_id', id).or(`done_at.is.null,done_at.gt.${now}`).limit(400),
+      this.sb.from('joint_runs').select('*').eq('alliance_id', id).lte('done_at', now).gt('done_at', since).order('done_at', { ascending: false }).limit(300),
     ]);
     const memberIds = this._check(mem).map((m) => m.user_id);
     const members = this._check(await this.sb.from('profiles').select('id, name, lat, lon').in('id', memberIds));
-    const runList = this._check(runs);
-    const contribs = runList.length
-      ? this._check(await this.sb.from('joint_contribs').select('run_id, amount, claimed').eq('user_id', me).in('run_id', runList.map((r) => r.id)))
-      : [];
+    const runList = [...this._check(active), ...this._check(done)];
+    // URL が長くなりすぎないよう、100件ずつ問い合わせる
+    const contribs = [];
+    for (let i = 0; i < runList.length; i += 100) {
+      const ids = runList.slice(i, i + 100).map((r) => r.id);
+      contribs.push(...this._check(await this.sb.from('joint_contribs').select('run_id, amount, claimed').eq('user_id', me).in('run_id', ids)));
+    }
     this.state = { alliance: this._check(a), members, runs: runList, contribs, joinedAt: rows[0].joined_at };
     return this.state;
   }
@@ -82,9 +89,10 @@ export class AllianceApi {
     return !st.contribs.some((c) => c.run_id === run.id && c.claimed);
   }
 
-  async claim(runId) {
+  /** refresh: false なら読み直さない（まとめて受け取るときは最後に1回だけ読み直す） */
+  async claim(runId, { refresh = true } = {}) {
     const ok = this._check(await this.sb.rpc('claim_joint', { p_run: runId }));
-    await this.refresh();
+    if (refresh) await this.refresh();
     return ok;
   }
 
