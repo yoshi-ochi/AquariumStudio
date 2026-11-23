@@ -497,9 +497,13 @@ body:not([data-view=floor]) #side-actions, body:not([data-view=floor]) #goal-car
 .bd-canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; max-width: 520px; margin: 0 auto; border: 1px solid var(--border); border-radius: 8px; touch-action: manipulation; cursor: crosshair; }
 
 /* 生き物のサムネイルと、右上のレア度の星（最大6つ） */
-.cthumb { position: relative; display: inline-block; flex: none; line-height: 0; }
-.cthumb > img { display: block; }
-.cstars { position: absolute; top: 2px; right: 2px; padding: 1px 3px; border-radius: 6px; background: rgba(10, 20, 30, .62); color: #ffc93c; font-size: 9px; font-style: normal; line-height: 1.2; letter-spacing: -1px; pointer-events: none; white-space: nowrap; }
+.cthumb { position: relative; display: inline-block; flex: none; line-height: 0; border-radius: 6px; }
+.cthumb > img { display: block; background: none !important; }
+/* レア度はカードの背景色：緑・青・紫・金 */
+.cthumb.r1 { background: linear-gradient(160deg, #e2f6dc, #7cc97f); }
+.cthumb.r2 { background: linear-gradient(160deg, #e0efff, #5f9fe6); }
+.cthumb.r3 { background: linear-gradient(160deg, #efe4ff, #9a6ae0); }
+.cthumb.r4 { background: linear-gradient(160deg, #fff6d2, #e3a92b); }
 .zk-mode { grid-template-columns: repeat(2, 1fr); margin-bottom: 6px; }
 
 /* メール */
@@ -614,8 +618,9 @@ body.sheet-full #view-rail, body.sheet-full #side-actions, body.sheet-full #goal
 body.tutorial-on #goal-card { display: none; }
 
 /* ---- 成長（魚種ごとのレベル） ---- */
-.cg-lv { position: absolute; left: 6px; top: 22px; padding: 0 4px; border-radius: 6px; color: #0f3550; background: var(--gold); font-size: 10px; font-style: normal; font-weight: 800; line-height: 1.5; }
-.cg-grow { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; margin: 6px 0; }
+.cg-lv { position: absolute; left: 6px; top: 22px; padding: 2px 3px; border-radius: 6px; background: rgba(10, 30, 45, .62); line-height: 0; }
+.cg-grow { display: grid; grid-template-columns: 1fr; align-items: center; gap: 4px; margin: 6px 0; }
+.cg-grow .oct-detail { margin: 0; }
 .cg-grow b { font-size: 15px; color: #1f6f9c; }
 .cg-grow .mo-bar { margin: 0; }
 .cg-grow small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
@@ -627,7 +632,7 @@ body.tutorial-on #goal-card { display: none; }
 .rk-row.me { background: #fff4d6; }
 .zk-cell { position: relative; }
 .zk-cell.sel { border-color: #2f8fd0; }
-.zk-lv { position: absolute; left: 5px; top: 5px; padding: 0 4px; border-radius: 6px; color: #0f3550; background: var(--gold); font-size: 9px; font-style: normal; font-weight: 800; line-height: 1.5; }
+.zk-lv { position: absolute; left: 5px; top: 5px; padding: 2px 3px; border-radius: 6px; background: rgba(10, 30, 45, .62); line-height: 0; }
 .zk-note { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 6px; }
 .zk-note small { color: var(--muted); font-size: 11px; line-height: 1.5; }
 
@@ -637,3 +642,19 @@ body.tutorial-on #goal-card { display: none; }
 
 /* 長押しで連続タップするボタン（holdRepeat.js） */
 button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+
+/* 成長：6つの8角星形（octagram.js）。ピースは上から時計回りに埋まる */
+.oct-row { display: inline-flex; gap: 2px; vertical-align: middle; }
+.oct { width: 22px; height: 22px; display: block; }
+.oct path { fill: #e3eaef; stroke: #9fb1bd; stroke-width: .5; stroke-linejoin: round; }
+.oct path.on { fill: #f2b632; stroke: #a8740c; }
+.oct.done path.on { fill: #ffc93c; }
+.oct-row.mini { gap: 1px; }
+.oct-row.mini .oct { width: 9px; height: 9px; }
+.oct-row.mini .oct path { fill: rgba(255, 255, 255, .3); stroke: none; }
+.oct-row.mini .oct path.on { fill: #ffd36b; }
+.oct-detail { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 4px 0 6px; }
+.oct-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.oct-col .oct { width: 100%; max-width: 40px; height: auto; aspect-ratio: 1; }
+.oct-col small { font-size: 9px; color: var(--muted, #5d7381); }
+.rk-oct { display: block; margin: 2px 0; }

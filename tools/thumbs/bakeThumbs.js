@@ -19,7 +19,7 @@ export async function bakeThumbs({ onProgress = () => {} } = {}) {
   const manifest = { d: {}, c: {} };
   const jobs = [['d', ALL_DEFS, buildObject], ['c', CREATURES, buildCreature]];
   for (const [kind, defs, build] of jobs) {
-    const shots = await generatePreviews(defs, build, { dispose: disposeObject, type: 'image/webp', quality: 0.82, onProgress: (i, n) => onProgress(kind, i, n) });
+    const shots = await generatePreviews(defs, build, { dispose: disposeObject, type: 'image/webp', quality: 0.82, transparent: kind === 'c', onProgress: (i, n) => onProgress(kind, i, n) });
     for (const def of defs) {
       await send(thumbFile(kind, def.id), shots.get(def.id).split(',')[1]);
       manifest[kind][def.id] = thumbKey(kind, def);

@@ -1,4 +1,4 @@
-import { DESTINATIONS, JOINT_PROJECTS, RETIRED_PLACES, STAR_LIST, starLabel, getCreature, activeCreatures } from '../expedition/creatureData.js';
+import { DESTINATIONS, JOINT_PROJECTS, RETIRED_PLACES, RARITY_LIST, RARITY_NAME, getCreature, activeCreatures } from '../expedition/creatureData.js';
 import { WATER } from '../expedition/husbandry.js';
 import { basePlace } from '../expedition/creatureConfig.js';
 import { placeEntry, setInPool, validId, idTaken } from './adminState.js';
@@ -16,7 +16,7 @@ export class PlacesTab {
     const places = DESTINATIONS.map((d) => this._place(d)).join('');
     const joint = JOINT_PROJECTS.map((p) => this._pool(p.id, `合同調査：${p.name}`, p.pool, `<p class="ad-note">費用 ¥${num(p.cost)} ・ 同盟Lv${p.level} ・ ${p.hours}時間（費用・時間はサーバーの SQL で管理）</p>`)).join('');
     const retired = RETIRED_PLACES.map((d) => `<div class="ad-row"><span>${esc(d.name)}（削除済）</span><button data-restore="${d.id}">削除を取り消す</button></div>`).join('');
-    return `<div class="ad-bar"><button id="ad-new-place">＋ 採取地を追加</button><span class="ad-note">捕れる確率は星の数の「出現の重み」で決まります（星・経験値タブ）。</span></div>
+    return `<div class="ad-bar"><button id="ad-new-place">＋ 採取地を追加</button><span class="ad-note">捕れる確率はレア度の「採取の重み」で決まります（レア度・成長タブ）。</span></div>
       ${places}${joint}${retired ? `<section class="ad-card"><h3>削除した採取地</h3>${retired}</section>` : ''}`;
   }
 
@@ -35,10 +35,10 @@ export class PlacesTab {
   _pool(id, title, pool, extra) {
     const chips = pool.map((cid) => {
       const c = getCreature(cid);
-      return `<span class="ad-chip s${c.stars}">${esc(c.name)}<small>${starLabel(c.stars)}</small><button data-out="${id}:${cid}" aria-label="${esc(c.name)}を外す">×</button></span>`;
+      return `<span class="ad-chip r${c.rarity}">${esc(c.name)}<small>${RARITY_NAME[c.rarity]}</small><button data-out="${id}:${cid}" aria-label="${esc(c.name)}を外す">×</button></span>`;
     }).join('');
-    const options = activeCreatures().filter((c) => !pool.includes(c.id)).map((c) => `<option value="${c.id}">${esc(c.name)}（${starLabel(c.stars)}）</option>`).join('');
-    const count = STAR_LIST.map((r) => `★${r} ${pool.filter((x) => getCreature(x).stars === r).length}`).join(' ・ ');
+    const options = activeCreatures().filter((c) => !pool.includes(c.id)).map((c) => `<option value="${c.id}">${esc(c.name)}（${RARITY_NAME[c.rarity]}）</option>`).join('');
+    const count = RARITY_LIST.map((r) => `${RARITY_NAME[r]} ${pool.filter((x) => getCreature(x).rarity === r).length}`).join(' ・ ');
     return `<section class="ad-card"><h3>${title}</h3>${extra}
       <h4>捕れる生き物 ${pool.length}種 <small>${count}</small></h4><div class="ad-chips">${chips || '<span class="ad-note">いません</span>'}</div>
       <div class="ad-bar"><select data-pick="${id}"><option value="">生き物を加える…</option>${options}</select></div></section>`;

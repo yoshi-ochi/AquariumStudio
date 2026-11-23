@@ -1,6 +1,7 @@
 import { creatureThumb } from './creatureThumb.js';
 import { creatureGrid, qtyPanel, updateQty, creatureInfo } from './creatureGrid.js';
 import { CREATURES, getCreature } from '../expedition/creatureData.js';
+import { MAX_PIECES } from '../expedition/growth.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
 import { WATER, ensureCare, feedCost, hasLife, isHungry, predatorConflict, tankHealth, waterMismatch, nextFeedIn, crowdFactor, FEED_INTERVAL } from '../expedition/husbandry.js';
 import { tankLabel, defaultTankLabel, cleanTankName } from '../tanks/tankLabel.js';
@@ -56,9 +57,9 @@ export class TankView {
     if (list.length) {
       const n = this.sel ? t.userData.creatures[this.sel] : 0;
       const panel = this.sel
-        ? qtyPanel({ title: getCreature(this.sel).name, info: creatureInfo(this.sel, `展示中 ${n}`), max: n, qty: this.qty, buttons: [{ act: 'tank-unshow', id: `${this.sel}:{n}`, label: '{n}匹 バックヤードへ戻す', primary: true }, { act: 'tank-grow', id: this.sel, label: `育てる（Lv${this.expeditions.level(this.sel)}）` }] })
+        ? qtyPanel({ title: getCreature(this.sel).name, info: creatureInfo(this.sel, `展示中 ${n}`), max: n, qty: this.qty, buttons: [{ act: 'tank-unshow', id: `${this.sel}:{n}`, label: '{n}匹 バックヤードへ戻す', primary: true }, { act: 'tank-grow', id: this.sel, label: `育てる（${this.expeditions.pieces(this.sel)}/${MAX_PIECES}ピース）` }] })
         : '';
-      shown.push(creatureGrid(this.previews, list.map(([id, k]) => ({ id, n: k, lv: this.expeditions.level(id) })), { sel: this.sel, panel }));
+      shown.push(creatureGrid(this.previews, list.map(([id, k]) => ({ id, n: k, pieces: this.expeditions.pieces(id) })), { sel: this.sel, panel }));
     }
     const over = used > cap ? `<em class="gs-alert">収容枠の目安を超えています。過密で幸福度が下がります</em>` : '';
     const life = `<h4 class="gs-sub">展示生物（収容枠 ${used}/${cap}）</h4>${over}

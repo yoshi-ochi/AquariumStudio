@@ -8,7 +8,7 @@ import { GrowthTab } from './adminGrowth.js';
 import { esc } from './adminUi.js';
 
 /**
- * 管理者ツール（ゲームとは別サイト：admin/。npm run admin で起動）。生物の星の数・季節・生息環境・採取地・経験値を編集し、
+ * 管理者ツール（ゲームとは別サイト：admin/。npm run admin で起動）。生物のレア度・季節・生息環境・採取地・成長を編集し、
  * Supabase の game_config に保存する。プレイヤーは次に起動したときに反映される。
  * 書き込みは管理者だけ（supabase/admin_config.sql の行レベルセキュリティ）。
  */
@@ -34,7 +34,7 @@ function changed() {
 const tabs = {
   species: ['魚種', new SpeciesTab(state, changed)],
   places: ['採取地', new PlacesTab(state, changed)],
-  growth: ['星・経験値', new GrowthTab(state, changed)],
+  growth: ['レア度・成長', new GrowthTab(state, changed)],
   audit: ['点検', { html: () => auditHtml(), bind() {} }],
 };
 

@@ -1,5 +1,5 @@
 import { mulberry32 } from '../tanks/random.js';
-import { levelOf, xpForLevel, xpPerFish, fishToNext, MAX_LEVEL } from './growth.js';
+import { piecesOf, fishToNext, maxFish, legacyXpToFish } from './growth.js';
 import { getCreature, getDestination, CATCH_WEIGHT, travelPlan, inSeason } from './creatureData.js';
 import { SPECIES_METHODS } from './fishingData.js';
 
@@ -18,7 +18,7 @@ export class Expeditions extends EventTarget {
     this.extraTeams = 0;
     this.creatures = {};
     this.seen = {}; // 図鑑：これまでに手に入れた数
-    this.xp = {}; // 成長：魚種ごとの累計経験値
+    this.xp = {}; // 成長：魚種ごとに成長に使った匹数（累計）
     this.getCapacity = () => Infinity;
     this.released = []; // 満杯で放流した生き物（直前の受け取り分）
   }
@@ -115,9 +115,9 @@ export class Expeditions extends EventTarget {
     return true;
   }
 
-  /** 魚種のレベル（1〜999） */
-  level(id) {
-    return levelOf(this.xp[id] ?? 0, id);
+  /** 魚種の成長：埋まったピースの数（0〜48） */
+  pieces(id) {
+    return piecesOf(this.xp[id] ?? 0);
   }
 
   /**
@@ -128,21 +128,27 @@ export class Expeditions extends EventTarget {
     return Math.max(0, this.count(id) - (shown > 0 ? 0 : 1));
   }
 
-  /** 使える在庫で次のレベルに上げられるか（図鑑の通知バッジ） */
+  /** 使える在庫で次のピースを埋められるか（図鑑の通知バッジ） */
   canLevelUp(id, shown = 0) {
     const n = this.usable(id, shown);
-    return n > 0 && n >= fishToNext(id, this.xp[id] ?? 0);
+    return n > 0 && n >= fishToNext(this.xp[id] ?? 0);
   }
 
-  /** 在庫の同じ魚種 n 匹を成長に使う。{ from, to, gained } を返す（使えなければ null） */
+  /** 全部のピースを埋め終えたか */
+  isMaxed(id) {
+    return (this.xp[id] ?? 0) >= maxFish();
+  }
+
+  /** 在庫の同じ魚種 n 匹を成長に使う（全部埋まる分まで）。{ from, to, used } を返す（使えなければ null） */
   grow(id, n = 1, shown = 0) {
-    if (n < 1 || this.usable(id, shown) < n || this.level(id) >= MAX_LEVEL) return null;
-    const from = this.level(id);
+    const room = maxFish() - (this.xp[id] ?? 0);
+    n = Math.min(n, room);
+    if (n < 1 || this.usable(id, shown) < n) return null;
+    const from = this.pieces(id);
     this.creatures[id] -= n;
-    const gained = xpPerFish(id) * n;
-    this.xp[id] = Math.min(xpForLevel(MAX_LEVEL, id), (this.xp[id] ?? 0) + gained);
+    this.xp[id] = (this.xp[id] ?? 0) + n;
     this._emit();
-    return { from, to: this.level(id), gained };
+    return { from, to: this.pieces(id), used: n };
   }
 
   give(id, n = 1) {
@@ -151,7 +157,7 @@ export class Expeditions extends EventTarget {
   }
 
   toJSON() {
-    return { extraTeams: this.extraTeams, trips: this.trips.map((t) => ({ ...t })), creatures: { ...this.creatures }, seen: { ...this.seen }, xp: { ...this.xp }, xpv: 3 };
+    return { extraTeams: this.extraTeams, trips: this.trips.map((t) => ({ ...t })), creatures: { ...this.creatures }, seen: { ...this.seen }, xp: { ...this.xp }, xpv: 4 };
   }
 
   fromJSON(data) {
@@ -160,8 +166,8 @@ export class Expeditions extends EventTarget {
     this.creatures = { ...(data?.creatures ?? {}) };
     this.seen = { ...(data?.seen ?? {}) };
     this.xp = { ...(data?.xp ?? {}) };
-    // 一時期の形式（使った匹数, xpv 2）は経験値に直す。それ以前（版なし）は経験値のまま
-    if (data?.xpv === 2) for (const id of Object.keys(this.xp)) this.xp[id] *= xpPerFish(id);
+    // xpv 4・2 は使った匹数。版なし・xpv 3 は経験値なので、旧版の1匹の経験値で割って匹数に直す
+    if (data?.xpv !== 4 && data?.xpv !== 2) for (const id of Object.keys(this.xp)) this.xp[id] = legacyXpToFish(id, this.xp[id]);
     for (const [id, n] of Object.entries(this.creatures)) if (n > 0) this.markSeen(id);
     this._emit();
   }
@@ -171,7 +177,7 @@ export class Expeditions extends EventTarget {
   }
 }
 
-/** 2〜4匹を星の数の重みで抽選 */
+/** 2〜4匹をレア度の重みで抽選 */
 export function rollCatch(trip) {
   const rand = mulberry32(trip.seed);
   const pool0 = getDestination(trip.dest).pool.filter((id) => getCreature(id));
@@ -180,12 +186,12 @@ export function rollCatch(trip) {
   const all = fresh.length ? fresh : pool0;
   const usable = trip.method ? all.filter((id) => SPECIES_METHODS[id]?.includes(trip.method)) : all;
   const pool = (usable.length ? usable : all).map(getCreature);
-  const total = pool.reduce((s, c) => s + CATCH_WEIGHT[c.stars], 0);
+  const total = pool.reduce((s, c) => s + CATCH_WEIGHT[c.rarity], 0);
   const n = 2 + Math.floor(rand() * 3);
   return Array.from({ length: n }, () => {
     let r = rand() * total;
     for (const c of pool) {
-      r -= CATCH_WEIGHT[c.stars];
+      r -= CATCH_WEIGHT[c.rarity];
       if (r < 0) return c.id;
     }
     return pool[0].id;

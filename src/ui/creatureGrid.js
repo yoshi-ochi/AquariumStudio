@@ -1,5 +1,6 @@
-import { getCreature, starLabel } from '../expedition/creatureData.js';
+import { getCreature, RARITY_NAME } from '../expedition/creatureData.js';
 import { creatureThumb } from './creatureThumb.js';
+import { octagrams } from './octagram.js';
 
 const COLS = 4;
 const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
@@ -7,14 +8,14 @@ const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 /**
  * 生き物を4列のアイコンで並べる（種類が多くても一覧しやすい）。
  * タップで選ぶと、その行のすぐ下に操作カード（panel）を差し込む。カードの吹き出しの先が選んだアイコンを指す。
- *   items: [{ id, n, lv? }]（n は所持数など、アイコンの左上に ×n で出す。lv は成長レベル）
+ *   items: [{ id, n, pieces? }]（n は所持数など、アイコンの左上に ×n で出す。pieces は成長のピース数）
  */
 export function creatureGrid(previews, items, { sel = null, panel = '' } = {}) {
   const at = items.findIndex((it) => it.id === sel);
   const out = [];
-  items.forEach(({ id, n, lv }, i) => {
+  items.forEach(({ id, n, pieces }, i) => {
     const c = getCreature(id);
-    out.push(`<button class="cg-cell ${sel === id ? 'sel' : ''}" data-act="cg-pick" data-id="${id}" aria-label="${c?.name ?? id} ${n}匹" aria-expanded="${sel === id}">${creatureThumb(previews, id)}<i class="cg-n">×${n}</i>${lv ? `<i class="cg-lv">Lv${lv}</i>` : ''}<small>${c?.name ?? id}</small></button>`);
+    out.push(`<button class="cg-cell ${sel === id ? 'sel' : ''}" data-act="cg-pick" data-id="${id}" aria-label="${c?.name ?? id} ${n}匹" aria-expanded="${sel === id}">${creatureThumb(previews, id)}<i class="cg-n">×${n}</i>${pieces != null ? `<i class="cg-lv">${octagrams(pieces, { mini: true })}</i>` : ''}<small>${c?.name ?? id}</small></button>`);
     // 選んだアイコンの行の最後（または一覧の最後）にカードを入れる
     const rowEnd = Math.min(items.length - 1, Math.floor(at / COLS) * COLS + COLS - 1);
     if (at >= 0 && panel && i === rowEnd) {
@@ -68,8 +69,8 @@ export function updateQty(el) {
   return n;
 }
 
-/** 名前の横に出す短い説明（星の数・枠） */
+/** 名前の横に出す短い説明（レア度・枠） */
 export const creatureInfo = (id, extra = '') => {
   const c = getCreature(id);
-  return `${starLabel(c.stars)} ・ 1匹 ${c.slots}枠${extra ? ` ・ ${extra}` : ''}`;
+  return `レア度 ${RARITY_NAME[c.rarity]} ・ 1匹 ${c.slots}枠${extra ? ` ・ ${extra}` : ''}`;
 };

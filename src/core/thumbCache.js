@@ -29,7 +29,8 @@ const defAtLoad = new Map([...ALL_DEFS.map((d) => [`d:${d.id}`, JSON.stringify(d
 /** 定義の中身から作る版。kind: 'd'（水槽・オブジェ）/ 'c'（生き物） */
 export const thumbKey = (kind, def) => {
   const body = defAtLoad.get(`${kind}:${def.id}`) ?? JSON.stringify(def);
-  return hash(`${THUMB_REV}|${body}|${kind === 'c' ? anatomyAtLoad.get(def.id) ?? 'null' : ''}`);
+  // 生き物は背景を透明にして撮る（版に含める）
+  return hash(`${THUMB_REV}|${body}|${kind === 'c' ? `alpha|${anatomyAtLoad.get(def.id) ?? 'null'}` : ''}`);
 };
 export const thumbFile = (kind, id) => `${kind}_${id}.webp`;
 
