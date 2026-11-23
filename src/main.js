@@ -47,7 +47,7 @@ import { AllianceApi } from './online/allianceApi.js';
 import { AllianceView } from './ui/allianceView.js';
 import { MapPage } from './ui/mapPage.js';
 import { LifeSystems } from './game/lifeSystems.js';
-import { START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter } from './building/blueprint.js';
+import { BUILDING_VERSION, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter } from './building/blueprint.js';
 import { ViewModes } from './building/viewModes.js';
 import { OutdoorScenery } from './building/outdoorScenery.js';
 import { WallInteraction } from './interaction/wallInteraction.js';
@@ -58,7 +58,7 @@ import { SeaPen } from './building/seaPen.js';
 import { SeaPenScene } from './building/seaPenScene.js';
 import { SeaPenView } from './ui/seaPenView.js';
 import { ZoneView } from './building/buildingViews.js';
-import { migrateToLayout, relocateInvalid, zonesForLegacyStage } from './building/migrate.js';
+import { migrateToLayout, relocateInvalid, migrateLayoutV4, zonesForLegacyStage } from './building/migrate.js';
 import { FishingScene } from './expedition/fishingScene.js';
 import { zoneOf } from './expedition/husbandry.js';
 import { isHungry } from './expedition/husbandry.js';
@@ -504,7 +504,7 @@ async function boot() {
 
   /** 現在の状態を保存用データにする */
   function snapshot() {
-    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), ...(home && { home }), room: { ...roomSettings, building: 3, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
+    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
   }
 
   let pendingLayout = null; // 初期設定で選んだ間取り
@@ -538,7 +538,9 @@ async function boot() {
     if (mode !== 'home') goHome();
     views.setMode('floor');
     setLayout(data.room?.layout ?? pendingLayout ?? DEFAULT_LAYOUT);
-    setWallEdits(data.room?.layout ? data.room.walls : null);
+    // 間取りを広げる前（版4未満）の壁の編集は、壁の位置が変わるので使わない
+    const oldBuilding = data.room?.layout && (data.room.building ?? 0) < BUILDING_VERSION;
+    setWallEdits(data.room?.layout && !oldBuilding ? data.room.walls : null);
     // 建造した水槽の定義を先に登録する（ID に寸法が入っている）
     registerCustomIds([...(data.objects ?? []).map((o) => o.defId), ...Object.keys(data.inventory?.stock ?? {}), ...(data.inventory?.orders ?? []).map((o) => o.defId)]);
     economy.fromJSON(data.economy);
@@ -560,9 +562,11 @@ async function boot() {
       migrateToLayout({ manager, unlocked, wasBuilding: !!data.room?.building, inventory, expeditions, economy });
       resetLights();
       economy.setFloor(0);
-    } else if ((data.room.building ?? 0) < 3) {
-      // 管理通路の追加で置けなくなった物を移す
+    } else if (oldBuilding) {
+      // 間取りを広げた：物を元のエリアの新しい位置へ移し、置けない物だけ空いている場所へ（照明は置き直す）
+      migrateLayoutV4({ manager });
       relocateInvalid({ manager, unlocked, inventory, expeditions, economy });
+      resetLights();
     }
     delete roomSettings.plan;
     manager.setFloor(economy.floor);

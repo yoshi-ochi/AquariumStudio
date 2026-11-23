@@ -143,19 +143,28 @@ function grounds(group) {
 
 // ---- 間取りごとの大屋根 ------------------------------------------------------
 
+/** 大水槽（高さ10m）より上に屋根を架ける高さ */
+const TANK_TOP = 10.6;
+/** 大水槽ホールの大きさ（ワールド座標の半幅） */
+function atriumHalf() {
+  const [x0, z0, x1, z1] = getZone('atrium').rects[0];
+  return { hx: ((x1 - x0 + 1) * CELL_SIZE) / 2, hz: ((z1 - z0 + 1) * CELL_SIZE) / 2 };
+}
+
 /** 回遊らせん型：大水槽を包むガラスの塔と、巻き上がる白いリボン */
 function spiralRoof(group) {
   const { x, z } = ATRIUM_TANK_POS;
-  const R = 6.6;
-  const H = TOP + 7;
+  const { hx, hz } = atriumHalf();
+  const R = Math.hypot(hx, hz) * 0.78;
+  const H = TANK_TOP + 4;
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 40, 1, true), MAT.glass);
   drum.position.set(x, H / 2, z);
   const pts = [];
   for (let k = 0; k <= 96; k++) {
     const a = (k / 96) * Math.PI * 7;
-    pts.push(new THREE.Vector3(x + Math.cos(a) * (R + 0.4), 0.8 + (k / 96) * (H - 0.8), z + Math.sin(a) * (R + 0.4)));
+    pts.push(new THREE.Vector3(x + Math.cos(a) * (R + 0.6), 0.8 + (k / 96) * (H - 0.8), z + Math.sin(a) * (R + 0.6)));
   }
-  const ribbon = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 220, 0.34, 6), MAT.white);
+  const ribbon = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 320, 0.5, 6), MAT.white);
   const cap = new THREE.Mesh(new THREE.SphereGeometry(R + 0.5, 32, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.3, 1), MAT.white);
   cap.position.set(x, H, z);
   group.add(drum, ribbon, cap);
@@ -167,7 +176,7 @@ function waveRoof(group) {
   const roof = surface(44, 18, (u, v) => {
     const x = b.x0 - 3 + u * (b.x1 - b.x0 + 6);
     const z = b.z0 - 2 + v * (b.z1 - b.z0 + 4);
-    return [x, TOP + 2 + Math.sin(u * Math.PI * 3 + v * 1.4) * 1.5 + (1 - u) * 2.4, z];
+    return [x, TANK_TOP + 1.6 + Math.sin(u * Math.PI * 3 + v * 1.4) * 1.5 + (1 - u) * 2.4, z];
   });
   group.add(new THREE.Mesh(roof, MAT.white));
 }
@@ -175,15 +184,18 @@ function waveRoof(group) {
 /** 放射ギャラリー型：ガラスのドームと、展示棟に架かる白い帆 */
 function domeRoof(group) {
   const { x, z } = ATRIUM_TANK_POS;
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(6.4, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2), MAT.glass);
-  dome.position.set(x, TOP, z);
-  group.add(dome);
+  const { hx, hz } = atriumHalf();
+  // 大ホールを覆う楕円のドーム（大水槽より上まで）
+  const dome = new THREE.Group();
+  dome.add(new THREE.Mesh(new THREE.SphereGeometry(1, 36, 12, 0, Math.PI * 2, 0, Math.PI / 2), MAT.glass));
   for (let k = 0; k < 12; k++) {
-    const rib = new THREE.Mesh(new THREE.TorusGeometry(6.45, 0.07, 6, 28, Math.PI), MAT.white);
-    rib.position.set(x, TOP, z);
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(1.004, 0.004, 6, 36, Math.PI), MAT.white);
     rib.rotation.y = (k / 12) * Math.PI;
-    group.add(rib);
+    dome.add(rib);
   }
+  dome.position.set(x, TOP, z);
+  dome.scale.set(hx + 0.5, TANK_TOP - TOP + 4, hz + 0.5);
+  group.add(dome);
   for (const id of ['coast', 'subtropical', 'entrance']) {
     const [x0, z0, x1, z1] = getZone(id).rects[0];
     const alongX = x1 - x0 >= z1 - z0;
@@ -201,18 +213,23 @@ function shellRoofs(group) {
     const [x0, z0, x1, z1] = getZone(id).rects[0];
     const w = wx(x1 + 1) - wx(x0) + 2;
     const d = wz(z1 + 1) - wz(z0) + 2;
+    const base = id === 'atrium' ? TANK_TOP + 2.4 : TOP + 2.2; // 大水槽の上は高く
     const shell = surface(24, 24, (u, v) => {
       const a = u * 2 - 1;
       const b = v * 2 - 1;
-      return [wx(x0) - 1 + u * w, TOP + 2.2 + (a * a - b * b) * 2.2, wz(z0) - 1 + v * d];
+      return [wx(x0) - 1 + u * w, base + (a * a - b * b) * 2.2, wz(z0) - 1 + v * d];
     });
     group.add(new THREE.Mesh(shell, MAT.white));
   }
   const lagoon = new THREE.Mesh(new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2), MAT.water);
-  lagoon.scale.set(4.2, 1, 3.6);
+  lagoon.scale.set(6, 1, 5);
+  // 入口へ向かう渡り廊下の両脇（大水槽ホールと入口の間の中庭）に水盤
+  const [ex0, ez0, ex1] = getZone('entrance').rects[0];
+  const [, , , az1] = getZone('atrium').rects[0];
+  const mid = (wx(ex0) + wx(ex1 + 1)) / 2;
   for (const s of [-1, 1]) {
     const pond = lagoon.clone();
-    pond.position.set(s * 6.4, 0.04, wz(38));
+    pond.position.set(mid + s * 12, 0.04, (wz(az1 + 1) + wz(ez0)) / 2);
     group.add(pond);
   }
 }

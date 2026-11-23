@@ -1,10 +1,12 @@
 import * as THREE from 'three';
-import { BASEMENT, PLAN_FLOORS, floorLabel, floorOrder, isWing, WING_BASE, WING_GRID_CENTER } from './blueprint.js';
+import { BASEMENT, PLAN_FLOORS, floorLabel, floorOrder, isWing, WING_BASE, WING_GRID_CENTER, GRID_X, CELL_SIZE } from './blueprint.js';
 import { buildFloorModel } from './floorModel.js';
 import { Exterior, wingCenter } from './exterior.js';
 
 /** フロアを上下に離して並べる全館ビューの階の間隔(m) */
 const STACK_GAP = 24;
+/** 敷地の広さに合わせてカメラを引く倍率（間取りを広げる前の敷地 64.8m を1とする） */
+const SITE_SCALE = (GRID_X * CELL_SIZE) / 64.8;
 const TWEEN = 0.8;
 const ease = (t) => t * t * (3 - 2 * t);
 
@@ -102,7 +104,7 @@ export class ViewModes {
     this.scenery.group.visible = mode !== 'stack' && !away;
     if (mode === 'stack') this._buildStack();
     const c = this.cameraCtl.controls;
-    c.maxDistance = floor ? this.saved?.maxDistance ?? c.maxDistance : 260;
+    c.maxDistance = floor ? this.saved?.maxDistance ?? c.maxDistance : 260 * SITE_SCALE;
     c.maxPolarAngle = Math.PI / 2 - 0.03;
     if (floor && this.saved) this._fly(this.saved.pos, this.saved.target);
     else if (mode === 'stack') {
@@ -119,7 +121,7 @@ export class ViewModes {
 
   /** 縦長の画面でも建物全体が収まるようカメラを引く */
   _away(x, y, z, targetY) {
-    const k = Math.max(1, 0.72 / this.cameraCtl.camera.aspect);
+    const k = Math.max(1, 0.72 / this.cameraCtl.camera.aspect) * SITE_SCALE;
     return new THREE.Vector3(x * k, targetY + (y - targetY) * k, z * k);
   }
 

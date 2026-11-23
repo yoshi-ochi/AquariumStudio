@@ -5,13 +5,14 @@ import { sizeOf, speciesPieces } from '../expedition/growth.js';
 import { disposeObject } from '../tanks/tankBuilder.js';
 import { mulberry32 } from '../tanks/random.js';
 import { PEN, sectionSize } from './seaPen.js';
+import { GRID_X, CELL_SIZE } from './blueprint.js';
 
 /**
  * 生け簀の3D表示。本館の右手の海に、100m 四方の浮き桟橋と網の区画を並べる。
  * 区画の中の生き物は実寸（成長に応じた大きさ）で泳がせる。
  */
-/** 生け簀の中心（ワールド座標）。敷地（約65m幅）の右端から桟橋を渡った先 */
-export const PEN_CENTER = { x: 32.4 + 10 + PEN.size / 2, z: 0 };
+/** 生け簀の中心（ワールド座標）。敷地の右端から桟橋を渡った先 */
+export const PEN_CENTER = { x: (GRID_X * CELL_SIZE) / 2 + 10 + PEN.size / 2, z: 0 };
 const WATER_Y = -0.3;
 const MAX_PER_SPECIES = 8;
 
