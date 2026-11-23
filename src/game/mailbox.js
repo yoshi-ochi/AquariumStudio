@@ -135,7 +135,8 @@ export class Mailbox extends EventTarget {
   }
 
   fromJSON(data) {
-    this.items = Array.isArray(data?.items) ? data.items.slice(0, MAX_MAILS) : [];
+    // 合同調査の出資の記録はメールに残さない（以前のセーブに残っている分も消す）
+    this.items = Array.isArray(data?.items) ? data.items.filter((m) => !(m.kind === 'ally' && /に出資しました$/.test(m.title ?? ''))).slice(0, MAX_MAILS) : [];
     this.keys = Array.isArray(data?.keys) ? data.keys.slice(-MAX_KEYS) : [];
     this.seq = Math.max(data?.seq ?? 0, ...this.items.map((m) => m.id ?? 0));
     this.day = data?.day?.date ? { ...newDay(data.day.date), ...data.day } : newDay();
