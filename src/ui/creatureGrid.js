@@ -36,9 +36,9 @@ export function qtyPanel({ title, info = '', extra = '', max, qty, buttons, fiel
   const btns = buttons.map((b) => `<button data-act="${b.act}" data-id="${fill(b.id, b)}" data-idtpl="${b.id}" data-tpl="${b.label}" data-unit="${b.unit ?? 0}" data-xp="${b.xp ?? 0}" class="${b.primary ? 'primary' : ''}" ${b.disabled ? 'disabled' : ''}>${fill(b.label, b)}</button>`);
   const stepper = max > 1
     ? `<div class="cg-step">
-        <button data-act="cg-qty" data-id="${Math.max(1, n - 1)}" aria-label="1つ減らす" ${n <= 1 ? 'disabled' : ''}>−</button>
+        <button data-act="cg-qty" data-repeat data-id="${Math.max(1, n - 1)}" aria-label="1つ減らす" ${n <= 1 ? 'disabled' : ''}>−</button>
         <input type="range" data-field="${field}" min="1" max="${max}" step="1" value="${n}" aria-label="数" style="--p:${max > 1 ? ((n - 1) / (max - 1)) * 100 : 100}%">
-        <button data-act="cg-qty" data-id="${Math.min(max, n + 1)}" aria-label="1つ増やす" ${n >= max ? 'disabled' : ''}>＋</button>
+        <button data-act="cg-qty" data-repeat data-id="${Math.min(max, n + 1)}" aria-label="1つ増やす" ${n >= max ? 'disabled' : ''}>＋</button>
         <output class="cg-num">${n}</output>
         <button data-act="cg-qty" data-id="${max}" class="cg-max" aria-label="最大" ${n >= max ? 'disabled' : ''}>最大</button>
       </div>`

@@ -63,6 +63,8 @@ import { allianceBonus, allianceLevel } from './expedition/creatureData.js';
 import { CREATURES, DEFAULT_HOME, relocateCost } from './expedition/creatureData.js';
 import { setLevelSource } from './expedition/growth.js';
 import { buildCreature } from './expedition/creatureBuilder.js';
+import { loadCreatureConfig } from './expedition/creatureConfig.js';
+import { installHoldRepeat } from './ui/holdRepeat.js';
 import { TankView } from './ui/tankView.js';
 import { BuildView } from './ui/buildView.js';
 import { MailView } from './ui/mailView.js';
@@ -93,6 +95,7 @@ CanvasRenderingContext2D.prototype.roundRect ??= function roundRect(x, y, w, h) 
 
 async function boot() {
   const startedAt = performance.now();
+  installHoldRepeat(); // 出資・＋−などのボタンは長押しで連続タップ
   const splash = new Splash({ root: $('splash'), canvas: $('splash-canvas'), bar: $('splash-bar'), label: $('splash-label') });
 
   // ---- コア -----------------------------------------------------------------
@@ -110,6 +113,9 @@ async function boot() {
 
   // ---- 事前準備（スプラッシュの裏で）：サムネイル撮影と水面モーション ----------
   // 配信サムネイル（GitHub Pages）を使い、無い物・形が変わった物だけ端末で撮影する
+  // 管理者が編集した生物の設定（レア度・採取地・経験値など）を先に反映する
+  splash.setProgress(0, '生き物のデータを読み込み中…');
+  await loadCreatureConfig();
   const manifest = await loadThumbManifest();
   const objThumbs = splitThumbs('d', ALL_DEFS, manifest);
   const fishThumbs = splitThumbs('c', CREATURES, manifest);

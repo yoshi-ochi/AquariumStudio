@@ -79,7 +79,7 @@ export class StaffView {
       const need = o.required[r.id];
       return `<div class="gs-row"><div class="gs-info"><b>${r.name}</b><small>${r.text} ・ ${yen(r.wage)}/秒</small></div>
         <span class="st-need ${n < need ? 'lack' : ''}">${n}/${need}人</span>
-        <div class="st-ctl"><button data-act="fire" data-id="${r.id}" aria-label="${r.name}を減らす" ${n ? '' : 'disabled'}>−</button><button data-act="hire" data-id="${r.id}" class="primary" aria-label="${r.name}を増やす">＋</button></div></div>`;
+        <div class="st-ctl"><button data-act="fire" data-repeat data-id="${r.id}" aria-label="${r.name}を減らす" ${n ? '' : 'disabled'}>−</button><button data-act="hire" data-repeat data-id="${r.id}" class="primary" aria-label="${r.name}を増やす">＋</button></div></div>`;
     });
     return `<div class="st-sum"><div class="st-head"><b>来館者満足度 ${sat}%</b><small>来館者 ${Math.round(o.visitorMult * 100)}%</small></div>
       <div class="st-bar"><i style="width:${sat}%"></i></div>

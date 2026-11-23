@@ -21,18 +21,18 @@ export const CREATURES = [
   // 小笠原
   c('maaji', 'マアジ', 'tuna', 0.2, 1, 2, 1.2, 0xd2b24a, 0xdcd8e0, 0xdcae34, { pat: 'lateral', mark: 0xd8c36a }),
   c('mizukurage', 'ミズクラゲ', 'jelly', 0.16, 1, 2, 1.6, 0xdbe8f5, 0xf5d9e6, 0xeaf2fa),
-  c('shiira', 'シイラ', 'dolphin', 0.6, 2, 8, 6, 0x2fa58c, 0xe8d34e, 0x2467b0, { pat: 'spots', mark: 0x1d6f8a }),
-  c('manta', 'オニイトマキエイ', 'ray', 1.2, 3, 24, 30, 0x27323d, 0xe9edf0, 0x1d262f),
+  c('shiira', 'シイラ', 'dolphin', 1.2, 2, 8, 6, 0x2fa58c, 0xe8d34e, 0x2467b0, { pat: 'spots', mark: 0x1d6f8a }),
+  c('manta', 'オニイトマキエイ', 'ray', 4.5, 3, 24, 30, 0x27323d, 0xe9edf0, 0x1d262f),
   // 駿河湾
   c('kinmedai', 'キンメダイ', 'perch', 0.3, 1, 3, 3, 0xd83a2e, 0xf0a08a, 0xb32a22, { bigEye: true, iris: 0xf0c23c }),
   c('mizuuo', 'ミズウオ', 'lancet', 0.7, 1, 6, 4, 0x6c7b86, 0xb9c4cb, 0x3f4a53),
   c('mendako', 'メンダコ', 'dumbo', 0.15, 2, 2, 8, 0xd9674a, 0xeb9a7e, 0xc55238),
-  c('ryugu', 'リュウグウノツカイ', 'ribbon', 1.6, 3, 30, 45, 0xdfe5ea, 0xf4f6f8, 0xd8323f, { pat: 'spots', mark: 0x8b98a5 }),
+  c('ryugu', 'リュウグウノツカイ', 'ribbon', 3, 3, 30, 45, 0xdfe5ea, 0xf4f6f8, 0xd8323f, { pat: 'spots', mark: 0x8b98a5 }),
   // 三陸沖
   c('ainame', 'アイナメ', 'perch', 0.25, 1, 2, 1, 0x7b5a35, 0xc9b48c, 0x5a4227, { pat: 'mottle', mark: 0x4c3620 }),
   c('madara', 'マダラ', 'cod', 0.5, 1, 6, 2.5, 0x8a7a5c, 0xe6e0d0, 0x6a5d46, { pat: 'mottle', mark: 0x5a4d38 }),
   c('sanma', 'サンマ', 'needle', 0.3, 2, 2, 2, 0x31506f, 0xdfe7ec, 0x27405a, { pat: 'lateral', mark: 0x9fb4c4 }),
-  c('mola', 'マンボウ', 'mola', 0.9, 3, 18, 22, 0x8d9aa3, 0xdfe5e8, 0x76838c),
+  c('mola', 'マンボウ', 'mola', 1.8, 3, 18, 22, 0x8d9aa3, 0xdfe5e8, 0x76838c),
   // オホーツク海
   c('hokke', 'ホッケ', 'perch', 0.3, 1, 3, 1.5, 0x6d7450, 0xd6d4b8, 0x4f5639, { pat: 'bands', bands: 5, mark: 0x4d5338 }),
   c('fuusen', 'フウセンウオ', 'lump', 0.06, 2, 1, 4, 0xd9583f, 0xf0a184, 0xc2452f),
@@ -41,13 +41,13 @@ export const CREATURES = [
   // グレートバリアリーフ
   c('tsubame', 'ツバメウオ', 'bat', 0.3, 1, 3, 3, 0xc9c6b8, 0xe6e3d8, 0x3a3a38, { pat: 'bands', bands: 2, mark: 0x2c2c2a }),
   c('hagi2', 'ニシキヤッコ', 'disc', 0.18, 1, 2, 3.5, 0xe8a12d, 0xf2c75e, 0x1f4fa8, { pat: 'bands', bands: 6, mark: 0x2a60c0 }),
-  c('tsumaguro', 'ツマグロ', 'shark', 1.2, 2, 20, 18, 0x8c969e, 0xeef1f2, 0x1b1e21, { tipFins: true }),
-  c('napoleon', 'メガネモチノウオ', 'hump', 1, 3, 20, 28, 0x2f8f80, 0x6fc1ae, 0x246f8c, { pat: 'mask', mark: 0x1d5f6e }),
+  c('tsumaguro', 'ツマグロ', 'shark', 1.5, 2, 20, 18, 0x8c969e, 0xeef1f2, 0x1b1e21, { tipFins: true }),
+  c('napoleon', 'メガネモチノウオ', 'hump', 1.5, 3, 20, 28, 0x2f8f80, 0x6fc1ae, 0x246f8c, { pat: 'mask', mark: 0x1d5f6e }),
   // ガラパゴス
   c('gingame', 'ギンガメアジ', 'tuna', 0.5, 1, 6, 4, 0xa9b8c2, 0xeef2f4, 0x56646e, { bigEye: true }),
   c('kingangel', 'キングエンゼルフィッシュ', 'disc', 0.3, 2, 3, 9, 0x20345e, 0x2f4a80, 0xf0b52c, { pat: 'bands', bands: 1, mark: 0xf2f2ea }),
-  c('galashark', 'ガラパゴスザメ', 'shark', 1.6, 2, 30, 32, 0x7a858c, 0xe6eaec, 0x667077),
-  c('hammer', 'アカシュモクザメ', 'hammer', 1.8, 3, 36, 50, 0x858f94, 0xe8ecee, 0x70797e),
+  c('galashark', 'ガラパゴスザメ', 'shark', 3, 2, 30, 32, 0x7a858c, 0xe6eaec, 0x667077),
+  c('hammer', 'アカシュモクザメ', 'hammer', 3, 3, 36, 50, 0x858f94, 0xe8ecee, 0x70797e),
   // 水族館の定番（相模湾）
   c('madai', 'マダイ', 'perch', 0.4, 1, 3, 2.5, 0xd8606a, 0xf2c8c0, 0xc24a55, { pat: 'spots', mark: 0x4fa8d8 }),
   c('hirame', 'ヒラメ', 'flat', 0.5, 2, 4, 4, 0x7a6a4c, 0xf1eee4, 0x5a4c36),
@@ -56,14 +56,14 @@ export const CREATURES = [
   c('utsubo', 'ウツボ', 'eel', 0.7, 1, 5, 3, 0x6e5a32, 0xc9b98a, 0x54462a, { pat: 'mottle', mark: 0x3a2f1c }),
   c('tatsu', 'タツノオトシゴ', 'seahorse', 0.08, 2, 1, 4, 0xc9a24a, 0xe6cf8e, 0xe8d9a8),
   c('nekozame', 'ネコザメ', 'shark', 0.7, 2, 8, 7, 0x8a7a62, 0xe6dfd0, 0x6f614c, { pat: 'bands', bands: 6, mark: 0x4d4234 }),
-  c('akaei', 'アカエイ', 'ray', 0.6, 2, 8, 6, 0x8a5a3a, 0xf0d8c0, 0x6f4730),
+  c('akaei', 'アカエイ', 'ray', 1, 2, 8, 6, 0x8a5a3a, 0xf0d8c0, 0x6f4730),
   // 三陸沖
   c('maiwashi', 'マイワシ', 'tuna', 0.18, 1, 1, 0.8, 0x46618f, 0xd6dbe4, 0x7d8894, { pat: 'lateral', mark: 0x1f2f40 }),
   c('katsuo', 'カツオ', 'tuna', 0.5, 1, 6, 4, 0x22304e, 0xcdd3da, 0x2a3040, { pat: 'bands', bands: 5, mark: 0x8fa9bd }),
   c('zuwai', 'ズワイガニ', 'crab', 0.4, 2, 3, 6, 0xc2603a, 0xeac9a8, 0xa84e2e, { longLegs: true }),
   c('surume', 'スルメイカ', 'squid', 0.3, 1, 2, 3, 0xb56a58, 0xe8c4b4, 0x98523f),
   c('ankou', 'アンコウ', 'lump', 0.6, 3, 8, 15, 0x5c5340, 0xbdb39a, 0x463f30, { pat: 'mottle', mark: 0x38322a }),
-  c('mizudako', 'ミズダコ', 'octopus', 0.9, 2, 8, 10, 0xa84f3c, 0xdfa48e, 0x8c4031),
+  c('mizudako', 'ミズダコ', 'octopus', 3, 2, 8, 10, 0xa84f3c, 0xdfa48e, 0x8c4031),
   // 慶良間諸島
   c('chinanago', 'チンアナゴ', 'garden', 0.35, 1, 1, 2.5, 0xe8e2cc, 0xf6f2e4, 0x2a2a2a),
   c('deba', 'デバスズメダイ', 'clown', 0.07, 1, 1, 0.7, 0x5fd0c4, 0x9be6dc, 0x46b0a6),
@@ -71,32 +71,32 @@ export const CREATURES = [
   c('otohime', 'オトヒメエビ', 'lobster', 0.07, 2, 1, 3, 0xf0ece0, 0xffffff, 0xc23a3a),
   c('budai', 'アオブダイ', 'hump', 0.5, 2, 5, 6, 0x2f7fb0, 0x6fb6d0, 0x24648c),
   // オホーツク海
-  c('taraba', 'タラバガニ', 'crab', 0.8, 2, 6, 9, 0xa8452f, 0xe0b090, 0x8c3724, { longLegs: true }),
+  c('taraba', 'タラバガニ', 'crab', 1, 2, 6, 9, 0xa8452f, 0xe0b090, 0x8c3724, { longLegs: true }),
   c('kegani', 'ケガニ', 'crab', 0.2, 1, 2, 3, 0xa8603c, 0xe0bc94, 0x8c4e30),
   c('sake', 'シロザケ', 'tuna', 0.7, 1, 8, 5, 0x6f8494, 0xe6ecef, 0x566878),
   c('nishin', 'ニシン', 'tuna', 0.3, 1, 3, 2, 0x3f6480, 0xe6edf1, 0x34526a),
   // 小笠原諸島
-  c('kuromaguro', 'クロマグロ', 'tuna', 1.8, 3, 40, 80, 0x1f3350, 0xdfe6ea, 0x23364f),
+  c('kuromaguro', 'クロマグロ', 'tuna', 2, 3, 40, 80, 0x1f3350, 0xdfe6ea, 0x23364f),
   c('buri', 'ブリ', 'tuna', 0.8, 1, 10, 6, 0x4a6f8a, 0xe6edf0, 0xd8c04a, { pat: 'lateral', mark: 0xd8c04a }),
-  c('jinbei', 'ジンベエザメ', 'shark', 1.9, 3, 60, 200, 0x3f5468, 0xe6ebee, 0x34475a, { pat: 'spots', mark: 0xeef2f4 }),
+  c('jinbei', 'ジンベエザメ', 'shark', 10, 3, 60, 200, 0x3f5468, 0xe6ebee, 0x34475a, { pat: 'spots', mark: 0xeef2f4, plankton: true }),
   // グレートバリアリーフ
-  c('tamakai', 'タマカイ', 'grouper', 1.5, 3, 30, 35, 0x5e6048, 0xb9b794, 0x4a4c38, { pat: 'mottle', mark: 0x2f3024 }),
+  c('tamakai', 'タマカイ', 'grouper', 2.3, 3, 30, 35, 0x5e6048, 0xb9b794, 0x4a4c38, { pat: 'mottle', mark: 0x2f3024 }),
   c('hanahige', 'ハナヒゲウツボ', 'eel', 0.9, 2, 6, 7, 0x2747b8, 0xf0dc4a, 0xf0dc4a),
   // 駿河湾の深海
-  c('takaashi', 'タカアシガニ', 'crab', 1.2, 2, 15, 20, 0xc4623e, 0xefd0b0, 0xe0a070, { longLegs: true }),
+  c('takaashi', 'タカアシガニ', 'crab', 3, 2, 15, 20, 0xc4623e, 0xefd0b0, 0xe0a070, { longLegs: true }),
   c('ogusoku', 'オオグソクムシ', 'lobster', 0.35, 2, 3, 9, 0xb9b3a2, 0xdcd6c6, 0x98927f),
   c('sakuraebi', 'サクラエビ', 'lobster', 0.05, 1, 1, 1.5, 0xf08a8a, 0xf9c4c4, 0xe06c6c),
   c('tachiuo', 'タチウオ', 'ribbon', 1, 1, 8, 5, 0xdfe6ea, 0xf4f7f8, 0xbfd0d8),
   // ガラパゴス諸島
-  c('madaraotobi', 'マダラトビエイ', 'ray', 0.9, 2, 15, 14, 0x2a3442, 0xeef1f3, 0x1e2632),
+  c('madaraotobi', 'マダラトビエイ', 'ray', 2, 2, 15, 14, 0x2a3442, 0xeef1f3, 0x1e2632),
   // 合同調査の限定種
-  c('seela', 'シーラカンス', 'coelacanth', 1.4, 3, 28, 70, 0x2b4a6e, 0x6f8ba8, 0x223c5a, { pat: 'spots', mark: 0xd8e2ea }),
+  c('seela', 'シーラカンス', 'coelacanth', 1.8, 3, 28, 70, 0x2b4a6e, 0x6f8ba8, 0x223c5a, { pat: 'spots', mark: 0xd8e2ea }),
   c('demenigisu', 'デメニギス', 'barreleye', 0.15, 3, 3, 40, 0x2c2c33, 0x4a4a55, 0x1e1e24, { bigEye: true, iris: 0x7cf0a8 }),
-  c('daiou', 'ダイオウイカ', 'squid', 1.8, 3, 40, 110, 0xa23d33, 0xd98a78, 0x852f28),
+  c('daiou', 'ダイオウイカ', 'squid', 10, 3, 40, 110, 0xa23d33, 0xd98a78, 0x852f28),
   c('koori', 'コオリウオ', 'cod', 0.45, 3, 8, 60, 0xd5e4ea, 0xf2f8fa, 0xbdd2da, { bigEye: true }),
-  c('greenland', 'ニシオンデンザメ', 'shark', 1.9, 3, 50, 150, 0x4a4f50, 0x77807f, 0x3a3f40),
+  c('greenland', 'ニシオンデンザメ', 'shark', 4, 3, 50, 150, 0x4a4f50, 0x77807f, 0x3a3f40),
   c('harisenbon', 'ハリセンボン', 'box', 0.25, 2, 2, 5, 0xc9a878, 0xe0e4e8, 0xe8d878, { pat: 'spots', mark: 0x3a3428 }),
-  c('bashou', 'バショウカジキ', 'tuna', 1.9, 3, 40, 90, 0x1d3568, 0xe4e8ec, 0x16254a),
+  c('bashou', 'バショウカジキ', 'tuna', 2.7, 3, 40, 90, 0x1d3568, 0xe4e8ec, 0x16254a),
   c('suzuki', 'スズキ', 'perch', 0.6, 1, 6, 3, 0x6f8062, 0xd4dae0, 0x9aa088),
   c('karei', 'カレイ', 'flat', 0.35, 1, 3, 3, 0x8a6238, 0xf3efe4, 0x6a4a30),
   c('nokogiri', 'ノコギリザメ', 'shark', 1.2, 3, 20, 30, 0x8a8274, 0xe6dcd4, 0x7a7468),
@@ -140,9 +140,9 @@ export const CREATURES = [
   c('kijihata', 'キジハタ', 'grouper', 0.3, 2, 2, 4, 0xa23c1c, 0xcf8236, 0x8a3c1a, { pat: 'spots', mark: 0xe8402e }),
   c('takanoha', 'タカノハダイ', 'perch', 0.3, 1, 2, 1.5, 0x948e86, 0xd2cec6, 0xe8822a, { pat: 'stripes', mark: 0x7a5232 }),
   c('akaumigame', 'アカウミガメ', 'turtle', 0.9, 3, 8, 30, 0x6a3a26, 0xe6d4a0, 0x4a4630),
-  c('aoumigame', 'アオウミガメ', 'turtle', 0.9, 3, 8, 30, 0x5a4a38, 0xe8dcae, 0x3a3028),
-  c('bandou', 'バンドウイルカ', 'whale', 2.5, 3, 10, 70, 0x5a6270, 0xe8eaee, 0x4e5664),
-  c('shiroiruka', 'シロイルカ', 'whale', 3, 3, 10, 90, 0xecebe3, 0xf2f1ea, 0xe4e2d8),
+  c('aoumigame', 'アオウミガメ', 'turtle', 1, 3, 8, 30, 0x5a4a38, 0xe8dcae, 0x3a3028),
+  c('bandou', 'バンドウイルカ', 'whale', 2.8, 3, 10, 70, 0x5a6270, 0xe8eaee, 0x4e5664),
+  c('shiroiruka', 'シロイルカ', 'whale', 4, 3, 10, 90, 0xecebe3, 0xf2f1ea, 0xe4e2d8),
   c('togecho', 'トゲチョウチョウウオ', 'disc', 0.2, 2, 1, 2.4, 0xf2f0ea, 0xf4f2ee, 0xe8a030, { pat: 'mask', mark: 0x2e2a28 }),
   c('fuuraicho', 'フウライチョウチョウウオ', 'disc', 0.18, 2, 1, 2.4, 0xece8e0, 0xf2f0ea, 0xe8b830, { pat: 'mask', mark: 0x1a1a24 }),
 ];
@@ -152,20 +152,34 @@ export const CREATURES = [
  * 最小の30cm水槽（10枠）にクリオネが10匹、大水槽にはイワシが数百匹入る目安。
  */
 const SCHOOLING = new Set(['maiwashi', 'sanma', 'nishin', 'maaji', 'sakuraebi', 'deba', 'kakure', 'clione', 'mizukurage', 'chinanago']);
-export const slotFor = (c) => (SCHOOLING.has(c.id) ? 1 : Math.min(10, Math.max(1, Math.round((c.len / 0.2) ** 1.3))));
-for (const c of CREATURES) c.slots = slotFor(c);
+export const slotFor = (c) => (SCHOOLING.has(c.id) || c.school ? 1 : Math.min(10, Math.max(1, Math.round((c.len / 0.2) ** 1.3))));
 
 /**
  * 星の数（1〜6）。レア度の3段階をそれぞれ2つに分け、同じレア度の中で集客力が上位半分なら星を1つ増やす。
  * コモン ★1〜2 / レア ★3〜4 / 激レア ★5〜6
  */
 export const MAX_STARS = 6;
-for (const r of [1, 2, 3]) {
-  const tier = CREATURES.filter((c) => c.rarity === r).sort((a, b) => a.appeal - b.appeal);
-  tier.forEach((c, i) => (c.stars = r * 2 - 1 + (i >= tier.length / 2 ? 1 : 0)));
+
+/** 収容枠・星の数を計算し直す（管理者の設定でレア度・体長が変わったとき） */
+export function recomputeDerived() {
+  for (const c of CREATURES) c.slots = slotFor(c);
+  for (const r of [1, 2, 3]) {
+    const tier = CREATURES.filter((c) => c.rarity === r && !c.retired).sort((a, b) => a.appeal - b.appeal);
+    tier.forEach((c, i) => (c.stars = r * 2 - 1 + (i >= tier.length / 2 ? 1 : 0)));
+  }
+  for (const c of CREATURES) if (c.retired) c.stars ??= c.rarity * 2 - 1;
 }
+recomputeDerived();
 
 export const getCreature = (id) => CREATURES.find((x) => x.id === id);
+/** 図鑑・採取の対象になっている魚種（管理者が削除した魚種を除く） */
+export const activeCreatures = () => CREATURES.filter((c) => !c.retired);
+
+// ---- 季節（日本の暦：春3〜5月・夏6〜8月・秋9〜11月・冬12〜2月） ------------------
+export const SEASONS = ['春', '夏', '秋', '冬'];
+export const seasonOf = (time = Date.now()) => Math.floor(((new Date(time).getMonth() + 10) % 12) / 3);
+/** c.seasons（0〜3 の配列）が無ければ一年中捕れる */
+export const inSeason = (c, time = Date.now()) => !c?.seasons?.length || c.seasons.includes(seasonOf(time));
 
 export const DESTINATIONS = [
   { id: 'iso', name: '相模湾', text: '黒潮が寄せる、はじめての採取地', stage: 1, cost: 3000, seconds: 60, lat: 35.1, lon: 139.4, pool: ['akaumigame', 'takanoha', 'kijihata', 'kabutogani', 'akakurage', 'kouika', 'oniokoze', 'gonzui', 'houbou', 'nenbutsu', 'kagokaki', 'nizadai', 'torafugu', 'kawahagi', 'mebaru', 'kurodai', 'suzuki', 'mejina', 'kasago', 'hakofugu', 'ishidai', 'madai', 'hirame', 'madako', 'iseebi', 'utsubo', 'tatsu', 'nekozame', 'akaei'] },
@@ -178,7 +192,9 @@ export const DESTINATIONS = [
   { id: 'galapagos', name: 'ガラパゴス諸島', text: '大型のサメが群れる絶海の孤島', stage: 3, cost: 500000, seconds: 2400, lat: -0.7, lon: -90.6, pool: ['itachizame', 'gingame', 'kingangel', 'galashark', 'hammer', 'madaraotobi'] },
 ];
 
-export const getDestination = (id) => DESTINATIONS.find((d) => d.id === id);
+/** 管理者が削除した採取地（航海中の隊が帰れるように残す） */
+export const RETIRED_PLACES = [];
+export const getDestination = (id) => DESTINATIONS.find((d) => d.id === id) ?? RETIRED_PLACES.find((d) => d.id === id);
 
 /** 立地を指定していないときの基準地（東京） */
 export const DEFAULT_HOME = { lat: 35.7, lon: 139.8 };

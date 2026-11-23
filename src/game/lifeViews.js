@@ -72,7 +72,7 @@ export class ZukanView {
   /** レア度（星の数）ごとのまとまり。報酬はなし */
   get starGroups() {
     return Array.from({ length: MAX_STARS }, (_, i) => MAX_STARS - i).map((n) => ({
-      id: `star${n}`, name: `${'★'.repeat(n)}（星${n}つ）`, ids: CREATURES.filter((c) => c.stars === n).map((c) => c.id),
+      id: `star${n}`, name: `${'★'.repeat(n)}（星${n}つ）`, ids: CREATURES.filter((c) => c.stars === n && (!c.retired || this.expeditions.seenCount(c.id) > 0)).map((c) => c.id),
     })).filter((g) => g.ids.length);
   }
 
@@ -98,7 +98,7 @@ export class ZukanView {
   html() {
     const ex = this.expeditions;
     const seen = (id) => ex.seenCount(id) > 0;
-    const total = CREATURES.filter((c) => seen(c.id)).length;
+    const total = CREATURES.filter((c) => seen(c.id) && !c.retired).length;
     if (this.pick && !seen(this.pick)) this.pick = null;
     const mode = this.mode;
     const tab = (id, label) => `<button data-act="zk-mode" data-id="${id}" class="${mode === id ? 'active' : ''}">${label}</button>`;
@@ -123,7 +123,7 @@ export class ZukanView {
       return `<h4 class="gs-sub">${g.name} ${count}${mode === 'area' && claimed ? ' ・ 達成' : ''}</h4><div class="zk-grid">${cells || '<p class="gs-empty">在庫か展示中の生き物がいません。</p>'}</div>${reward}`;
     });
     const hint = '<p class="gs-empty">魚種をタップすると、在庫の同じ魚種を使って育てられます。育つほど体が大きくなり、集客とランキングの点数が上がります。</p>';
-    return `<p class="gs-empty">発見 ${total}/${CREATURES.length}種</p>${tabs}${mode === 'grow' ? hint : ''}${sections.join('')}`;
+    return `<p class="gs-empty">発見 ${total}/${CREATURES.filter((c) => !c.retired).length}種</p>${tabs}${mode === 'grow' ? hint : ''}${sections.join('')}`;
   }
 
   /** 数のスライダー（再描画しない） */

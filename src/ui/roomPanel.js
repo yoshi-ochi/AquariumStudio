@@ -77,7 +77,7 @@ export class RoomPanel {
       `<label class="slider">${label}<input type="range" data-field="light-${name}" min="${min}" max="${max}" step="${step}" value="${value}"><output>${value}${unit}</output></label>`;
     return `
       <div class="seg">${chips}
-        <button data-act="light-add" ${lights.length >= MAX_LIGHTS ? 'disabled' : ''}>＋</button>
+        <button data-act="light-add" data-repeat ${lights.length >= MAX_LIGHTS ? 'disabled' : ''}>＋</button>
         <button data-act="light-remove" class="danger" ${lights.length <= 1 ? 'disabled' : ''}>削除</button></div>
       ${l ? `
       <p class="note">💡 電球をドラッグで移動、床の ◎ をドラッグで照らす向きを変えられます。</p>
