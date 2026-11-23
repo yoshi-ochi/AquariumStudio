@@ -113,7 +113,7 @@ async function boot() {
 
   // ---- 事前準備（スプラッシュの裏で）：サムネイル撮影と水面モーション ----------
   // 配信サムネイル（GitHub Pages）を使い、無い物・形が変わった物だけ端末で撮影する
-  // 管理者が編集した生物の設定（レア度・採取地・経験値など）を先に反映する
+  // 管理者が編集した生物の設定（星の数・採取地・経験値など）を先に反映する
   splash.setProgress(0, '生き物のデータを読み込み中…');
   await loadCreatureConfig();
   const manifest = await loadThumbManifest();

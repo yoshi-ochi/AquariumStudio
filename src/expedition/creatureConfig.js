@@ -1,4 +1,4 @@
-import { CREATURES, DESTINATIONS, JOINT_PROJECTS, RARITY_WEIGHT, RETIRED_PLACES, recomputeDerived } from './creatureData.js';
+import { CREATURES, DESTINATIONS, JOINT_PROJECTS, CATCH_WEIGHT, STAR_LIST, RETIRED_PLACES, recomputeDerived } from './creatureData.js';
 import { SPECIES_METHODS } from './fishingData.js';
 import { NOTES } from './creatureNotes.js';
 import { GROWTH_RULES, XP_OVERRIDE, rebuildGrowth } from './growth.js';
@@ -8,17 +8,17 @@ import { GROWTH_RULES, XP_OVERRIDE, rebuildGrowth } from './growth.js';
  * 起動時に読み込み、組み込みのデータ（creatureData.js など）へ上書きする。何度反映しても同じ結果になる。
  *
  * {
- *   species: { [id]: { name, rarity, len, appeal, zone, seasons, methods, note, xp, removed } },
- *   added:   [{ id, name, form, len, rarity, appeal, colors: { body, belly, fin }, pat, mark, zone, seasons, methods, note }],
+ *   species: { [id]: { name, stars, len, appeal, zone, seasons, methods, note, xp, removed } },
+ *   added:   [{ id, name, form, len, stars, appeal, colors: { body, belly, fin }, pat, mark, zone, seasons, methods, note }],
  *   places:  { [id]: { name, text, stage, cost, lat, lon, zone, pool, removed } },
  *   addedPlaces: [{ id, name, text, stage, cost, lat, lon, zone, pool }],
  *   joint:   { [id]: { pool } },
- *   rarity:  { weight, xpMul, xpMin, xpFixed, levelMul }（それぞれ { 1, 2, 3 }）
+ *   stars:   { weight, xpMul, xpMin, xpFixed, levelMul }（それぞれ星の数 { 1〜6 }）
  * }
  */
 export const CONFIG_KEY = 'creatures';
 const CACHE = 'aq-creature-config';
-const SPECIES_KEYS = ['name', 'rarity', 'len', 'appeal', 'zone', 'seasons'];
+const SPECIES_KEYS = ['name', 'stars', 'len', 'appeal', 'zone', 'seasons'];
 const PLACE_KEYS = ['name', 'text', 'stage', 'cost', 'lat', 'lon', 'zone', 'pool'];
 
 // 組み込みの値（反映のたびにここから作り直す）
@@ -29,7 +29,7 @@ const BASE = {
   joint: JOINT_PROJECTS.map((p) => [...p.pool]),
   methods: clone(SPECIES_METHODS),
   notes: { ...NOTES },
-  weight: { ...RARITY_WEIGHT },
+  weight: { ...CATCH_WEIGHT },
   rules: clone(GROWTH_RULES),
 };
 export const baseCreature = (id) => BASE.creatures.find((c) => c.id === id);
@@ -61,7 +61,7 @@ export function applyConfig(cfg = {}) {
   // 追加した魚種
   for (const a of cfg.added ?? []) {
     if (!a?.id || CREATURES.some((c) => c.id === a.id)) continue;
-    CREATURES.push({ id: a.id, name: a.name || a.id, form: a.form || 'perch', len: +a.len || 0.2, rarity: +a.rarity || 1, slots: 1, appeal: +a.appeal || 1, colors: { body: 0x888888, belly: 0xdddddd, fin: 0x666666, ...a.colors }, ...(a.pat ? { pat: a.pat, mark: a.mark ?? 0x222222 } : {}), added: true });
+    CREATURES.push({ id: a.id, name: a.name || a.id, form: a.form || 'perch', len: +a.len || 0.2, stars: +a.stars || 1, slots: 1, appeal: +a.appeal || 1, colors: { body: 0x888888, belly: 0xdddddd, fin: 0x666666, ...a.colors }, ...(a.pat ? { pat: a.pat, mark: a.mark ?? 0x222222 } : {}), added: true });
     if (a.methods?.length) SPECIES_METHODS[a.id] = [...a.methods];
     if (a.note) NOTES[a.id] = a.note;
     for (const k of ['zone', 'seasons']) if (a[k]?.length) CREATURES.at(-1)[k] = clone(a[k]);
@@ -94,16 +94,16 @@ export function applyConfig(cfg = {}) {
   const alive = new Set(CREATURES.filter((c) => !c.retired).map((c) => c.id));
   for (const d of [...DESTINATIONS, ...JOINT_PROJECTS]) d.pool = [...new Set(d.pool.filter((id) => alive.has(id)))];
 
-  // レア度ごとの規則
-  const r = cfg.rarity ?? {};
-  resetObj(RARITY_WEIGHT, BASE.weight);
-  Object.assign(RARITY_WEIGHT, nums(r.weight));
+  // 星の数ごとの規則
+  const r = cfg.stars ?? {};
+  resetObj(CATCH_WEIGHT, BASE.weight);
+  Object.assign(CATCH_WEIGHT, nums(r.weight));
   for (const k of Object.keys(GROWTH_RULES)) GROWTH_RULES[k] = { ...BASE.rules[k], ...nums(r[k]) };
 
   recomputeDerived();
   rebuildGrowth();
 }
-const nums = (o) => Object.fromEntries(Object.entries(o ?? {}).filter(([k, v]) => [1, 2, 3].includes(+k) && Number.isFinite(+v) && v !== '' && v != null).map(([k, v]) => [k, +v]));
+const nums = (o) => Object.fromEntries(Object.entries(o ?? {}).filter(([k, v]) => STAR_LIST.includes(+k) && Number.isFinite(+v) && v !== '' && v != null).map(([k, v]) => [k, +v]));
 
 const readCache = () => {
   try {

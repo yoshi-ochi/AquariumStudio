@@ -2,7 +2,7 @@ import { creatureThumb } from './creatureThumb.js';
 import { creatureGrid, qtyPanel, updateQty, creatureInfo } from './creatureGrid.js';
 import { tankLabel } from '../tanks/tankLabel.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-import { CREATURES, RARITY, SEASONS, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
+import { CREATURES, SEASONS, starLabel, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
 import { getMethod, methodsAt } from '../expedition/fishingData.js';
 
@@ -42,7 +42,7 @@ export class ExpeditionView {
     const species = sel.catches.map((id) => {
       const c = getCreature(id);
       const off = !inSeason(c);
-      return `<div class="ex-sp${off ? ' off' : ''}">${creatureThumb(this.previews, id)}<small>${c.name}</small><small>${off ? `季節外（${c.seasons.map((i) => SEASONS[i]).join('・')}）` : RARITY[c.rarity]}</small></div>`;
+      return `<div class="ex-sp${off ? ' off' : ''}">${creatureThumb(this.previews, id)}<small>${c.name}</small><small>${off ? `季節外（${c.seasons.map((i) => SEASONS[i]).join('・')}）` : starLabel(c.stars)}</small></div>`;
     }).join('');
     const locked = d.stage > level;
     const full = ex.usedSlots >= this.getCapacity();
@@ -103,8 +103,9 @@ export class ExpeditionView {
 }
 
 /** アイテムの「生物」タブ：所持している生物と水槽への展示 */
-/** 食堂（カフェ）で料理として出したときの売上（1匹） */
-export const dishPrice = (c) => Math.round(((150 + Math.min(c.len, 3.5) * 2500) * [1, 1.6, 3][c.rarity - 1]) / 10) * 10;
+/** 食堂（カフェ）で料理として出したときの売上（1匹）。星の数で値段が上がる */
+const DISH_STAR = { 1: 1, 2: 1, 3: 1.6, 4: 1.6, 5: 3, 6: 3 };
+export const dishPrice = (c) => Math.round(((150 + Math.min(c.len, 3.5) * 2500) * DISH_STAR[c.stars]) / 10) * 10;
 
 export class CreatureView {
   constructor({ manager, expeditions, previews, toast, onChanged, economy, hasCafe }) {

@@ -79,8 +79,8 @@ i { font-style: normal; font-size: 11px; padding: 0 4px; border-radius: 4px; bac
 .ad-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .ad-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
 .ad-chip small { display: inline; }
-.ad-chip.r2 { border-color: #6aa8d8; }
-.ad-chip.r3 { border-color: #d8a43a; }
+.ad-chip.s3, .ad-chip.s4 { border-color: #6aa8d8; }
+.ad-chip.s5, .ad-chip.s6 { border-color: #d8a43a; }
 .ad-chip button { padding: 0 6px; border: 0; background: none; color: var(--muted); }
 
 .ad-issues { margin: 0; padding-left: 18px; }
@@ -88,12 +88,12 @@ i { font-style: normal; font-size: 11px; padding: 0 4px; border-radius: 4px; bac
 .ad-issues .warn { color: var(--muted); }
 .ad-login { max-width: 420px; margin: 40px auto; display: grid; gap: 8px; }
 
-/* 経験値のグラフ（xpChart.js）。系列色は categorical の1〜3番 */
-:root { --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --grid: #e4ebf0; }
+/* 経験値のグラフ（xpChart.js）。系列色は categorical の1〜6番（星1〜6） */
+:root { --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --grid: #e4ebf0; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --grid: #22384a; }
+  :root:not([data-theme='light']) { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c; --grid: #22384a; }
 }
-:root[data-theme='dark'] { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --grid: #22384a; }
+:root[data-theme='dark'] { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c; --grid: #22384a; }
 .ad-seg { display: inline-flex; gap: 4px; }
 .ad-more { margin-top: 10px; font-size: 13px; }
 .ad-more summary { cursor: pointer; color: var(--muted); }
@@ -104,6 +104,9 @@ i { font-style: normal; font-size: 11px; padding: 0 4px; border-radius: 4px; bac
 .xc-key.s1 { background: var(--s1); }
 .xc-key.s2 { background: var(--s2); }
 .xc-key.s3 { background: var(--s3); }
+.xc-key.s4 { background: var(--s4); }
+.xc-key.s5 { background: var(--s5); }
+.xc-key.s6 { background: var(--s6); }
 .xc-plot { position: relative; }
 .xc svg { display: block; width: 100%; height: auto; }
 .xc-grid { stroke: var(--grid); stroke-width: 1; }
@@ -114,6 +117,9 @@ i { font-style: normal; font-size: 11px; padding: 0 4px; border-radius: 4px; bac
 .xc-line.s1 { stroke: var(--s1); }
 .xc-line.s2 { stroke: var(--s2); }
 .xc-line.s3 { stroke: var(--s3); }
+.xc-line.s4 { stroke: var(--s4); }
+.xc-line.s5 { stroke: var(--s5); }
+.xc-line.s6 { stroke: var(--s6); }
 .xc-cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
 .xc-hit { fill: transparent; cursor: crosshair; touch-action: none; }
 .xc-tip { position: absolute; top: 8px; min-width: 170px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 12px; pointer-events: none; }

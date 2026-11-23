@@ -1,4 +1,4 @@
-import { CREATURES, RARITY, SEASONS, getCreature } from '../expedition/creatureData.js';
+import { CREATURES, SEASONS, STAR_LIST, starLabel, getCreature } from '../expedition/creatureData.js';
 import { METHODS, SPECIES_METHODS } from '../expedition/fishingData.js';
 import { NOTES } from '../expedition/creatureNotes.js';
 import { WATER, zoneOf } from '../expedition/husbandry.js';
@@ -28,13 +28,13 @@ export class SpeciesTab {
       const at = pools.filter((p) => p.pool.includes(c.id)).map((p) => p.name).join('・') || '—';
       const season = c.seasons?.length ? c.seasons.map((i) => SEASONS[i]).join('') : '通年';
       return `<tr data-id="${c.id}" class="${c.retired ? 'retired' : ''} ${this.sel === c.id ? 'sel' : ''}"><td>${esc(c.name)}${c.added ? ' <i>追加</i>' : ''}${c.retired ? ' <i>削除済</i>' : ''}<small>${c.id}</small></td>
-        <td>${RARITY[c.rarity]}<small>${'★'.repeat(c.stars)}</small></td><td>${c.len}m</td><td>${num(xpPerFish(c.id))}</td><td>${season}</td><td>${WATER[zoneOf(c.id)].label}</td><td class="ad-at">${esc(at)}</td></tr>`;
+        <td>${starLabel(c.stars)}</td><td>${c.len}m</td><td>${num(xpPerFish(c.id))}</td><td>${season}</td><td>${WATER[zoneOf(c.id)].label}</td><td class="ad-at">${esc(at)}</td></tr>`;
     }).join('');
     const filter = `<div class="ad-bar"><input id="ad-q" placeholder="名前・id で検索" value="${esc(this.q)}">
       <select id="ad-pool"><option value="">すべての採取地</option>${pools.map((p) => `<option value="${p.id}" ${p.id === this.pool ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
       <span>${list.length}種</span><button id="ad-new">＋ 魚種を追加</button></div>`;
     const editor = this.sel && getCreature(this.sel) ? this._editor(getCreature(this.sel)) : '<p class="ad-note">一覧の行を選ぶと編集できます。</p>';
-    return `<div class="ad-split"><section class="ad-card">${filter}<div class="ad-scroll"><table class="ad-table"><thead><tr><th>名前</th><th>レア度</th><th>体長</th><th>1匹の経験値</th><th>季節</th><th>生息環境</th><th>採取地</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+    return `<div class="ad-split"><section class="ad-card">${filter}<div class="ad-scroll"><table class="ad-table"><thead><tr><th>名前</th><th>星</th><th>体長</th><th>1匹の経験値</th><th>季節</th><th>生息環境</th><th>採取地</th></tr></thead><tbody>${rows}</tbody></table></div></section>
       <section class="ad-card ad-edit">${editor}</section></div>`;
   }
 
@@ -47,14 +47,14 @@ export class SpeciesTab {
           ${field('体の色', 'body', hex(c.colors.body), { type: 'color' })}${field('腹の色', 'belly', hex(c.colors.belly), { type: 'color' })}${field('ひれの色', 'fin', hex(c.colors.fin), { type: 'color' })}${field('模様の色', 'mark', hex(c.mark ?? 0x222222), { type: 'color' })}</div>`
       : '';
     return `<h3>${esc(c.name)} <small>${c.id}</small></h3>
-      ${base ? `<p class="ad-note">組み込みの値：${RARITY[base.rarity]} ・ 体長 ${base.len}m ・ 集客力 ${base.appeal}</p>` : ''}
+      ${base ? `<p class="ad-note">組み込みの値：${starLabel(base.stars)} ・ 体長 ${base.len}m ・ 集客力 ${base.appeal}</p>` : ''}
       <div class="ad-grid">
         ${field('名前', 'name', c.name)}
-        ${select('レア度', 'rarity', c.rarity, Object.entries(RARITY))}
+        ${select('星の数', 'stars', c.stars, STAR_LIST.map((n) => [n, `${starLabel(n)}（${n}）`]))}
         ${field('標準体長(m)', 'len', c.len, { type: 'number', step: 0.01, min: 0.01 })}
         ${field('集客力', 'appeal', c.appeal, { type: 'number', step: 0.1, min: 0 })}
         ${select('生息環境（水温）', 'zone', e.zone ?? '', ZONES)}
-        ${field('1匹の経験値（空欄でレア度の値）', 'xp', e.xp || '', { type: 'number', min: 1, placeholder: `レア度の値 ${xpPerFish(c.id)}` })}
+        ${field('1匹の経験値（空欄で星の数の値）', 'xp', e.xp || '', { type: 'number', min: 1, placeholder: `星の数の値 ${xpPerFish(c.id)}` })}
       </div>
       ${checks('季節（どれも選ばない＝通年）', 'season', SEASONS.map((s, i) => [String(i), s]), (c.seasons ?? []).map(String))}
       ${checks('漁法（採取地で捕るのに必要）', 'method', METHODS.map((m) => [m.id, m.name]), SPECIES_METHODS[c.id] ?? [])}
@@ -98,7 +98,7 @@ export class SpeciesTab {
     if (!f.name.trim()) return alert('名前を入力してください');
     if (!(f.len > 0)) return alert('体長は0より大きくしてください');
     const e = speciesEntry(this.state.cfg, c.id);
-    Object.assign(e, { name: f.name.trim(), rarity: +f.rarity, len: +f.len, appeal: +f.appeal || 0, zone: f.zone, xp: f.xp || '', note: f.note.trim() });
+    Object.assign(e, { name: f.name.trim(), stars: +f.stars, len: +f.len, appeal: +f.appeal || 0, zone: f.zone, xp: f.xp || '', note: f.note.trim() });
     e.seasons = readChecks(root, 'season').map(Number);
     e.methods = readChecks(root, 'method');
     if (c.added) {
@@ -125,7 +125,7 @@ export class SpeciesTab {
     if (!validId(id)) return alert('id は英小文字で始まる2〜31文字（英小文字・数字・_）にしてください');
     if (idTaken(id)) return alert('その id はすでに使われています');
     this.state.cfg.added ??= [];
-    this.state.cfg.added.push({ id, name: name.trim(), form: 'perch', len: 0.2, rarity: 1, appeal: 1, colors: { body: 0x8a8a8a, belly: 0xe0e0e0, fin: 0x6a6a6a }, methods: ['setnet', 'diving'] });
+    this.state.cfg.added.push({ id, name: name.trim(), form: 'perch', len: 0.2, stars: 1, appeal: 1, colors: { body: 0x8a8a8a, belly: 0xe0e0e0, fin: 0x6a6a6a }, methods: ['setnet', 'diving'] });
     this.sel = id;
     this.q = '';
     this.pool = '';

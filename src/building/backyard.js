@@ -1,5 +1,5 @@
 import { getCreature } from '../expedition/creatureData.js';
-import { ARCHIVE_BONUS, EXPAND_SLOTS, HOLD_BY_LEVEL, HOLD_PER_TANK, POINTS_PER_MIN, breedHours, researchCost } from './backyardData.js';
+import { ARCHIVE_BONUS, EXPAND_SLOTS, HOLD_BY_LEVEL, HOLD_PER_TANK, POINTS_PER_MIN, breedHours, researchCost, BREED_HARD_STARS } from './backyardData.js';
 
 /** バックヤードの研究室と繁殖水槽。state は保存データの一部 */
 export class Backyard {
@@ -66,7 +66,7 @@ export class Backyard {
   }
 
   canBreed(c) {
-    return c.rarity < 3 || this.level('breeding') >= 2;
+    return c.stars < BREED_HARD_STARS || this.level('breeding') >= 2;
   }
 
   /** 親2匹を確認して繁殖を始める（親は減らない） */
@@ -77,7 +77,7 @@ export class Backyard {
       this.toast('保持枠がいっぱいです', { error: true });
       return false;
     }
-    this.jobs[uid] = { id, until: Date.now() + breedHours(c.rarity, this.level('breeding')) * 3600000 };
+    this.jobs[uid] = { id, until: Date.now() + breedHours(c.stars, this.level('breeding')) * 3600000 };
     return true;
   }
 

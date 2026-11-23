@@ -1,6 +1,6 @@
 import { creatureThumb } from './creatureThumb.js';
 import { creatureGrid, qtyPanel, updateQty, creatureInfo } from './creatureGrid.js';
-import { CREATURES, RARITY, getCreature } from '../expedition/creatureData.js';
+import { CREATURES, getCreature } from '../expedition/creatureData.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
 import { WATER, ensureCare, feedCost, hasLife, isHungry, predatorConflict, tankHealth, waterMismatch, nextFeedIn, crowdFactor, FEED_INTERVAL } from '../expedition/husbandry.js';
 import { tankLabel, defaultTankLabel, cleanTankName } from '../tanks/tankLabel.js';
