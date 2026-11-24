@@ -59,7 +59,8 @@ export function syncLife(tank) {
     const shown = total <= MAX_MODELS ? n : Math.max(1, Math.round((n / total) * MAX_MODELS));
     for (let i = 0; i < shown; i++) {
       const fish = buildCreature(c);
-      if (tank.userData.clip) fish.userData.uni.uCauOn = tank.userData.clip.uCauOn; // 水槽の水紋の ON/OFF に合わせる
+      // 水槽の水紋（ON/OFF と、この水槽の真上をくり抜いた模様）を使う
+      if (tank.userData.clip) for (const k of ['uCauOn', 'uCauTex', 'uCauOrigin', 'uCauSize']) fish.userData.uni[k] = tank.userData.clip[k];
       const rand = mulberry32(tank.userData.uid * 131 + index++ * 977);
       const scale = Math.min(1, room / c.len) * sizeOf(speciesPieces(id)); // 大きな生物は水槽に収め、成長（ピース）に応じて育つ
       fish.scale.setScalar(scale);
