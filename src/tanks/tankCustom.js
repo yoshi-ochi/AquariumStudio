@@ -153,7 +153,7 @@ export class TankCustomizer {
     return `<div class="section"><h4>底砂</h4>
       <div class="seg"><button data-action="look-sand-on" class="${s.on ? 'active' : ''}">砂あり</button><button data-action="look-sand-off" class="${s.on ? '' : 'active'}">砂なし</button></div>
       ${s.on ? `<div class="seg wrap">${types}</div>${slider('sand-depth', '厚さ', 0.005, maxD, 0.005, Math.min(depth, maxD), 'cm')}` : '<p class="note">底面の色は「バックスクリーン・底面」の「底面」で選べます。</p>'}
-      <div class="seg"><button data-action="look-caustics" class="${look.caustics ? 'active' : ''}">🌊 底のゆらめく光 ${look.caustics ? 'ON' : 'OFF'}</button></div>
+      <div class="seg"><button data-action="look-caustics" class="${look.caustics ? 'active' : ''}">🌊 底のゆらめく光 ${look.caustics ? 'ON' : 'OFF'}</button></div>${look.caustics && !look.light.on ? '<small class="note">水紋は水槽ライトを付けているときに映ります</small>' : ''}
       </div>`;
   }
 

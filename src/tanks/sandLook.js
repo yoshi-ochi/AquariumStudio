@@ -132,7 +132,8 @@ export function applySand(tank, look) {
   }
   // 水紋：底・水槽内の物・生き物の材質が、この水槽の uCauOn を見て水紋を映す
   const floorY = base.y0 + (s.on ? depth : 0.002);
-  if (tank.userData.clip) tank.userData.clip.uCauOn.value = look.caustics ? 1 : 0;
+  // 水紋は水槽ライトを付けているときだけ（ライトの光が水面で揺らいで底に映る）
+  if (tank.userData.clip) tank.userData.clip.uCauOn.value = look.caustics && look.light.on ? 1 : 0;
   const old = body.getObjectByName('caustics'); // 以前の版の、底に重ねた水紋の板
   if (old) {
     body.remove(old);
