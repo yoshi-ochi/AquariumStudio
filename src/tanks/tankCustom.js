@@ -198,7 +198,7 @@ export class TankCustomizer {
       ${look.light.on ? `
       <div class="look-row"><span>ライト色</span><input type="color" data-look="lightColor" value="${look.light.color}">
         <button data-action="look-lightpreset-#e8f4ff">白</button><button data-action="look-lightpreset-#7fb4ff">青</button><button data-action="look-lightpreset-#ffe2b0">暖色</button></div>
-      ${slider('tanklight-intensity', '光量', 0.2, 4, 0.2, look.light.intensity, 'lv')}<small class="note">光量が強いほど水紋が深くまで届く（1段階で約${(14 / 19).toFixed(1)}m）</small>` : ''}</div>`;
+      ${slider('tanklight-intensity', '光量', 0.2, 4, 0.2, look.light.intensity, 'lv')}<small class="note">光量が強いほど水紋が深くまで届く（n段階で水深 n m までほぼ届く）</small>` : ''}</div>`;
   }
 
   _embedSection(obj) {
