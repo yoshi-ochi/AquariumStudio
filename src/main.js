@@ -980,7 +980,7 @@ async function boot() {
         title: '館内エリア',
         view: new ZoneView({
           economy, getUnlocked: () => unlocked, onUnlock: unlockZone,
-          getLook: (id) => ({ floor: roomSettings.floor.color, wall: roomSettings.wall.color, ...roomSettings.zoneLook?.[id] }),
+          getLook: (id) => ({ floor: roomSettings.floor.color, wall: roomSettings.wall.color, ceiling: roomSettings.ceiling.color, ...roomSettings.zoneLook?.[id] }),
           onLook: (id, kind, color) => {
             const all = { ...roomSettings.zoneLook };
             if (kind) all[id] = { ...all[id], [kind]: color };
@@ -1180,6 +1180,7 @@ async function boot() {
     interior.update();
     economy.update(dt, manager.totalAppeal() * (visiting ? 1 : ops.visitorMult * allyBonus() * life.visitorMult));
     views.update(dt);
+    room.updateCeiling(sceneMgr.camera.position.y);
     room.updateCut(sceneMgr.camera.position.distanceTo(cameraCtl.controls.target), dt);
     room.updateOcclusion(sceneMgr.camera.position, cameraCtl.controls.target, dt);
     life.crowd.setVisible(showVisitors && views.mode === 'floor' && mode !== 'interior-edit' && mode !== 'tank' && !mapPage.isOpen);

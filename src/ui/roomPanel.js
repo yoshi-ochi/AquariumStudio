@@ -31,9 +31,10 @@ export class RoomPanel {
     let body = '';
     if (this.section === 'floor') body = this._lookSection('floor', FLOOR_TYPES, s.floor);
     else if (this.section === 'wall') body = this._lookSection('wall', WALL_TYPES, s.wall);
+    else if (this.section === 'ceiling') body = `${this._lookSection('ceiling', [], s.ceiling)}<p class="note">天井と照明器具は、天井より低い位置から部屋を見たときに表示されます。</p>`;
     else if (this.section === 'walls') body = this._wallSection();
     else body = this._lightSection(s.lights);
-    this.el.innerHTML = `<div class="seg">${tab('floor', '床')}${tab('wall', '壁')}${tab('light', '照明')}${tab('walls', '間取り')}</div>${body}`;
+    this.el.innerHTML = `<div class="seg">${tab('floor', '床')}${tab('wall', '壁')}${tab('ceiling', '天井')}${tab('light', '照明')}${tab('walls', '間取り')}</div>${body}`;
   }
 
   setVisible(visible) {
@@ -63,7 +64,7 @@ export class RoomPanel {
 
   _lookSection(kind, types, cur) {
     return `
-      <div class="seg">${types.map((t) => `<button data-act="${kind}-type" data-v="${t.id}" class="${cur.type === t.id ? 'active' : ''}">${t.label}</button>`).join('')}</div>
+      <div class="seg" ${types.length ? '' : 'hidden'}>${types.map((t) => `<button data-act="${kind}-type" data-v="${t.id}" class="${cur.type === t.id ? 'active' : ''}">${t.label}</button>`).join('')}</div>
       <div class="row"><span class="label">色</span><input type="color" data-field="${kind}-color" value="${cur.color}"></div>`;
   }
 
@@ -126,6 +127,7 @@ export class RoomPanel {
     const s = this.getSettings();
     if (field === 'floor-color') s.floor.color = value;
     else if (field === 'wall-color') s.wall.color = value;
+    else if (field === 'ceiling-color') s.ceiling.color = value;
     else if (field.startsWith('light-')) {
       s.lights[this.lightIndex][field.slice(6)] = value;
       const out = input.parentElement.querySelector('output');

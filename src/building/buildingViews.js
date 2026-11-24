@@ -21,7 +21,7 @@ export class ZoneView {
     const color = (kind, label) => `<label class="zn-color">${label}<input type="color" data-field="zone-${kind}" data-id="${z.id}" value="${look[kind]}"></label>`;
     return `<div class="gs-row wrap zn-edit"><div class="gs-info"><b>エリアの編集</b><small>元の名前：${esc(defaultZoneName(z.id))}</small></div>
       <div class="tv-name"><input id="zn-name" value="${esc(z.name)}" maxlength="${MAX_ZONE_NAME}" aria-label="エリア名"><button data-act="zone-rename" data-id="${z.id}" class="primary">名前を変更</button></div>
-      <div class="zn-colors">${indoor ? `${color('floor', '床の色')}${color('wall', '壁の色')}` : '<small>屋外エリアは色を変えられません</small>'}</div>
+      <div class="zn-colors">${indoor ? `${color('floor', '床の色')}${color('wall', '壁の色')}${color('ceiling', '天井の色')}` : '<small>屋外エリアは色を変えられません</small>'}</div>
       <div class="gs-btns">${indoor ? `<button data-act="zone-color-reset" data-id="${z.id}">色を全体設定に戻す</button>` : ''}<button data-act="zone-edit-done">閉じる</button></div></div>`;
   }
 
@@ -49,7 +49,7 @@ export class ZoneView {
   /** 色の選択はその場で建物に反映する */
   input(el) {
     const f = el.dataset.field;
-    if (f === 'zone-floor' || f === 'zone-wall') this.onLook(el.dataset.id, f.slice(5), el.value);
+    if (f === 'zone-floor' || f === 'zone-wall' || f === 'zone-ceiling') this.onLook(el.dataset.id, f.slice(5), el.value);
   }
 
   act(act, id, b) {

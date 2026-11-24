@@ -35,6 +35,7 @@ export function defaultRoomSettings() {
   return {
     floor: { type: 'flooring', color: '#c99d74' },
     wall: { type: 'plaster', color: '#eef0ec' },
+    ceiling: { color: '#f2f1ec' },
     lights: [defaultLight(0.45, 14.85)],
   };
 }
