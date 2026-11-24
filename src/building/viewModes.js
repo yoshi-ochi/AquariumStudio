@@ -112,7 +112,8 @@ export class ViewModes {
       if (wings.length) this._fly(this._away(70, 96 + wings.length * 8, 70, 10), new THREE.Vector3(0, 10, wingCenter().z / 2));
       else this._fly(this._away(16, 84, 74, 4), new THREE.Vector3(0, 4, 0));
     } else if (mode === 'exterior') {
-      if (wings.length) this._fly(this._away(-62, 34 + wings.length * 3, 52, 6), new THREE.Vector3(0, 6, wingCenter().z / 2));
+      // 別棟は本館の裏なので、大屋根に隠れないよう高い位置から見下ろす
+      if (wings.length) this._fly(this._away(-55, 66 + wings.length * 3, 48, 6), new THREE.Vector3(0, 6, wingCenter().z / 2));
       else this._fly(this._away(-34, 20, 62, 5), new THREE.Vector3(0, 5, 4));
     }
     this.syncRail();

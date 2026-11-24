@@ -1,4 +1,5 @@
 import { creatureThumb } from '../ui/creatureThumb.js';
+import { PEN } from './seaPen.js';
 import { PLAN_FLOORS, WING_FLOORS, ZONES, ZONE_TYPE, MAX_ZONE_NAME, defaultZoneName, floorLabel, getZone } from './blueprint.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -43,7 +44,18 @@ export class ZoneView {
       return `<h4 class="gs-sub">${floorLabel(floor)}</h4>${items.join('')}`;
     });
     const pen = this.seaPen;
-    const penRow = pen ? `<h4 class="gs-sub">屋外</h4><div class="gs-row"><div class="gs-info"><b>屋外生け簀</b><small>100m×100m の海の生け簀。自由に区切って大型の生き物を展示できる</small>${pen.unlocked ? `<small>区画 ${pen.sections.length}</small>` : `<small>水族館レベル5で解放</small>`}</div><button data-act="zone-seapen" class="primary">${pen.unlocked ? '開く' : '見る'}</button></div>` : '';
+    let penRow = '';
+    if (pen) {
+      // 未解放：レベル5未満は条件を、レベル5以上は解放ボタンを出す。解放済みは区画の編集へ
+      const ready = level >= PEN.unlockLevel;
+      const state = pen.unlocked ? `区画 ${pen.sections.length}` : ready ? '解放できます' : `水族館レベル${PEN.unlockLevel}で解放（現在 Lv${level}）`;
+      const btn = pen.unlocked
+        ? '<button data-act="zone-seapen" class="primary">区画を編集</button>'
+        : ready
+          ? `<button data-act="zone-seapen-unlock" class="primary" ${this.economy.canAfford(PEN.unlockCost) ? '' : 'disabled'}>解放 ${yen(PEN.unlockCost)}</button>`
+          : '<button data-act="zone-seapen">詳しく</button>';
+      penRow = `<h4 class="gs-sub">屋外</h4><div class="gs-row"><div class="gs-info"><b>屋外生け簀</b><small>100m×100m の海の生け簀。自由に区切って大型の生き物を展示できる</small><small>${state}</small></div>${btn}</div>`;
+    }
     return rows.join('') + penRow;
   }
 
@@ -61,6 +73,14 @@ export class ZoneView {
     else if (act === 'zone-seapen') {
       this.onSeaPen?.();
       return false;
+    } else if (act === 'zone-seapen-unlock') {
+      const pen = this.seaPen;
+      if (pen?.canUnlock(this.economy.stage.level) && this.economy.spend(PEN.unlockCost)) {
+        pen.unlock();
+        this.onSeaPen?.();
+        return false;
+      }
+      return true;
     }
     if (act.startsWith('zone-') && act !== 'zone-open') return true;
     if (act !== 'zone-open') return false;
