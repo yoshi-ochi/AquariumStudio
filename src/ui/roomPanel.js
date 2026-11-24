@@ -115,19 +115,19 @@ export class RoomPanel {
 
   _lightSection(lights) {
     if (!this.zone) {
-      return '<p class="note">照明を編集する部屋をタップしてください。部屋の中から壁や天井を見渡して、照明を追加・調整できます。照明はその部屋の中だけを照らします（数の上限はありません）。</p>';
+      return '<p class="note">編集する部屋をタップしてください。真上から見た部屋で、床をタップして照明を追加できます。照明はその部屋の中だけを照らします（数の上限はありません）。</p>';
     }
     const own = this._zoneLights();
     const l = own.includes(this.lightIndex) ? lights[this.lightIndex] : null;
     const chips = own.map((i, k) => `<button data-act="light-pick" data-v="${i}" class="${i === this.lightIndex ? 'active' : ''}">💡${k + 1}</button>`).join('');
-    const head = `<div class="row"><b>${getZone(this.zone)?.name ?? ''} の照明</b><button data-act="room-exit">部屋から出る</button></div>`;
+    const head = `<div class="row"><b>${getZone(this.zone)?.name ?? ''} の照明</b></div>`;
     const range = (name, label, min, max, step, value, unit) =>
       `<label class="slider">${label}<input type="range" data-field="light-${name}" min="${min}" max="${max}" step="${step}" value="${value}"><output>${value}${unit}</output></label>`;
     return `${head}
       <div class="seg">${chips}
         <button data-act="light-add" data-repeat>＋</button>
         <button data-act="light-remove" class="danger" ${l ? '' : 'disabled'}>削除</button></div>
-      <p class="note">ドラッグで見渡し、床や天井をタップするとその場所に照明を追加できます。リング（または電球）をドラッグで移動、白い ● をドラッグで照らす場所を変えられます。</p>
+      <p class="note">床をタップするとその場所に照明を追加できます。リングをドラッグで移動。置いたあと、照らす向きは「向き」「傾き」か、白い ● のドラッグで調整できます。</p>
       ${l ? `
       ${range('height', '高さ', 0.5, 5, 0.05, l.height, 'm')}
       ${range('yaw', '向き', 0, 355, 5, this._aim(l).yaw, '°')}
@@ -165,7 +165,6 @@ export class RoomPanel {
       this.onChange('light-update', this.lightIndex);
       return this.render();
     }
-    else if (act === 'room-exit') return this.onChange('room-exit');
     else if (act === 'light-add' && this.zone) {
       const c = zoneCenter(getZone(this.zone));
       s.lights.push(defaultLight(c.x, c.z, this.zone));
