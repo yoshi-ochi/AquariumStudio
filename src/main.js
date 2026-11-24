@@ -450,8 +450,8 @@ async function boot() {
   const view = new ViewInteraction({
     sceneMgr, manager, onTankTap: (tank) => openTank(tank),
     onStairsTap: (stairs, e) => openStairsMenu(stairs, e),
-    // 部屋の床をタップ：部屋の中から見渡すプレビュー
-    onFloorTap: (e) => {
+    // 部屋の床を長押し：部屋の中から見渡すプレビュー
+    onFloorLongPress: (e) => {
       if (roomView) return;
       const zone = floorZoneAt(e);
       if (zone && zone.type !== 'outdoor') enterRoomView(zone.id);
