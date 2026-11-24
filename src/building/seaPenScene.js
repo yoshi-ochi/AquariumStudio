@@ -5,13 +5,13 @@ import { sizeOf, speciesPieces } from '../expedition/growth.js';
 import { disposeObject } from '../tanks/tankBuilder.js';
 import { mulberry32 } from '../tanks/random.js';
 import { PEN, sectionSize } from './seaPen.js';
-import { GRID_X, GRID_Z, CELL_SIZE, getZone } from './blueprint.js';
+import { GRID_X, GRID_Z, CELL_SIZE, FLOOR_COUNT, ZONES, ZONE_TYPE } from './blueprint.js';
 
 /**
  * 生け簀の3D表示。本館の右手の海に、100m 四方の浮き桟橋と網の区画を並べる。
  * 区画の中の生き物は実寸（成長に応じた大きさ）で泳がせる。
  */
-/** 生け簀の中心（ワールド座標）。売店・食堂の左から桟橋を渡った先の海（間取りで変わるので setLayout で決める） */
+/** 生け簀の中心（ワールド座標）。本館の右から桟橋を渡った先の海（間取りで変わるので setLayout で決める） */
 export const PEN_CENTER = { x: 0, z: 0 };
 const wx = (i) => (i - GRID_X / 2) * CELL_SIZE;
 const wz = (j) => (j - GRID_Z / 2) * CELL_SIZE;
@@ -68,18 +68,21 @@ export class SeaPenScene {
     const rim = 2;
     g.add(box(S + rim * 2, 0.4, rim, 0, 0, -S / 2 - rim / 2, MAT.deck), box(S + rim * 2, 0.4, rim, 0, 0, S / 2 + rim / 2, MAT.deck));
     g.add(box(rim, 0.4, S, -S / 2 - rim / 2, 0, 0, MAT.deck), box(rim, 0.4, S, S / 2 + rim / 2, 0, 0, MAT.deck));
-    // 陸（売店・食堂）側から渡る桟橋
-    g.add(box(10, 0.4, 3, S / 2 + rim + 5, 0, 0, MAT.deck));
+    // 本館側から渡る桟橋
+    g.add(box(10, 0.4, 3, -S / 2 - rim - 5, 0, 0, MAT.deck));
     return g;
   }
 
   /** 表示の切り替え（解放済みで、本館の地上階を見ているときだけ） */
   /** 売店・食堂の左端から10m 先に、生け簀の右端が来るよう置き直す */
+  /** 本館の右端から10m 先に、生け簀の左端が来るよう置き直す（奥行きは本館の中央） */
   setLayout() {
-    const left = Math.min(...['store', 'diner'].map((id) => getZone(id)?.rects[0][0] ?? GRID_X / 2));
-    const rows = getZone('marine')?.rects[0] ?? [0, 0, 0, GRID_Z - 1];
-    PEN_CENTER.x = wx(left) - 10 - PEN.size / 2;
-    PEN_CENTER.z = (wz(rows[1]) + wz(rows[3] + 1)) / 2;
+    const main = ZONES.filter((z) => z.floor < FLOOR_COUNT && z.type !== ZONE_TYPE.OUTDOOR && !z.facility && z.id !== 'yard0').flatMap((z) => z.rects ?? []);
+    const right = main.length ? Math.max(...main.map((r) => r[2])) + 1 : GRID_X;
+    const z0 = main.length ? Math.min(...main.map((r) => r[1])) : 0;
+    const z1 = main.length ? Math.max(...main.map((r) => r[3])) + 1 : GRID_Z;
+    PEN_CENTER.x = wx(right) + 10 + PEN.size / 2;
+    PEN_CENTER.z = (wz(z0) + wz(z1)) / 2;
     this.group.position.set(PEN_CENTER.x, 0, PEN_CENTER.z);
   }
 
