@@ -1,5 +1,5 @@
 import { creatureThumb } from '../ui/creatureThumb.js';
-import { PLAN_FLOORS, WING_FLOORS, ZONES, ZONE_TYPE, MAX_ZONE_NAME, defaultZoneName, floorLabel, getZone } from './blueprint.js';
+import { PLAN_FLOORS, WING_FLOORS, isWing, ZONES, ZONE_TYPE, MAX_ZONE_NAME, defaultZoneName, floorLabel, getZone } from './blueprint.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 import { EXPAND_COST, EXPAND_SLOTS } from './backyardData.js';
@@ -29,7 +29,7 @@ export class ZoneView {
     const unlocked = this.getUnlocked();
     const level = this.economy.stage.level;
     // 地下展示室・別館は、解放済みのものだけ並べる（解放はレイアウト編集の「増築」タブから）
-    const wings = WING_FLOORS.filter((f) => ZONES.some((z) => z.floor === f && unlocked.has(z.id)));
+    const wings = WING_FLOORS.filter((f) => isWing(f) && ZONES.some((z) => z.floor === f && unlocked.has(z.id)));
     const rows = [...PLAN_FLOORS, ...wings].map((floor) => {
       const items = ZONES.filter((z) => z.floor === floor && (!z.annex || unlocked.has(z.id))).map((z) => {
         if (unlocked.has(z.id)) {

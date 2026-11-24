@@ -47,7 +47,7 @@ import { AllianceApi } from './online/allianceApi.js';
 import { AllianceView } from './ui/allianceView.js';
 import { MapPage } from './ui/mapPage.js';
 import { LifeSystems } from './game/lifeSystems.js';
-import { BUILDING_VERSION, STORY_H, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter } from './building/blueprint.js';
+import { BUILDING_VERSION, STORY_H, FLOOR_COUNT, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorLevel, wingCount, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter, ZONES, floorLabel } from './building/blueprint.js';
 import { ViewModes } from './building/viewModes.js';
 import { buildLowerShell, buildWingShell } from './building/exterior.js';
 import { OutdoorScenery } from './building/outdoorScenery.js';
@@ -63,7 +63,7 @@ import { PoolView } from './ui/poolView.js';
 import { DinerView } from './ui/dinerView.js';
 import { ExpandPanel } from './ui/expandPanel.js';
 import { ZoneView } from './building/buildingViews.js';
-import { migrateToLayout, relocateInvalid, migrateLayoutV4, migrateGridV5, zonesForLegacyStage } from './building/migrate.js';
+import { migrateToLayout, relocateInvalid, migrateLayoutV4, migrateGridV5, migrateGridV6, migrateWingV6, freeFloorSpot, zonesForLegacyStage } from './building/migrate.js';
 import { FishingScene } from './expedition/fishingScene.js';
 import { zoneOf } from './expedition/husbandry.js';
 import { isHungry } from './expedition/husbandry.js';
@@ -168,6 +168,49 @@ async function boot() {
     manager.add('atriumTank', { ...ATRIUM_TANK_POS, floor: 0 });
     manager.setFloor(economy.floor);
   }
+  /** 各階に階段を1つずつ置く（なければ、その階の最初の展示室の中央近くの空いた床へ。動かすのは自由、撤去はできない） */
+  function ensureStairs() {
+    const def = getDef('stairs');
+    for (const floor of floorOrder(unlocked)) {
+      if ([...manager.objects.values()].some((o) => o.userData.floor === floor && manager.defOf(o).stairs)) continue;
+      // 展示室がない階（地下の機械室だけなど）はバックヤードに置く
+      const open = ZONES.filter((z) => z.floor === floor && unlocked.has(z.id) && !z.facility && z.type !== 'outdoor');
+      const zone = open.find((z) => z.type === 'hall') ?? open[0];
+      const type = zone?.type === 'hall' ? CELL.FLOOR : CELL.YARD;
+      const spot = zone && freeFloorSpot({ manager, floor, unlocked, hx: def.size.w / 2, hz: def.size.d / 2, target: zoneCenter(zone), type });
+      if (spot) manager.add('stairs', { ...spot, floor });
+    }
+  }
+  /** 階段で行ける上下の階（なければ null） */
+  function stairsTo(floor, dir) {
+    const list = floorOrder(unlocked).filter((f) => f === floor || ZONES.some((z) => z.floor === f && unlocked.has(z.id))).sort((a, b) => floorLevel(a) - floorLevel(b));
+    const k = list.indexOf(floor) + (dir === 'up' ? 1 : -1);
+    return list.indexOf(floor) < 0 || k < 0 || k >= list.length ? null : list[k];
+  }
+  /** 階段をタップしたときの、上下の階へ移動するメニュー（タップした位置に出す） */
+  function openStairsMenu(stairs, e) {
+    let pop = document.getElementById('stairs-pop');
+    if (!pop) {
+      pop = document.createElement('div');
+      pop.id = 'stairs-pop';
+      document.body.append(pop);
+      pop.addEventListener('click', (ev) => {
+        const b = ev.target.closest('button[data-floor]');
+        pop.hidden = true;
+        if (b) views.goFloor(+b.dataset.floor);
+      });
+      document.addEventListener('pointerdown', (ev) => !ev.target.closest('#stairs-pop') && (pop.hidden = true));
+    }
+    const item = (dir, mark) => {
+      const to = stairsTo(stairs.userData.floor, dir);
+      return to == null ? '' : `<button data-floor="${to}">${mark} ${floorLabel(to)}へ</button>`;
+    };
+    const items = item('up', '▲') + item('down', '▼');
+    pop.innerHTML = `<b>階段</b>${items || '<small>ほかの階はまだありません</small>'}`;
+    pop.style.left = `${Math.min(e.clientX, innerWidth - 150)}px`;
+    pop.style.top = `${Math.min(e.clientY, innerHeight - 130)}px`;
+    pop.hidden = false;
+  }
   /** 埋め込み水槽を壁に合わせ直し、穴あきの壁を作り直す */
   function refreshRoom() {
     const runs = room.plan.runs();
@@ -199,15 +242,15 @@ async function boot() {
     pool.setLayout();
     penScene.setLayout();
     zoneLabels.update(economy.floor, unlocked);
-    const under = economy.floor === BASEMENT;
-    const away = under || isWing(economy.floor); // 別館では本館の屋外（プール・景観）を出さない
+    const under = economy.floor === BASEMENT; // 地下では屋外（プール・景観・生け簀）を出さない
     room.setUnderground(under);
-    pool.setUnlocked(unlocked.has('pool') && !away);
-    scenery.group.visible = !away;
-    penScene.setVisible(!away);
+    pool.setUnlocked(unlocked.has('pool') && !under);
+    scenery.group.visible = !under;
+    penScene.setVisible(!under);
     scenery.sync(LAYOUT.id, unlocked);
     manager.extraAppeal = (unlocked.has('pool') ? POOL_APPEAL : 0) + Object.entries(OUTDOOR_APPEAL).reduce((s, [id, n]) => s + (unlocked.has(id) ? n : 0), 0);
     ensureAtriumTank();
+    ensureStairs();
     room.applyLook(roomSettings);
     room.setLights(roomSettings.lights);
     refreshRoom();
@@ -224,23 +267,23 @@ async function boot() {
   let viewMode = 'floor'; // 表示の切り替え（ViewModes の mode）
   function syncGround() {
     const floorView = viewMode === 'floor';
-    const main = economy.floor !== BASEMENT && !isWing(economy.floor);
-    const drop = floorView && main ? economy.floor * STORY_H : 0;
+    const level = floorLevel(economy.floor);
+    const drop = floorView && level > 0 ? level * STORY_H : 0;
     room.grass.position.y = -0.03 - drop;
     for (const g of [scenery.group, pool.group, penScene.group]) g.position.y = -drop;
     // 下の階の外壁（地面からの高さが分かるように）
     lowerShell.visible = drop > 0;
     lowerShell.position.y = -drop;
-    lowerShell.scale.y = Math.max(1, economy.floor);
-    // 本館の各階からも、裏に建つ別館の外観を見せる
-    const wings = floorOrder(unlocked).filter(isWing).length;
+    lowerShell.scale.y = Math.max(1, Math.min(level, FLOOR_COUNT));
+    // 別館は今の階より下の階だけ外観を出す（今の階は館内として表示している）
+    const wings = Math.max(0, Math.min(level, wingCount(unlocked)));
     if (wingShell?.userData.floors !== wings) {
       if (wingShell) sceneMgr.scene.remove(wingShell);
       wingShell = buildWingShell(wings);
       wingShell.userData.floors = wings;
       sceneMgr.scene.add(wingShell);
     }
-    wingShell.visible = floorView && main && wings > 0;
+    wingShell.visible = floorView && wings > 0;
     wingShell.position.y = -drop;
   }
   applyRoom(true);
@@ -266,6 +309,7 @@ async function boot() {
     gizmoEl: $('gizmo'),
     getDef,
     getBrush: () => interior.brush,
+    stairsTo,
     getGrowMode: () => interior.growMode,
     onAction: (action, obj, value) => {
       if (action.startsWith('brush-')) return interior.setBrush('mode', action === 'brush-off' ? null : action.slice(6));
@@ -278,6 +322,11 @@ async function boot() {
       if (action === 'param-bubbles') return (obj.userData.bubbles = value);
       if (action.startsWith('look-') || action === 'param-tanklight-intensity' || action === 'param-side-alpha') return changeTankLook(obj, action, value);
       if (action === 'unembed') return hall.unembed(obj);
+      if (action === 'stairs-up' || action === 'stairs-down') {
+        const to = stairsTo(obj.userData.floor, action === 'stairs-up' ? 'up' : 'down');
+        if (to != null) views.goFloor(to);
+        return;
+      }
       if (action === 'lock') {
         obj.userData.locked = !obj.userData.locked;
         customizer.syncLock();
@@ -390,6 +439,7 @@ async function boot() {
   // 水槽のほか、イルカプールと生け簀もタップで展示の画面を開く
   const view = new ViewInteraction({
     sceneMgr, manager, onTankTap: (tank) => openTank(tank),
+    onStairsTap: (stairs, e) => openStairsMenu(stairs, e),
     extraTargets: () => [
       ...(pool.group.visible ? [[pool.water, () => gameSheet.openPanel('pool')]] : []),
       ...(penScene.group.visible ? [[penScene.group, () => gameSheet.openPanel('seapen')]] : []),
@@ -621,6 +671,7 @@ async function boot() {
     const oldBuilding = data.room?.layout && builtVer < BUILDING_VERSION;
     const oldGrid = data.room?.layout && builtVer < 4; // 間取りを広げる前（版3まで）
     if (data.room?.layout && builtVer === 4) migrateGridV5(data); // 敷地の格子を左右に広げた
+    if (data.room?.layout && builtVer < 6) migrateGridV6(data, builtVer); // 格子を北へ広げ、別館をプールの奥へ移した
     setWallEdits(data.room?.layout && !oldGrid ? data.room.walls : null);
     // 建造した水槽の定義を先に登録する（ID に寸法が入っている）
     registerCustomIds([...(data.objects ?? []).map((o) => o.defId), ...Object.keys(data.inventory?.stock ?? {}), ...(data.inventory?.orders ?? []).map((o) => o.defId)]);
@@ -648,6 +699,7 @@ async function boot() {
     } else if (oldBuilding) {
       // 間取りを広げた：物を元のエリアの新しい位置へ移し、置けない物だけ空いている場所へ（照明は置き直す）
       if (oldGrid) migrateLayoutV4({ manager });
+      if (builtVer < 6) migrateWingV6({ manager, moved: oldGrid });
       // 版5：屋外ひろば・自然再現エリアを廃止し、左に海獣広場・売店・食堂を設けた。置けなくなった物だけ移す
       relocateInvalid({ manager, unlocked, inventory, expeditions, economy });
       if (oldGrid) resetLights();

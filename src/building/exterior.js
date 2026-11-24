@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { CELL_SIZE, FLOOR_COUNT, GRID_X, GRID_Z, LAYOUT, STORY_H, ZONES, ZONE_TYPE, ATRIUM_TANK_POS, getZone, zoneHas } from './blueprint.js';
+import { CELL_SIZE, FLOOR_COUNT, GRID_X, GRID_Z, GRID_Z0, LAYOUT, STORY_H, ZONES, ZONE_TYPE, ATRIUM_TANK_POS, WING_GRID_CENTER, WING_RECT, getZone, zoneHas } from './blueprint.js';
 
 /** 近代的な外観：ガラスのカーテンウォールと、間取りごとに形の違う白い大屋根 */
 const TOP = STORY_H * FLOOR_COUNT;
 const wx = (i) => (i - GRID_X / 2) * CELL_SIZE;
-const wz = (j) => (j - GRID_Z / 2) * CELL_SIZE;
+const wz = (j) => (j - GRID_Z0) * CELL_SIZE;
 
 const MAT = {
   glass: new THREE.MeshStandardMaterial({ color: 0xa8dcea, metalness: 0.25, roughness: 0.08, transparent: true, opacity: 0.88 }),
@@ -37,8 +37,9 @@ function surface(nu, nv, fn) {
   return g;
 }
 
-/** 本館（地上の階）のエリア。地下・別館・左の売店や食堂は含めない */
-const buildingZones = () => ZONES.filter((z) => z.type !== ZONE_TYPE.OUTDOOR && z.floor < FLOOR_COUNT && !z.facility && z.id !== 'yard0');
+/** 本館（地上の階）のエリア。地下・別館・左の売店や食堂・屋外のバックヤードは含めない */
+const OUTDOOR_YARDS = ['yard0', 'poolyard'];
+const buildingZones = () => ZONES.filter((z) => z.type !== ZONE_TYPE.OUTDOOR && z.floor < FLOOR_COUNT && !z.facility && !z.wing && !OUTDOOR_YARDS.includes(z.id));
 
 /** 全エリアの外接矩形（ワールド座標） */
 function footprint() {
@@ -274,22 +275,16 @@ function shellRoofs(group) {
 
 const ROOFS = { spiral: spiralRoof, descent: waveRoof, radial: domeRoof, pavilion: shellRoofs };
 
-/** 別館：本館の裏に建つ30m四方のガラスの棟。階数ぶんの高さで、本館とは渡り廊下でつなぐ */
-export const WING_SIZE = 34 * CELL_SIZE;
-export const WING_GAP = 9;
-/** 別館の中心（本館の裏側。ワールド座標） */
-export function wingCenter() {
-  const b = footprint();
-  return { x: (b.x0 + b.x1) / 2, z: b.z0 - WING_GAP - WING_SIZE / 2 };
-}
+/** 別館：イルカプールの奥に建つ、周りをバックヤードが囲む約34m四方のガラスの棟（階数ぶんの高さ） */
+/** 別館の中心（ワールド座標。間取りの格子上の区画の中心） */
+export const wingCenter = () => ({ x: WING_GRID_CENTER.x, z: WING_GRID_CENTER.z });
 
 function wing(group, floors) {
-  const b = footprint();
   const { x, z } = wingCenter();
-  const S = WING_SIZE;
+  const S = (WING_RECT[2] - WING_RECT[0] + 1) * CELL_SIZE;
   const H = floors * STORY_H;
-  const paving = new THREE.Mesh(new THREE.PlaneGeometry(S + 10, S + WING_GAP + 6).rotateX(-Math.PI / 2), MAT.paving);
-  paving.position.set(x, 0.012, z + WING_GAP / 2);
+  const paving = new THREE.Mesh(new THREE.PlaneGeometry(S + 8, S + 8).rotateX(-Math.PI / 2), MAT.paving);
+  paving.position.set(x, 0.012, z);
   // ガラスの外壁（四面）と、角と各面の方立て
   const glass = new THREE.Mesh(new THREE.BoxGeometry(S, H, S).translate(x, H / 2, z), MAT.glass);
   const parts = [];
@@ -300,12 +295,10 @@ function wing(group, floors) {
     parts.push(box(0.08, H, 0.16, x + t, H / 2, z - S / 2), box(0.08, H, 0.16, x + t, H / 2, z + S / 2));
     parts.push(box(0.16, H, 0.08, x - S / 2, H / 2, z + t), box(0.16, H, 0.08, x + S / 2, H / 2, z + t));
   }
-  // 屋上の機械室と、本館の裏とつなぐ渡り廊下
+  // 屋上の機械室と、南（プール側）の入口のひさし
   parts.push(box(S * 0.3, 2.4, S * 0.2, x + S * 0.2, H + 1.2, z - S * 0.15));
-  const bridgeZ = (b.z0 + z + S / 2) / 2;
-  parts.push(box(4.4, 0.3, WING_GAP, x, STORY_H, bridgeZ), box(4.4, 0.3, WING_GAP, x, 0.15, bridgeZ));
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(4, STORY_H - 0.3, WING_GAP).translate(x, STORY_H / 2, bridgeZ), MAT.glass);
-  group.add(paving, glass, bridge, new THREE.Mesh(mergeGeometries(parts), MAT.white));
+  parts.push(box(6, 0.25, 3, x, 3, z + S / 2 + 1.5));
+  group.add(paving, glass, new THREE.Mesh(mergeGeometries(parts), MAT.white));
   // 棟名の看板（正面＝本館側）
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -327,10 +320,10 @@ function wing(group, floors) {
   }
 }
 
-/** 左の売店・食堂・屋外バックヤード：平屋のガラスの棟と白い屋根 */
+/** 左の売店・食堂：平屋のガラスの棟と白い屋根（屋外バックヤードは屋根なし） */
 function sidePavilions(group) {
   const parts = [];
-  for (const id of ['store', 'diner', 'yard0']) {
+  for (const id of ['store', 'diner']) {
     const [x0, z0, x1, z1] = getZone(id)?.rects[0] ?? [];
     if (x0 == null) continue;
     const w = (x1 - x0 + 1) * CELL_SIZE;

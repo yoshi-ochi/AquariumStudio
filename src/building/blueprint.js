@@ -11,27 +11,42 @@ export const CELL_SIZE = 0.9;
  */
 export const GRID_X = 180;
 const SITE_X = 44;
-export const GRID_Z = 86;
+/** 版6：イルカプールの奥（北）に別館を置くため、格子を北へ広げた行数。ワールド座標は版5と同じ */
+export const NORTH_ROWS = 62;
+export const GRID_Z = 86 + NORTH_ROWS;
+/** ワールド座標 z = 0 になる行（版5までの格子の中央） */
+export const GRID_Z0 = 43 + NORTH_ROWS;
 /** 建物の版（間取りの大きさを変えたら上げる。セーブの移行に使う） */
-export const BUILDING_VERSION = 5;
+export const BUILDING_VERSION = 6;
+/** イルカプールの客席の奥行き（客席の背から水面の中心まで）と、中心からステージ奥の壁まで(m) */
+export const POOL_SEAT_REACH = 10.7;
+const POOL_BACK = 7.2;
 export const FLOOR_COUNT = 2;
 /** 地下1階のフロア番号（地上は 0, 1） */
 export const BASEMENT = 2;
 export const PLAN_FLOORS = [0, 1, BASEMENT];
 
 /**
- * 別館：最大レベルの後に建てる、30m四方の独立した建物。中は1つの広い展示室で、壁を立てて自由に使い、階を積み増せる。
- * 階番号は WING_BASE から（別館1F = WING_BASE）。各階は本館と同じ敷地の格子を使い、表示は1階ずつ切り替える。
+ * 別館：最大レベルの後に建てる、30m四方の独立した建物（イルカプールの奥）。中は1つの広い展示室で、周囲をバックヤードが囲む。
+ * 1F・2F は本館の 1F・2F と同じ階（同じ格子に並べて同時に表示）。3F 以上は別館だけの階で、階番号は WING_BASE + 階数-1。
  */
 export const WING_BASE = 10;
 export const WING_MAX = 8;
-export const WING_FLOORS = Array.from({ length: WING_MAX }, (_, i) => WING_BASE + i);
-export const isWing = (floor) => floor >= WING_BASE && floor < WING_BASE + WING_MAX;
-/** 34マス × 0.9m ≒ 30m 四方 */
-const WING_RECT = [73, 26, 106, 59];
-export const floorLabel = (floor) => (floor === BASEMENT ? 'B1' : isWing(floor) ? `別館${floor - WING_BASE + 1}F` : `${floor + 1}F`);
-/** 階の並び（下から）。別館は解放済みの階だけ */
-export const floorOrder = (unlocked) => [BASEMENT, 0, 1, ...WING_FLOORS.filter((f) => unlocked.has(`wing${f - WING_BASE + 1}`))];
+/** 別館の i 番目（0 = 1F）の階のフロア番号 */
+export const wingFloor = (i) => (i < FLOOR_COUNT ? i : WING_BASE + i);
+export const WING_FLOORS = Array.from({ length: WING_MAX }, (_, i) => wingFloor(i));
+/** 別館だけの階（3F 以上） */
+export const isWing = (floor) => floor >= WING_BASE + FLOOR_COUNT && floor < WING_BASE + WING_MAX;
+/** 地上からの階（1F = 0。地下は -1） */
+export const floorLevel = (floor) => (floor === BASEMENT ? -1 : floor >= WING_BASE ? floor - WING_BASE : floor);
+/** 別館の展示室（34マス × 0.9m ≒ 30m 四方）の周りを囲むバックヤードの幅 */
+export const WING_YARD = 2;
+const WING_HALL = 34;
+export const floorLabel = (floor) => (floor === BASEMENT ? 'B1' : isWing(floor) ? `別館${floorLevel(floor) + 1}F` : `${floor + 1}F`);
+/** 建設済みの別館の階数 */
+export const wingCount = (unlocked) => WING_FLOORS.filter((_, i) => unlocked.has(`wing${i + 1}`)).length;
+/** 階の並び（下から）。別館だけの階は解放済みの階だけ */
+export const floorOrder = (unlocked) => [BASEMENT, 0, 1, ...WING_FLOORS.filter((f) => isWing(f) && unlocked.has(`wing${floorLevel(f) + 1}`))];
 /** 展示室の壁の裏に設ける管理通路の幅（2マス = 1.8m） */
 export const SERVICE_WIDTH = 2;
 export const EXHIBIT_ZONES = ['coast', 'subtropical', 'deep', 'archive'];
@@ -43,12 +58,12 @@ const { HALL, YARD, OUTDOOR } = ZONE_TYPE;
 
 /**
  * 増築展示室：地下の空いた敷地に、順番に増やせる展示室。レベルに関係なく、前の部屋を開けば次を増築できる。
- * rects は敷地の絶対マス（全間取り共通）。
+ * rects は敷地の絶対マス（全間取り共通。版5の格子の行番号で書き、北へ広げた分は後でずらす）。
  */
 const ANNEX_RECTS = [
   [28, 3, 49, 24], [50, 3, 71, 24], [72, 3, 93, 24], [94, 3, 115, 24],
   [116, 3, 137, 24], [130, 25, 151, 46], [28, 25, 49, 46], [28, 47, 49, 68],
-];
+].map(([x0, z0, x1, z1]) => [x0, z0 + NORTH_ROWS, x1, z1 + NORTH_ROWS]);
 export const ANNEX_IDS = ANNEX_RECTS.map((_, i) => `annex${i + 1}`);
 const ANNEX_LINKS = [['annex1', 'annex2'], ['annex2', 'annex3'], ['annex3', 'annex4'], ['annex4', 'annex5'], ['annex5', 'annex6'], ['annex1', 'annex7'], ['annex7', 'annex8']];
 function ANNEX_META() {
@@ -81,7 +96,7 @@ const ZONE_META = [
   { id: 'deep', name: '深海エリア', floor: 1, type: HALL, stage: 2, cost: 2000000, requires: 'gallery', theme: 'cold', color: '#4a5a9c', text: '冷たい海の生き物を展示すると集客+25%' },
   { id: 'archive', name: '資料エリア', floor: 1, type: HALL, stage: 2, cost: 1000000, requires: 'gallery', color: '#b79bd8', text: '研究の進み方が1.5倍になる' },
   { id: 'marine', name: '海獣広場', floor: 0, type: OUTDOOR, open: true, stage: 1, cost: 400000, color: '#8aa6b8', text: '建物の左の屋外の更地（幅20m）。海獣用水槽など、好きな水槽を自由に置ける' },
-  { id: 'yard0', name: '屋外バックヤード', floor: 0, type: YARD, stage: 1, cost: 300000, requires: 'marine', color: '#c9ccd0', text: '海獣広場の奥の職員エリア。設備や予備の水槽を置ける' },
+  { id: 'yard0', name: '屋外バックヤード', floor: 0, type: YARD, stage: 1, cost: 300000, requires: 'marine', color: '#c9ccd0', text: '海獣広場の周りを囲む、屋根のない職員エリア。設備や予備の水槽を置ける' },
   { id: 'store', name: '売店', floor: 0, type: HALL, stage: 1, cost: 300000, requires: 'marine', color: '#e6a15c', facility: 'store', text: '棚に商品が並ぶお土産の売店。タップで商品を補充できる' },
   { id: 'diner', name: '食堂', floor: 0, type: HALL, stage: 1, cost: 500000, requires: 'marine', color: '#e0c46c', facility: 'diner', text: '提供口とテーブルのある食堂。タップで料理を提供できる' },
   { id: 'b1a', name: '地下機械室', floor: BASEMENT, type: YARD, stage: 1, cost: 0, color: '#9aa4ad', text: '水質管理と予備水槽の基本エリア' },
@@ -91,6 +106,7 @@ const ZONE_META = [
   ...ANNEX_META(),
   ...WING_META(),
   { id: 'pool', name: 'イルカプール', floor: 0, type: OUTDOOR, stage: 3, cost: 8000000, color: '#54c0d8', text: '2階建ての観客席を備えたショープール' },
+  { id: 'poolyard', name: 'プールバックヤード', floor: 0, type: YARD, stage: 3, cost: 600000, requires: 'pool', color: '#c9ccd0', text: 'イルカプールのステージ裏の、屋根のない職員エリア' },
 ];
 
 /** 吹き抜けを囲む2階の回廊 */
@@ -166,22 +182,33 @@ export const LAYOUTS = [
   },
 ];
 
-// 建物の区画を敷地の中央へ寄せる（ワールド座標は変わらない）
-const shift = ([x0, z0, x1, z1]) => [x0 + SITE_X, z0, x1 + SITE_X, z1];
+// 建物の区画を敷地の中央へ寄せ、北へ広げた分だけ行をずらす（ワールド座標は変わらない）
+const shift = ([x0, z0, x1, z1]) => [x0 + SITE_X, z0 + NORTH_ROWS, x1 + SITE_X, z1 + NORTH_ROWS];
+const N = NORTH_ROWS;
 for (const l of LAYOUTS) {
   for (const id of Object.keys(l.rects)) l.rects[id] = l.rects[id].map(shift);
   l.voidRect = shift(l.voidRect);
-  // 建物の左端から、海獣広場（22マス≒20m）と屋外バックヤード、その左に売店・食堂（各22マス四方）
+  // 建物の左端から、海獣広場（22マス≒20m）、その左に売店・食堂（各22マス四方）。
+  // 屋外バックヤードは海獣広場の北・西・南の縁（幅2マス）を囲む。売店・食堂への出入口の前は空ける
   const L = Math.min(...Object.entries(l.rects).filter(([id]) => id !== 'pool').flatMap(([, rs]) => rs.map((r) => r[0])));
   Object.assign(l.rects, {
-    marine: [[L - 22, 30, L - 1, 85]], yard0: [[L - 22, 2, L - 1, 29]],
-    store: [[L - 44, 30, L - 23, 51]], diner: [[L - 44, 52, L - 23, 73]],
+    marine: [[L - 22, 2 + N, L - 1, 85 + N]],
+    yard0: [[L - 22, 2 + N, L - 1, 3 + N], [L - 22, 4 + N, L - 21, 38 + N], [L - 22, 43 + N, L - 21, 60 + N], [L - 22, 65 + N, L - 21, 83 + N], [L - 22, 84 + N, L - 1, 85 + N]],
+    store: [[L - 44, 30 + N, L - 23, 51 + N]], diner: [[L - 44, 52 + N, L - 23, 73 + N]],
   });
+  // プールのステージ奥の壁より北に、プールバックヤード（24×10マス）。その北に4マス空けて別館（展示室34マス＋周りのバックヤード）
+  const [px0, , px1, pz1] = l.rects.pool[0];
+  const pcx = Math.round((px0 + px1 + 1) / 2);
+  const back = (pz1 + 1 - GRID_Z0) * CELL_SIZE - POOL_SEAT_REACH - POOL_BACK;
+  const yz1 = Math.floor(back / CELL_SIZE + GRID_Z0) - 1;
+  l.rects.poolyard = [[pcx - 12, yz1 - 9, pcx + 11, yz1]];
+  const W = WING_HALL + WING_YARD * 2;
+  l.wingRect = [pcx - W / 2, yz1 - 13 - W, pcx + W / 2 - 1, yz1 - 14];
   l.links = [...l.links, ['marine', l.leftLink], ['marine', 'store'], ['marine', 'diner']];
   l.serviceLinks = (l.serviceLinks ?? []).map(shift);
-  Object.assign(l.rects, { b1a: [[72, 25, 107, 46]], b1b: [[50, 25, 71, 46]], b1c: [[108, 25, 129, 46]], b1d: [[50, 47, 129, 58]] });
+  Object.assign(l.rects, { b1a: [[72, 25 + N, 107, 46 + N]], b1b: [[50, 25 + N, 71, 46 + N]], b1c: [[108, 25 + N, 129, 46 + N]], b1d: [[50, 47 + N, 129, 58 + N]] });
   ANNEX_RECTS.forEach((r, i) => (l.rects[ANNEX_IDS[i]] = [r]));
-  WING_FLOORS.forEach((_, i) => (l.rects[`wing${i + 1}`] = [WING_RECT]));
+  WING_FLOORS.forEach((_, i) => (l.rects[`wing${i + 1}`] = [l.wingRect]));
   l.links = [...l.links, ...ANNEX_LINKS];
 }
 
@@ -193,13 +220,16 @@ function sceneryRect(id, [x0, z0, x1, z1]) {
 export const DEFAULT_LAYOUT = LAYOUTS[0].id;
 export const START_ZONES = ZONE_META.filter((z) => z.cost === 0).map((z) => z.id);
 export const inRect = ([x0, z0, x1, z1], i, j) => i >= x0 && i <= x1 && j >= z0 && j <= z1;
-const rectCenter = ([x0, z0, x1, z1]) => ({ x: ((x0 + x1 + 1) / 2 - GRID_X / 2) * CELL_SIZE, z: ((z0 + z1 + 1) / 2 - GRID_Z / 2) * CELL_SIZE });
+const rectCenter = ([x0, z0, x1, z1]) => ({ x: ((x0 + x1 + 1) / 2 - GRID_X / 2) * CELL_SIZE, z: ((z0 + z1 + 1) / 2 - GRID_Z0) * CELL_SIZE });
 
 // 選択中の間取り（setLayout で切り替わる）
 export let LAYOUT = LAYOUTS[0];
 export let ZONES = [];
 export let ATRIUM_VOID = null;
 export let ATRIUM_TANK_POS = null;
+/** 別館の区画（周りのバックヤードを含む。マス番号）と、その中心（ワールド座標） */
+export let WING_RECT = null;
+export const WING_GRID_CENTER = { x: 0, z: 0 };
 /** 自由に編集した壁。{ 階: { add: [境目キー], remove: [境目キー] } } */
 export let WALL_EDITS = {};
 export const setWallEdits = (edits) => (WALL_EDITS = JSON.parse(JSON.stringify(edits ?? {})));
@@ -224,6 +254,8 @@ export function setLayout(id) {
   ZONES = ZONE_META.map((z) => ({ ...z, name: ZONE_NAMES[z.id] ?? z.name, rects: LAYOUT.rects[z.id], requires: LAYOUT.requires?.[z.id] ?? z.requires, scenery: z.open ? sceneryRect(z.id, LAYOUT.rects[z.id][0]) : null }));
   ATRIUM_VOID = { floor: 1, rect: LAYOUT.voidRect, zone: 'atrium' };
   ATRIUM_TANK_POS = rectCenter(LAYOUT.voidRect);
+  WING_RECT = LAYOUT.wingRect;
+  Object.assign(WING_GRID_CENTER, rectCenter(WING_RECT));
 }
 setLayout(DEFAULT_LAYOUT);
 
@@ -233,7 +265,7 @@ export const zonesUpToLevel = (level) => (level >= 2 ? ZONES.filter((z) => z.sta
 export const zoneHas = (zone, i, j) => zone.rects.some((r) => inRect(r, i, j));
 
 /** ワールド座標 → マス番号 */
-export const cellAt = (x, z) => [Math.floor(x / CELL_SIZE + GRID_X / 2), Math.floor(z / CELL_SIZE + GRID_Z / 2)];
+export const cellAt = (x, z) => [Math.floor(x / CELL_SIZE + GRID_X / 2), Math.floor(z / CELL_SIZE + GRID_Z0)];
 
 /** その位置のエリア */
 export function zoneAt(floor, x, z) {
@@ -245,8 +277,6 @@ export function zoneAt(floor, x, z) {
 export const zoneRectCenter = (rect) => rectCenter(rect);
 /** エリアの中心（最初の区画の中心。ワールド座標） */
 export const zoneCenter = (zone) => rectCenter(zone.rects[0]);
-/** 別館の区画の中心（各階の格子上。ワールド座標） */
-export const WING_GRID_CENTER = rectCenter(WING_RECT);
 
 /** 間取りを選ぶ前の建物（旧セーブの移行に使う） */
 const OLD_RECTS = {

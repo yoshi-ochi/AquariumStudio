@@ -6,54 +6,37 @@ import { sizeOf, speciesPieces } from '../expedition/growth.js';
 import { disposeObject } from '../tanks/tankBuilder.js';
 import { mulberry32 } from '../tanks/random.js';
 import { PEN, sectionSize } from './seaPen.js';
-import { GRID_X, GRID_Z, CELL_SIZE, FLOOR_COUNT, ZONES, ZONE_TYPE } from './blueprint.js';
+import { GRID_X, GRID_Z, GRID_Z0, CELL_SIZE, FLOOR_COUNT, ZONES, ZONE_TYPE } from './blueprint.js';
 
 /**
- * 生け簀の3D表示。本館の右手の海に、100m 四方の浮き桟橋と網の区画を並べる。
+ * 生け簀の3D表示。本館の右手に離して、地面に掘り込んだ 100m 四方の堀を作り、ブイの列で仕切った網の区画を並べる。
  * 区画の中の生き物は実寸（成長に応じた大きさ）で泳がせる。
  */
-/** 生け簀の中心（ワールド座標）。本館の右から桟橋を渡った先の海（間取りで変わるので setLayout で決める） */
+/** 生け簀の中心（ワールド座標）。本館の右から小道を歩いた先の堀（間取りで変わるので setLayout で決める） */
 export const PEN_CENTER = { x: 0, z: 0 };
 const wx = (i) => (i - GRID_X / 2) * CELL_SIZE;
-const wz = (j) => (j - GRID_Z / 2) * CELL_SIZE;
-const WATER_Y = -0.3;
+const wz = (j) => (j - GRID_Z0) * CELL_SIZE;
+/** 堀の水面（地面より下） */
+const WATER_Y = -1.2;
 const MAX_PER_SPECIES = 8;
 
 const MAT = {
-  water: new THREE.MeshStandardMaterial({ color: 0x1d6f8f, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide }),
-  sea: new THREE.MeshStandardMaterial({ color: 0x0f4d6a, roughness: 0.6 }),
-  deck: new THREE.MeshStandardMaterial({ color: 0xc8b48c, roughness: 0.85 }),
-  float: new THREE.MeshStandardMaterial({ color: 0xe8edf0, roughness: 0.7 }),
+  water: new THREE.MeshStandardMaterial({ color: 0x1d6f8f, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }),
+  pitWall: new THREE.MeshStandardMaterial({ color: 0x8f9893, roughness: 0.95, side: THREE.BackSide }),
+  pitFloor: new THREE.MeshStandardMaterial({ color: 0x24505c, roughness: 0.9, side: THREE.BackSide }),
+  hidden: new THREE.MeshBasicMaterial({ visible: false }),
+  coping: new THREE.MeshStandardMaterial({ color: 0xc9c6bc, roughness: 0.9 }),
+  float: new THREE.MeshStandardMaterial({ color: 0xeef1f2, roughness: 0.5 }),
   net: new THREE.MeshBasicMaterial({ color: 0x23343e, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide }),
-  pipe: new THREE.MeshStandardMaterial({ color: 0x1d2226, roughness: 0.4 }), // 黒い HDPE の浮きパイプ
-  grate: new THREE.MeshStandardMaterial({ color: 0x9aa3a8, roughness: 0.7, metalness: 0.3 }),
   rail: new THREE.MeshStandardMaterial({ color: 0xd8dde0, roughness: 0.35, metalness: 0.6 }),
   buoy: new THREE.MeshStandardMaterial({ color: 0xf28a1c, roughness: 0.45 }),
-  mooring: new THREE.MeshStandardMaterial({ color: 0xf2d02c, roughness: 0.45 }),
   rope: new THREE.MeshBasicMaterial({ color: 0x3a3a32 }),
 };
-/** 1辺ぶんの浮き：水面に浮く2本の HDPE パイプ、その上の歩廊（グレーチング）、2.5m おきの支柱と手すり */
-function collarEdge(len, rot) {
-  const parts = { pipe: [], grate: [], rail: [] };
-  const along = (geo, x, y, z) => (rot ? geo.rotateY(Math.PI / 2) : geo).translate(rot ? z : x, y, rot ? x : z);
-  for (const off of [-0.45, 0.45]) parts.pipe.push(along(new THREE.CylinderGeometry(0.22, 0.22, len, 10).rotateZ(Math.PI / 2), 0, 0.02, off));
-  parts.grate.push(along(new THREE.BoxGeometry(len, 0.06, 0.9), 0, 0.26, 0));
-  const n = Math.max(1, Math.round(len / 2.5));
-  for (let i = 0; i <= n; i++) {
-    const x = -len / 2 + (i / n) * len;
-    parts.rail.push(along(new THREE.CylinderGeometry(0.03, 0.03, 1, 6), x, 0.76, 0.45));
-  }
-  parts.rail.push(along(new THREE.CylinderGeometry(0.035, 0.035, len, 6).rotateZ(Math.PI / 2), 0, 1.24, 0.45));
-  parts.rail.push(along(new THREE.CylinderGeometry(0.025, 0.025, len, 6).rotateZ(Math.PI / 2), 0, 0.78, 0.45));
-  return parts;
-}
+/** 堀の縁（笠木）の幅と、本館から堀までの距離(m) */
+const RIM = 2.5;
+const GAP = 30;
 const sphere = (r, x, y, z, mat) => {
   const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), mat);
-  m.position.set(x, y, z);
-  return m;
-};
-const box = (w, h, d, x, y, z, mat) => {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
   m.position.set(x, y, z);
   return m;
 };
@@ -81,50 +64,51 @@ export class SeaPenScene {
     pen.addEventListener('change', () => this.rebuild());
   }
 
-  /** 外周の桟橋・海面・本館からの桟橋（区画によらない部分） */
+  /** 堀・水面・縁の柵・本館からの小道（区画によらない部分） */
   _base() {
     const g = new THREE.Group();
     const S = PEN.size;
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(S + 40, S + 40).rotateX(-Math.PI / 2), MAT.sea);
-    sea.position.y = -PEN.depth - 0.5;
-    g.add(sea);
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(S + 40, S + 40).rotateX(-Math.PI / 2), MAT.water);
+    // 地面を掘り込んだ堀：内側の面だけを描く上面のない箱（外から見た手前の壁は消え、奥の壁と底が見える）
+    const D = PEN.depth - WATER_Y + 0.5;
+    const pit = new THREE.Mesh(new THREE.BoxGeometry(S, D, S).translate(0, -D / 2, 0), [MAT.pitWall, MAT.pitWall, MAT.hidden, MAT.pitFloor, MAT.pitWall, MAT.pitWall]);
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(S, S).rotateX(-Math.PI / 2), MAT.water);
     water.position.y = WATER_Y;
     water.renderOrder = 2;
-    g.add(water);
-    const rim = 2;
-    g.add(box(S + rim * 2, 0.4, rim, 0, 0, -S / 2 - rim / 2, MAT.deck), box(S + rim * 2, 0.4, rim, 0, 0, S / 2 + rim / 2, MAT.deck));
-    g.add(box(rim, 0.4, S, -S / 2 - rim / 2, 0, 0, MAT.deck), box(rim, 0.4, S, S / 2 + rim / 2, 0, 0, MAT.deck));
-    // 外周の係留ブイ（12.5m おき）と、海底のアンカーへ斜めに張る係留索
-    const moor = [];
-    const ropes = [];
-    for (let i = 0; i <= 8; i++) {
-      const t = -S / 2 + (i / 8) * S;
-      for (const [x, z, dx, dz] of [[t, -S / 2 - 9, 0, 1], [t, S / 2 + 9, 0, -1], [-S / 2 - 9, t, 1, 0], [S / 2 + 9, t, -1, 0]]) {
-        moor.push(new THREE.SphereGeometry(0.6, 10, 8).translate(x, 0.1, z));
-        const a = new THREE.Vector3(x, 0, z);
-        const b = new THREE.Vector3(x + dx * 7, 0.1, z + dz * 7);
-        const mid = a.clone().add(b).multiplyScalar(0.5);
-        const rope = new THREE.CylinderGeometry(0.03, 0.03, a.distanceTo(b), 4).rotateZ(Math.PI / 2);
-        rope.rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate(mid.x, mid.y, mid.z);
-        ropes.push(rope);
+    g.add(pit, water);
+    // 堀の縁：地面と同じ高さのコンクリートの笠木と、外周の柵（支柱 5m おき、手すり2段）
+    const parts = [];
+    const fence = [];
+    for (const [w, d, x, z] of [[S + RIM * 2, RIM, 0, -S / 2 - RIM / 2], [S + RIM * 2, RIM, 0, S / 2 + RIM / 2], [RIM, S, -S / 2 - RIM / 2, 0], [RIM, S, S / 2 + RIM / 2, 0]]) {
+      parts.push(new THREE.BoxGeometry(w, 0.3, d).translate(x, 0.0, z));
+    }
+    const E = S / 2 + 0.3;
+    for (const [rot, x, z] of [[0, 0, -E], [0, 0, E], [1, -E, 0], [1, E, 0]]) {
+      const len = S + 0.6;
+      for (let k = 0; k <= len / 5; k++) {
+        const t = -len / 2 + k * 5;
+        fence.push(new THREE.CylinderGeometry(0.04, 0.04, 1.1, 6).translate(rot ? x : x + t, 0.7, rot ? z + t : z));
+      }
+      for (const y of [0.7, 1.2]) {
+        const bar = new THREE.CylinderGeometry(0.03, 0.03, len, 6).rotateZ(Math.PI / 2);
+        fence.push((rot ? bar.rotateY(Math.PI / 2) : bar).translate(x, y, z));
       }
     }
-    g.add(new THREE.Mesh(mergeGeometries(moor), MAT.mooring), new THREE.Mesh(mergeGeometries(ropes), MAT.rope));
-    // 本館側から渡る桟橋
-    g.add(box(10, 0.4, 3, -S / 2 - rim - 5, 0, 0, MAT.deck));
+    g.add(new THREE.Mesh(mergeGeometries(parts), MAT.coping), new THREE.Mesh(mergeGeometries(fence), MAT.rail));
+    // 本館から堀まで歩く舗装の小道
+    const path = new THREE.Mesh(new THREE.PlaneGeometry(GAP, 4).rotateX(-Math.PI / 2), MAT.coping);
+    path.position.set(-S / 2 - RIM - GAP / 2, 0.012, 0);
+    g.add(path);
     return g;
   }
 
   /** 表示の切り替え（解放済みで、本館の地上階を見ているときだけ） */
-  /** 売店・食堂の左端から10m 先に、生け簀の右端が来るよう置き直す */
-  /** 本館の右端から10m 先に、生け簀の左端が来るよう置き直す（奥行きは本館の中央） */
+  /** 本館の右端から GAP 先に、堀の縁が来るよう置き直す（奥行きは本館の中央） */
   setLayout() {
-    const main = ZONES.filter((z) => z.floor < FLOOR_COUNT && z.type !== ZONE_TYPE.OUTDOOR && !z.facility && z.id !== 'yard0').flatMap((z) => z.rects ?? []);
+    const main = ZONES.filter((z) => z.floor < FLOOR_COUNT && z.type !== ZONE_TYPE.OUTDOOR && !z.facility && !z.wing && z.id !== 'yard0' && z.id !== 'poolyard').flatMap((z) => z.rects ?? []);
     const right = main.length ? Math.max(...main.map((r) => r[2])) + 1 : GRID_X;
     const z0 = main.length ? Math.min(...main.map((r) => r[1])) : 0;
     const z1 = main.length ? Math.max(...main.map((r) => r[3])) + 1 : GRID_Z;
-    PEN_CENTER.x = wx(right) + 10 + PEN.size / 2;
+    PEN_CENTER.x = wx(right) + GAP + RIM + PEN.size / 2;
     PEN_CENTER.z = (wz(z0) + wz(z1)) / 2;
     this.group.position.set(PEN_CENTER.x, 0, PEN_CENTER.z);
   }
@@ -148,7 +132,7 @@ export class SeaPenScene {
     this._key = this._growthKey();
   }
 
-  /** 解放前はブラックアウトだけ、解放後は桟橋・海面・区画 */
+  /** 解放前はブラックアウトだけ、解放後は堀・水面・区画 */
   _showParts() {
     const on = this.pen.unlocked;
     this.blackout.visible = !on;
@@ -163,18 +147,24 @@ export class SeaPenScene {
     const z0 = cx(s.z0);
     const mx = x0 + w / 2;
     const mz = z0 + d / 2;
-    // 区画の縁：HDPE の二重パイプの浮き・歩廊・手すり（外向き）と、水中へ垂らした網。四隅に目印のブイ
-    const kit = { pipe: [], grate: [], rail: [] };
-    for (const [len, x, z, rot, flip] of [[w, mx, z0, 0, -1], [w, mx, z0 + d, 0, 1], [d, x0, mz, 1, -1], [d, x0 + w, mz, 1, 1]]) {
-      const e = collarEdge(len, rot);
-      for (const k of Object.keys(kit)) for (const geo of e[k]) kit[k].push((flip < 0 ? geo.rotateY(Math.PI) : geo).translate(x, 0, z));
+    // 区画の仕切り：水面に浮かべたブイの列とロープ（4つに1つは目立つ橙）、水中へ垂らした網。四隅に大きめのブイ
+    const floats = { white: [], orange: [] };
+    const ropes = [];
+    for (const [len, x, z, rot] of [[w, mx, z0, 0], [w, mx, z0 + d, 0], [d, x0, mz, 1], [d, x0 + w, mz, 1]]) {
+      const n = Math.max(2, Math.round(len / 1.25));
+      for (let k = 0; k <= n; k++) {
+        const t = -len / 2 + (k / n) * len;
+        floats[k % 4 === 0 ? 'orange' : 'white'].push(new THREE.SphereGeometry(0.2, 8, 6).translate(rot ? x : x + t, WATER_Y + 0.06, rot ? z + t : z));
+      }
+      const rope = new THREE.CylinderGeometry(0.025, 0.025, len, 4).rotateZ(Math.PI / 2);
+      ropes.push((rot ? rope.rotateY(Math.PI / 2) : rope).translate(x, WATER_Y + 0.03, z));
       const net = new THREE.Mesh(new THREE.PlaneGeometry(len, PEN.depth), MAT.net);
       net.position.set(x, WATER_Y - PEN.depth / 2, z);
       if (rot) net.rotation.y = Math.PI / 2;
       g.add(net);
     }
-    g.add(new THREE.Mesh(mergeGeometries(kit.pipe), MAT.pipe), new THREE.Mesh(mergeGeometries(kit.grate), MAT.grate), new THREE.Mesh(mergeGeometries(kit.rail), MAT.rail));
-    for (const [bx, bz] of [[x0, z0], [x0 + w, z0], [x0, z0 + d], [x0 + w, z0 + d]]) g.add(sphere(0.45, bx, 0.35, bz, MAT.buoy));
+    g.add(new THREE.Mesh(mergeGeometries(floats.white), MAT.float), new THREE.Mesh(mergeGeometries(floats.orange), MAT.buoy), new THREE.Mesh(mergeGeometries(ropes), MAT.rope));
+    for (const [bx, bz] of [[x0, z0], [x0 + w, z0], [x0, z0 + d], [x0 + w, z0 + d]]) g.add(sphere(0.4, bx, WATER_Y + 0.15, bz, MAT.buoy));
     // 生き物（種ごとに最大8匹を表示）
     const rand = mulberry32(s.id * 7919);
     for (const [id, n] of Object.entries(s.creatures)) {

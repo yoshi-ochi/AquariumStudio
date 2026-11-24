@@ -4,13 +4,13 @@ import { getCreature } from '../expedition/creatureData.js';
 import { appealOf, sizeOf, speciesPieces } from '../expedition/growth.js';
 import { disposeObject } from '../tanks/tankBuilder.js';
 import { buildStadium, buildBackdrop } from './stadium.js';
-import { CELL_SIZE, GRID_X, GRID_Z, STORY_H, getZone } from './blueprint.js';
+import { CELL_SIZE, GRID_X, GRID_Z0, POOL_SEAT_REACH, STORY_H, getZone } from './blueprint.js';
 
 /**
  * 屋外イルカプール：楕円のプールと、2階建ての高さまで段になった半円形の観客席。
  * 水槽と同じく、在庫の生き物を入れて展示する（はじめは空）。creatures = { id: 匹数 }
  */
-const SEAT_REACH = 10.7;
+const SEAT_REACH = POOL_SEAT_REACH;
 const TIERS = 12;
 const SEAT_TOP = STORY_H * 2;
 /** 収容枠（水面 約18m×9.6m の楕円 ≒ 135m²） */
@@ -164,7 +164,7 @@ export class DolphinPool extends EventTarget {
   /** 間取りのプール区画に合わせて置き直す（客席の背が建物側に接する） */
   setLayout() {
     const [x0, , x1, z1] = getZone('pool').rects[0];
-    this.group.position.set(((x0 + x1 + 1) / 2 - GRID_X / 2) * CELL_SIZE, 0, (z1 + 1 - GRID_Z / 2) * CELL_SIZE - SEAT_REACH);
+    this.group.position.set(((x0 + x1 + 1) / 2 - GRID_X / 2) * CELL_SIZE, 0, (z1 + 1 - GRID_Z0) * CELL_SIZE - SEAT_REACH);
   }
 
   setUnlocked(v) {

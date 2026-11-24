@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BASEMENT, PLAN_FLOORS, floorLabel, floorOrder, isWing, WING_BASE, WING_GRID_CENTER, CELL_SIZE } from './blueprint.js';
+import { BASEMENT, floorLabel, floorLevel, floorOrder, isWing, wingCount, CELL_SIZE } from './blueprint.js';
 import { buildFloorModel } from './floorModel.js';
 import { Exterior, wingCenter } from './exterior.js';
 
@@ -30,14 +30,6 @@ export class ViewModes {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.classList.contains('vr-cur')) return this._openList(this.railEl.querySelector('.vr-list').hidden);
-      // 本館・別館の切り替えは一覧を開いたまま、その建物の階を並べ直す
-      if (b.dataset.bld) {
-        this.bld = b.dataset.bld;
-        this.railKey = null;
-        this._rail();
-        this._openList(true);
-        return this.syncRail();
-      }
       this._openList(false);
       if (b.dataset.view) this.setMode(b.dataset.view);
       else this.goFloor(+b.dataset.floor);
@@ -50,22 +42,16 @@ export class ViewModes {
   }
 
   /**
-   * 表示の一覧：全館・外観 ／ 本館・別館の切り替え ／ 選んだ建物の各階（別館は解放済みの階だけ）。
-   * 建物や階が変わったときだけ作り直す
+   * 表示の一覧：全館・外観 ／ 各階（本館と別館の同じ階は一緒に表示。3F 以上は別館だけの階）。
+   * 階が変わったときだけ作り直す
    */
   _rail() {
-    const all = floorOrder(this.getUnlocked()).reverse();
-    const hasWing = all.some(isWing);
-    this.bld ??= isWing(this.getFloor()) ? 'wing' : 'main';
-    if (!hasWing) this.bld = 'main';
-    const floors = all.filter((f) => (this.bld === 'wing') === isWing(f));
-    const key = `${this.bld}:${all.join(',')}`;
+    const floors = floorOrder(this.getUnlocked()).reverse();
+    const key = floors.join(',');
     if (key === this.railKey) return;
     this.railKey = key;
-    const bld = (id, label, off) => `<button data-bld="${id}" class="vr-bld ${this.bld === id ? 'on' : ''}" ${off ? 'disabled' : ''}>${label}</button>`;
     this.railEl.innerHTML = `<button class="vr-cur" aria-haspopup="listbox" aria-label="表示の切り替え"></button>
       <div class="vr-list" role="listbox" hidden><button data-view="stack">全館</button><button data-view="exterior">外観</button>
-      <div class="vr-seg">${bld('main', '本館')}${bld('wing', '別館', !hasWing)}</div>
       ${floors.map((f) => `<button data-floor="${f}" class="${isWing(f) ? 'wing' : ''}">${floorLabel(f)}</button>`).join('')}</div>`;
   }
 
@@ -77,8 +63,6 @@ export class ViewModes {
   }
 
   syncRail() {
-    // 今いる階の建物に合わせる（一覧で別館を選んだだけのときは、そのまま）
-    if (this.mode === 'floor' && !this.railEl.classList.contains('open')) this.bld = isWing(this.getFloor()) ? 'wing' : 'main';
     this._rail();
     let label = '';
     this.railEl.querySelectorAll('.vr-list button').forEach((b) => {
@@ -95,7 +79,7 @@ export class ViewModes {
     if (this.mode !== 'floor') this.setMode('floor');
     if (floor !== from) {
       this.onFloor(floor);
-      this.slide = Math.max(-4.8, Math.min(4.8, (floor - from) * 2.4));
+      this.slide = Math.max(-4.8, Math.min(4.8, (floorLevel(floor) - floorLevel(from)) * 2.4));
     }
     this.syncRail();
   }
@@ -109,18 +93,17 @@ export class ViewModes {
     this.room.built.visible = floor;
     this.manager.group.visible = floor;
     this.labels.group.visible = floor;
-    const wings = floorOrder(this.getUnlocked()).filter(isWing);
-    this.exterior.show(mode === 'exterior', wings.length);
+    const wings = wingCount(this.getUnlocked());
+    this.exterior.show(mode === 'exterior', wings);
     this.stack.visible = mode === 'stack';
     // 引きの表示では霞ませない
     const scene = this.sceneMgr.scene;
     if (!floor && scene.fog) [this.fog, scene.fog] = [scene.fog, null];
     else if (floor && this.fog) [scene.fog, this.fog] = [this.fog, null];
     const under = floor && this.getFloor() === BASEMENT;
-    const away = under || (floor && isWing(this.getFloor())); // 地下と別館では本館の屋外を出さない
     this.room.setUnderground(under);
-    this.pool.group.visible = mode !== 'stack' && !away && this.getUnlocked().has('pool');
-    this.scenery.group.visible = mode !== 'stack' && !away;
+    this.pool.group.visible = mode !== 'stack' && !under && this.getUnlocked().has('pool');
+    this.scenery.group.visible = mode !== 'stack' && !under;
     if (mode === 'stack') this._buildStack();
     const c = this.cameraCtl.controls;
     c.maxDistance = floor ? this.saved?.maxDistance ?? c.maxDistance : 260 * SITE_SCALE;
@@ -128,11 +111,11 @@ export class ViewModes {
     if (floor && this.saved) this._fly(this.saved.pos, this.saved.target);
     else if (mode === 'stack') {
       // 別館があるときは、本館の裏に並ぶ別館の階も入るよう引いて斜めから見る
-      if (wings.length) this._fly(this._away(70, 96 + wings.length * 8, 70, 10), new THREE.Vector3(0, 10, wingCenter().z / 2));
+      if (wings) this._fly(this._away(70, 96 + wings * 8, 70, 10), new THREE.Vector3(0, 10, wingCenter().z / 2));
       else this._fly(this._away(16, 84, 74, 4), new THREE.Vector3(0, 4, 0));
     } else if (mode === 'exterior') {
       // 別館は本館の裏なので、大屋根に隠れないよう高い位置から見下ろす
-      if (wings.length) this._fly(this._away(-55, 66 + wings.length * 3, 48, 6), new THREE.Vector3(0, 6, wingCenter().z / 2));
+      if (wings) this._fly(this._away(-55, 66 + wings * 3, 48, 6), new THREE.Vector3(0, 6, wingCenter().z / 2));
       else this._fly(this._away(-34, 20, 62, 5), new THREE.Vector3(0, 5, 4));
     }
     this.syncRail();
@@ -182,17 +165,12 @@ export class ViewModes {
     this.stack.clear();
     this.slabs = [];
     const unlocked = this.getUnlocked();
-    for (const f of [...PLAN_FLOORS, ...floorOrder(unlocked).filter(isWing)]) this.stack.add(this._floorModel(f, unlocked));
+    for (const f of floorOrder(unlocked)) this.stack.add(this._floorModel(f, unlocked));
   }
 
   _floorModel(floor, unlocked) {
     const g = buildFloorModel({ floor, unlocked, manager: this.manager });
-    g.position.y = floor === BASEMENT ? -STACK_GAP : isWing(floor) ? (floor - WING_BASE) * STACK_GAP : floor * STACK_GAP;
-    // 別館の階は、外観と同じく本館の裏に並べる（各階の模型は敷地の格子のままなので、別館の区画を裏へずらす）
-    if (isWing(floor)) {
-      const c = wingCenter();
-      g.position.set(c.x - WING_GRID_CENTER.x, g.position.y, c.z - WING_GRID_CENTER.z);
-    }
+    g.position.y = floorLevel(floor) * STACK_GAP; // 別館は本館と同じ格子（プールの奥）にあるので、ずらさずに重ねる
     this.slabs.push(g.userData.slab);
     return g;
   }

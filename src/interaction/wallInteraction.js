@@ -41,7 +41,7 @@ export class WallInteraction {
     const hit = this.raycaster.ray.intersectPlane(this.plane, new THREE.Vector3());
     if (!hit) return;
     const plan = this.room.plan;
-    const vertex = [Math.round(hit.x / plan.cell + plan.GX / 2), Math.round(hit.z / plan.cell + plan.GZ / 2)];
+    const vertex = [Math.round(hit.x / plan.cell + plan.GX / 2), Math.round(hit.z / plan.cell + plan.Z0)];
     if (!this.start) {
       this.start = vertex;
       const [x, z] = plan.cellMin(vertex[0], vertex[1]);
