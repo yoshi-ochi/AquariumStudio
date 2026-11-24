@@ -679,3 +679,9 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 .ep-row > span { flex: none; color: var(--muted); font-size: 12px; }
 .ep-row button { flex: none; }
 .ep-row.done b { color: var(--muted); }
+
+/* 表示の一覧：本館・別館の切り替え */
+#view-rail .vr-seg { display: flex; gap: 4px; padding: 4px 6px; border-top: 1px solid var(--bar-line); border-bottom: 1px solid var(--bar-line); }
+#view-rail .vr-list .vr-seg button.vr-bld { flex: 1; min-width: 0; min-height: 30px; padding: 0 10px; border-radius: 8px; text-align: center; background: rgba(255, 255, 255, .08); }
+#view-rail .vr-list .vr-seg button.vr-bld.on { color: #0f3550; background: var(--aqua); }
+#view-rail .vr-list .vr-seg button.vr-bld:disabled { opacity: .4; }

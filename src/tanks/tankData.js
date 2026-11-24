@@ -42,8 +42,9 @@ export const STRUCTURE_DEFS = [
   { id: 'freezer', name: '餌の冷凍庫', shape: 'freezer', size: { w: 1.2, h: 2, d: 0.8 }, price: 120000, yardOnly: true, text: 'エサ代 -20%・幸福度 +5%' },
   { id: 'liveFeed', name: '活き餌の培養水槽', shape: 'liveFeed', size: { w: 1.4, h: 1.6, d: 0.7 }, price: 180000, yardOnly: true, text: '幸福度 +8%（生きた餌で食いつきが良くなる）' },
   { id: 'foodPrep', name: '調餌室の作業台', shape: 'foodPrep', size: { w: 1.6, h: 2, d: 0.8 }, price: 90000, yardOnly: true, text: 'エサの間隔 1.5倍・幸福度 +4%' },
-  { id: 'souvenirShop', name: 'お土産店', shape: 'souvenirShop', size: { w: 1.5, h: 1.9, d: 1.1 }, price: 30000 },
-  { id: 'cafe', name: 'カフェ', shape: 'cafe', size: { w: 1.7, h: 1.9, d: 1.3 }, price: 50000 },
+  // お土産店・カフェの置物は廃止（売店・食堂のエリアに置き換え）。以前のセーブを読むために定義だけ残す
+  { id: 'souvenirShop', name: 'お土産店', shape: 'souvenirShop', size: { w: 1.5, h: 1.9, d: 1.1 }, price: 30000, hidden: true },
+  { id: 'cafe', name: 'カフェ', shape: 'cafe', size: { w: 1.7, h: 1.9, d: 1.3 }, price: 50000, hidden: true },
   { id: 'entrance', name: '館内入口', shape: 'entrance', size: { w: 3, h: 2.8, d: 0.6 }, price: 30000 },
 ].map(withCategory(CATEGORY.STRUCTURE));
 
@@ -129,7 +130,7 @@ export const groupOf = (def) => def.group ?? def.category;
 
 /** 館内モードで配置できる定義 */
 export const PLACEABLE_TANKS = TANK_DEFS.filter((d) => !d.hidden);
-export const HALL_DEFS = [...PLACEABLE_TANKS, ...STRUCTURE_DEFS];
+export const HALL_DEFS = [...PLACEABLE_TANKS, ...STRUCTURE_DEFS.filter((d) => !d.hidden)];
 export const ALL_DEFS = [...TANK_DEFS, ...STRUCTURE_DEFS, ...INTERIOR_DEFS];
 
 const defMap = new Map(ALL_DEFS.map((d) => [d.id, d]));

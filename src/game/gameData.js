@@ -14,7 +14,7 @@ export const GOALS = [
   { id: 'show', text: '生き物を水槽に展示する（アイテム→生物）', reward: 8000, done: (s) => s.creatures >= 1 },
   { id: 'feed', text: '飼育画面で生き物にエサをあげる', reward: 5000, done: (s) => s.flags.fed },
   { id: 'home', text: '地図で水族館の立地を設定する', reward: 5000, done: (s) => s.hasHome },
-  { id: 'shop', text: 'レイアウトでお土産店を設置する', reward: 20000, done: (s) => s.shops >= 1 },
+  { id: 'shop', text: '館内エリアで売店を開く', reward: 20000, done: (s) => s.shops >= 1 },
   { id: 'event', text: 'イベントを開催する（その他→イベント）', reward: 30000, done: (s) => s.flags.event },
   { id: 'zukan10', text: '図鑑で10種を発見する', reward: 100000, done: (s) => s.species >= 10 },
 ];

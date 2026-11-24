@@ -17,7 +17,7 @@ const emptyState = () => ({ goals: [], flags: {}, zukan: [], event: null, cooldo
 /** 目標・オフライン収入・来館者・飼育・図鑑・イベントをまとめて管理する */
 export class LifeSystems {
   constructor({ sceneMgr, room, manager, economy, ops, inventory, expeditions, previews, toast, getHome, goalEl, reportEl, isUnlocked }) {
-    Object.assign(this, { manager, economy, ops, inventory, expeditions, toast, getHome, goalEl, reportEl });
+    Object.assign(this, { manager, economy, ops, inventory, expeditions, toast, getHome, goalEl, reportEl, isUnlocked });
     this.state = emptyState();
     this.mail = new Mailbox();
     this.crowd = new Crowd({ scene: sceneMgr.scene, room, manager });
@@ -72,8 +72,8 @@ export class LifeSystems {
       creatures: tanks.reduce((s, t) => s + Object.values(t.userData.creatures ?? {}).reduce((a, n) => a + n, 0), 0),
       species: CREATURES.filter((c) => this.expeditions.seenCount(c.id) > 0).length,
       guides: this.ops.staff.guide,
-      shops: count('souvenirShop'),
-      cafes: count('cafe'),
+      shops: this.isUnlocked('store') ? 1 : 0,
+      cafes: this.isUnlocked('diner') ? 1 : 0,
       hasHome: !!this.getHome(),
       trips: this.expeditions.trips.length,
       flags: this.state.flags,
@@ -178,8 +178,6 @@ export class LifeSystems {
     this._goalKey = null;
     if (!own) return;
     for (const t of this.manager.tanks) for (const id of Object.keys(t.userData.creatures ?? {})) this.expeditions.markSeen(id);
-    const placed = this.stats().shops;
-    if (oldShops > placed) this.inventory.add('souvenirShop', oldShops - placed);
-    this.ops.shops = placed;
+    this.ops.shops = this.stats().shops;
   }
 }

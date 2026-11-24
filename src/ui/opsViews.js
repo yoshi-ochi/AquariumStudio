@@ -105,11 +105,10 @@ export class ShopView {
     const o = this.ops;
     const level = this.economy.stage.level;
     const need = o.shops + o.cafes;
-    const stock = this.inventory.count('souvenirShop');
-    const head = `<div class="st-sum"><div class="st-head"><b>お土産店 ${o.shops}店 ・ カフェ ${o.cafes}店</b><small>売上合計 ${yen(o.sales)}</small></div>
+    const head = `<div class="st-sum"><div class="st-head"><b>売店 ${o.shops ? '営業中' : '未開店'} ・ 食堂 ${o.cafes ? '営業中' : '未開店'}</b><small>売上合計 ${yen(o.sales)}</small></div>
       <small>店員 ${o.staff.shop}/${need}人</small>
       ${need > o.staff.shop ? '<em class="gs-alert">店員が足りません。スタッフから配置してください</em>' : ''}
-      <div class="gs-btns"><button data-act="shop-place" data-id="souvenirShop" class="primary">お土産店を設置${stock ? `（在庫${stock}）` : ' ¥30,000'}</button><button data-act="shop-place" data-id="cafe">カフェを設置 ¥50,000</button></div></div>`;
+      ${o.shops && o.cafes ? '<small>売店をタップすると商品の補充、食堂をタップすると料理の提供ができます</small>' : '<small>売店・食堂は、館内エリアで海獣広場の左に開けます</small>'}</div>`;
     if (!o.shops) return head;
     const rows = PRODUCTS.map((p) => {
       if (p.stage > level) return `<div class="gs-row locked">${artIcon(p.id)}<div class="gs-info"><b>${p.name}</b><small>ステージ${p.stage}で解放</small></div></div>`;

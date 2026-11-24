@@ -8,7 +8,7 @@ import { updateBubbles } from './aeration.js';
 import { syncLife, updateLife, lifeAppeal } from '../expedition/tankLife.js';
 import { cleanAppealFactor, updateCareVisual } from './tankCleaning.js';
 import { tankHealth } from '../expedition/husbandry.js';
-import { FLOOR_COUNT, STORY_H, ATRIUM_VOID, cellAt, inRect } from '../building/blueprint.js';
+import { FLOOR_COUNT, STORY_H } from '../building/blueprint.js';
 
 /**
  * 館内に配置されたオブジェクトの管理。
@@ -180,9 +180,17 @@ export class TankManager {
   /** 吹き抜けの大水槽は、吹き抜けの下に置いてあれば2階からも見える（他の場所では2階の床に隠れる） */
   _visibleOn(o, floor) {
     if (o.userData.floor === floor) return true;
-    if (!this.defOf(o).atrium || floor >= FLOOR_COUNT || o.userData.floor !== 0) return false;
-    const [i, j] = cellAt(o.position.x, o.position.z);
-    return inRect(ATRIUM_VOID.rect, i, j);
+    return this._pierces(o, floor);
+  }
+
+  /** 下の階の背の高い水槽（大水槽など）が、この階まで突き抜けているか（地上の本館の階どうし） */
+  _pierces(o, floor) {
+    const from = o.userData.floor;
+    if (floor >= FLOOR_COUNT || from >= FLOOR_COUNT || from >= floor) return false;
+    const def = this.defOf(o);
+    if (def.category !== CATEGORY.TANK) return false;
+    const base = o.position.y + (o.userData.drop ?? 0);
+    return base + def.size.h > (floor - from) * STORY_H;
   }
 
   /** 全水槽（配置順） */
@@ -271,8 +279,14 @@ export class TankManager {
   setFloor(floor) {
     this.currentFloor = floor;
     for (const o of this.objects.values()) {
+      // 上の階を見ているときは地面ごと下げて表示するので、突き抜けた水槽も同じだけ下げる
+      o.position.y += o.userData.drop ?? 0;
+      o.userData.drop = 0;
       o.visible = this._visibleOn(o, floor);
-      if (this.defOf(o).atrium) o.position.y = floor * -STORY_H; // 2階からは吹き抜け越しに見下ろす
+      if (o.visible && o.userData.floor !== floor) {
+        o.userData.drop = (floor - o.userData.floor) * STORY_H;
+        o.position.y -= o.userData.drop;
+      }
     }
   }
 

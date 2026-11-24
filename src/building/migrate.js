@@ -4,7 +4,7 @@ import { FloorPlan, CELL } from '../room/floorPlan.js';
 import { ZONES, FLOOR_COUNT, BASEMENT, PLAN_FLOORS, WING_FLOORS, isWing, ATRIUM_TANK_POS, LAYOUT, WING_GRID_CENTER, getZone, inRect, oldZoneOffset, zoneCenter, zoneRectCenter } from './blueprint.js';
 import { LEGACY_V3 } from './legacyLayoutV3.js';
 
-/** 版3の別棟の区画（格子 72×46） */
+/** 版3の別館の区画（格子 72×46） */
 const OLD_WING_RECT = [19, 6, 52, 39];
 
 /** 自由な床形状の時代に使えていた広さに相当するエリア */
@@ -167,5 +167,29 @@ export function migrateLayoutV4({ manager }) {
       item.position.x += delta.x;
       item.position.z += delta.z;
     }
+  }
+}
+
+/**
+ * 建物の版4 → 5：敷地の格子を左右に26マスずつ広げた（128 → 180 マス。建物のワールド座標は同じ）。
+ * マス番号で持つ壁の編集（境目キー）と、壁への埋め込み（縦の壁の線番号）を新しい格子に直す。data を書き換える
+ */
+export function migrateGridV5(data) {
+  const [OLD_GX, NEW_GX, SHIFT] = [128, 180, 26];
+  const conv = (idx) => Math.floor(idx / OLD_GX) * NEW_GX + (idx % OLD_GX) + SHIFT;
+  for (const edits of Object.values(data.room?.walls ?? {})) {
+    for (const k of ['add', 'remove']) {
+      edits[k] = (edits[k] ?? []).map((key) => {
+        const [a, b] = String(key).split('|').map(Number);
+        const [x, y] = [conv(a), conv(b)];
+        return x < y ? `${x}|${y}` : `${y}|${x}`;
+      });
+    }
+  }
+  for (const o of data.objects ?? []) {
+    const e = o.embed;
+    if (!e?.key) continue;
+    const [axis, line, ...rest] = String(e.key).split(':');
+    if (axis === 'z') e.key = [axis, Number(line) + SHIFT, ...rest].join(':');
   }
 }
