@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TILE, causticMaterial } from './caustics.js';
 
 /**
  * 水槽の底：底砂（種類・厚さ／砂なし）と、底面の色（バックスクリーンと同じ色＋不透明度）、水面のゆらぎが底に映す光の模様（コースティクス）。
@@ -57,61 +58,11 @@ function sandTexture(id) {
   return tex;
 }
 
-// ---- コースティクス：水面の凹凸で集まった光が底に作る網目の模様 ------------------------------
-/** 繰り返しのワーリーノイズの「境目」を明るくした模様（起動時に1回だけ作る） */
-function causticTexture() {
-  const N = 128;
-  const P = 14;
-  let seed = 3;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const pts = Array.from({ length: P }, () => [rnd() * N, rnd() * N]);
-  const img = new Uint8Array(N * N * 4);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    let d1 = 1e9;
-    let d2 = 1e9;
-    for (const [px, py] of pts) for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) {
-      const d = Math.hypot(x - px - ox, y - py - oy);
-      if (d < d1) [d2, d1] = [d1, d];
-      else if (d < d2) d2 = d;
-    }
-    // 境目の細い線ほど明るく（線の太さ 約2px）
-    const v = Math.max(0, 1 - (d2 - d1) / 3.2) ** 2.6;
-    const k = (y * N + x) * 4;
-    img[k] = img[k + 1] = img[k + 2] = Math.round(v * 255);
-    img[k + 3] = 255;
-  }
-  const tex = new THREE.DataTexture(img, N, N, THREE.RGBAFormat);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.magFilter = tex.minFilter = THREE.LinearFilter;
-  tex.needsUpdate = true;
-  return tex;
-}
-let CAUSTIC = null;
-/** 2枚の模様を別々の向き・速さで流して重ね、揺らめいて見せる（全水槽で共有） */
-function causticMaterials() {
-  if (CAUSTIC) return CAUSTIC;
-  const tex = causticTexture();
-  const t2 = tex.clone();
-  t2.repeat.set(0.77, 0.77);
-  t2.needsUpdate = true;
-  const mat = (map, opacity) => {
-    const m = new THREE.MeshBasicMaterial({ map, color: 0xd8f4ff, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 });
-    m.userData.shared = true;
-    return m;
-  };
-  CAUSTIC = { tex, t2, mats: [mat(tex, 0.2), mat(t2, 0.16)] };
-  return CAUSTIC;
-}
-
-/** 毎フレーム：模様を流す */
-export function updateCaustics(time) {
-  if (!CAUSTIC) return;
-  CAUSTIC.tex.offset.set(time * 0.031, time * 0.017);
-  CAUSTIC.t2.offset.set(-time * 0.022, time * 0.027);
-}
+// 水紋（コースティクス）はシミュレーションで作った模様を共有する（caustics.js）
+export { updateCaustics } from './caustics.js';
 
 /** 底の形の平面（XZ）。UV はメートル単位（模様の大きさを水槽によらずそろえる） */
-function bottomGeometry(b, tile = 0.2) {
+function bottomGeometry(b, tile = TILE) {
   let geo;
   if (b.kind === 'circle') geo = new THREE.CircleGeometry(b.r, 48);
   else if (b.kind === 'shape') geo = new THREE.ShapeGeometry(b.shape);
@@ -185,13 +136,11 @@ export function applySand(tank, look) {
   if (look.caustics && !ca) {
     ca = new THREE.Group();
     ca.name = 'caustics';
-    const geo = bottomGeometry(b);
-    for (const mat of causticMaterials().mats) {
-      const m = new THREE.Mesh(geo, mat);
-      m.renderOrder = 0.9; // 水（1）より先に描いて、水の色で包む
-      m.raycast = () => {};
-      ca.add(m);
-    }
+    // 底の色に光と影を掛け合わせる1枚（水（1）より先に描いて、水の色で包む）
+    const m = new THREE.Mesh(bottomGeometry(b), causticMaterial());
+    m.renderOrder = 0.9;
+    m.raycast = () => {};
+    ca.add(m);
     body.add(ca);
   } else if (!look.caustics && ca) {
     body.remove(ca);
