@@ -9,14 +9,24 @@ import * as THREE from 'three';
  *   水槽の大きさでは繰り返しも規則性も見えない（波数は 50m あたりの整数なので、50m ごとにだけつながる）。
  * くり抜き：水槽ごとに、その水槽の真上にあたる範囲だけを計算する（水槽ごとに違う模様になり、隣の水槽とも続いている）。
  *   範囲の格子を1回描くだけ（GPU）で、水槽の大きさに合わせた解像度（1m あたり 200px）のテクスチャに書く。
- *   4m を超える大きな水槽は、4m の範囲を繰り返す。
+ *   大きな水槽（WINDOW を超える）も繰り返さず、元の水面のまま、見ている所のまわり WINDOW 四方だけを計算する
+ *   （範囲の外は水紋なし。縁はぼかす）。
+ * 水深：屈折で光がずれる量は水面から底までの深さに比例するので、深い水槽ほど網目がはっきりして、深すぎると崩れる。
+ *   （60cm より深い所は網目の細かさをそのままに、）水が光を吸うので深いほど淡くなる（水槽ごとに水面と底の高さから決める）。
  * 元の実装との違い（軽量化）：水面の数値シミュレーションと、光源から見た環境の深度マップは使わない。
  *   画面に見えている近くの水槽だけ、約24回/秒に間引いて描き直す。
  * 底・水槽内の物・生き物の材質には、ワールド座標で水槽のテクスチャを引いて「明るい網目（光）とそのあいだ（影）」を掛ける。
  */
 const PERIOD = 50; // m（水面が繰り返す1辺）
 const PX_PER_M = 200;
-const MAX_WINDOW = 4; // m
+/** 大きな水槽で一度に計算する範囲の1辺(m) */
+const WINDOW = 6;
+/** 波の振幅を決めたときの基準の水深(m)。水深 / これ で光のずれを伸び縮みさせる */
+const REF_DEPTH = 0.35;
+/** 水紋の濃さが 1/e になる水深(m)（水の吸収） */
+const FADE_DEPTH = 2.5;
+/** 光のずれが伸びる深さの上限(m)。これより深いと光が交差しすぎて砂嵐のようになるので、網目のまま淡くしていく */
+const MAX_FOCUS_DEPTH = 0.6;
 /** くり抜く範囲の外から入ってくる光も数えるための余白(m) */
 const PAD = 0.25;
 const UPDATE_HZ = 24;
@@ -72,12 +82,15 @@ function createSim() {
       uPhase: { value: WAVES.map((w) => w.phase) },
       uOrigin: { value: new THREE.Vector2() }, // くり抜く範囲の左上（ワールド XZ）
       uSize: { value: new THREE.Vector2(1, 1) },
+      uDepth: { value: 1 }, // 水深 / 基準の水深（光のずれの倍率）
+      uFade: { value: 1 }, // 水の吸収で残る濃さ
     },
     vertexShader: `uniform float uTime;
       uniform vec4 uWave[${WAVES.length}];
       uniform float uPhase[${WAVES.length}];
       uniform vec2 uOrigin;
       uniform vec2 uSize;
+      uniform float uDepth;
       varying vec2 vOld;
       varying vec2 vNew;
       void main() {
@@ -90,16 +103,18 @@ function createSim() {
           d += w.z * normalize(w.xy) * cos(ph);
         }
         vOld = p;
-        vNew = p + d;
+        vNew = p + d * uDepth;
         gl_Position = vec4((vNew - uOrigin) / uSize * 2.0 - 1.0, 0.0, 1.0);
       }`,
-    fragmentShader: `varying vec2 vOld;
+    fragmentShader: `uniform float uFade;
+      varying vec2 vOld;
       varying vec2 vNew;
       void main() {
         // 明るさ＝元の面積 ÷ 屈折後の面積（光が集まって縮んだ所ほど明るい）
         float oldArea = length(dFdx(vOld)) * length(dFdy(vOld));
         float newArea = length(dFdx(vNew)) * length(dFdy(vNew));
         float I = min(oldArea / max(newArea, 1e-12), 12.0);
+        I = 1.0 + (I - 1.0) * uFade; // 深いほど淡く
         gl_FragColor = vec4(vec3(I * 0.25), 1.0);
       }`,
     side: THREE.DoubleSide,
@@ -134,8 +149,9 @@ function gridFor(w, h) {
 }
 
 const v3 = new THREE.Vector3();
-/** 水槽の水の範囲（ワールド XZ の外接矩形。大きさは 10cm 単位に切り上げ） */
-function windowOf(tank) {
+const dir = new THREE.Vector3();
+/** 水槽の水の範囲（ワールド XZ の外接矩形。大きさは 10cm 単位に切り上げ）。focus：大きな水槽で中心にしたい点 */
+function windowOf(tank, focus) {
   const I = tank.userData.interior;
   const hx = I.radius ?? I.halfW;
   const hz = I.radius ?? I.halfD;
@@ -145,9 +161,15 @@ function windowOf(tank) {
     x0 = Math.min(x0, v3.x); x1 = Math.max(x1, v3.x);
     z0 = Math.min(z0, v3.z); z1 = Math.max(z1, v3.z);
   }
-  const w = Math.min(MAX_WINDOW, Math.ceil(Math.max(0.1, x1 - x0) * 10) / 10);
-  const h = Math.min(MAX_WINDOW, Math.ceil(Math.max(0.1, z1 - z0) * 10) / 10);
-  return { x: x0, z: z0, w, h };
+  // 大きな水槽は、見ている所（focus）を中心にした WINDOW 四方（水槽からはみ出さない。0.5m 刻みで動かす）
+  const fit = (a0, a1, c) => {
+    if (a1 - a0 <= WINDOW) return [a0, Math.ceil(Math.max(0.1, a1 - a0) * 10) / 10];
+    const start = Math.min(a1 - WINDOW, Math.max(a0, Math.round(((c ?? (a0 + a1) / 2) - WINDOW / 2) * 2) / 2));
+    return [start, WINDOW];
+  };
+  const [x, w] = fit(x0, x1, focus?.x);
+  const [z, h] = fit(z0, z1, focus?.z);
+  return { x, z, w, h };
 }
 
 const clearColor = new THREE.Color();
@@ -176,14 +198,26 @@ export function updateCaustics(time, renderer, tanks = [], camera = null) {
     tank.updateWorldMatrix(true, false);
     tank.getWorldPosition(v3);
     if (camera && v3.distanceTo(camera.position) > NEAR) continue;
-    const win = windowOf(tank);
+    // 見ている所：カメラの視線が水槽の底の高さと交わる点
+    const I = tank.userData.interior;
+    let focus = null;
+    if (camera) {
+      camera.getWorldDirection(dir);
+      const t = dir.y < -1e-3 ? (camera.position.y - (v3.y + I.floorY)) / -dir.y : 0;
+      focus = { x: camera.position.x + dir.x * t, z: camera.position.z + dir.z * t };
+    }
+    const win = windowOf(tank, focus);
+    // 水深（水面から底まで）で、光のずれと淡さを決める
+    const depth = Math.max(0.05, I.waterTop - I.floorY);
+    sim.mat.uniforms.uDepth.value = Math.min(depth, MAX_FOCUS_DEPTH) / REF_DEPTH;
+    sim.mat.uniforms.uFade.value = Math.exp(-depth / FADE_DEPTH);
     let st = sim.tanks.get(tank);
     const rw = Math.max(16, Math.round(win.w * PX_PER_M));
     const rh = Math.max(16, Math.round(win.h * PX_PER_M));
     if (!st || st.rt.width !== rw || st.rt.height !== rh) {
       st?.rt.dispose();
       const rt = new THREE.WebGLRenderTarget(rw, rh, { depthBuffer: false, stencilBuffer: false });
-      rt.texture.wrapS = rt.texture.wrapT = THREE.RepeatWrapping;
+      rt.texture.wrapS = rt.texture.wrapT = THREE.ClampToEdgeWrapping; // 繰り返さない
       rt.texture.generateMipmaps = false;
       st = { rt };
       sim.tanks.set(tank, st);
@@ -222,7 +256,10 @@ float cauFactor(vec3 wp) {
   if (uCauOn < 0.5) return 1.0;
   vec3 n = normalize(cross(dFdx(wp), dFdy(wp)));
   float up = clamp(abs(n.y) * 0.8 + 0.2, 0.0, 1.0);
-  float I = texture2D(uCauTex, (wp.xz - uCauOrigin) / uCauSize).r * 4.0;
+  vec2 uv = (wp.xz - uCauOrigin) / uCauSize;
+  // 計算した範囲の外は水紋なし（大きな水槽で見ている所から離れた所）。縁 3% はぼかす
+  vec2 e = smoothstep(vec2(0.0), vec2(0.03), uv) * smoothstep(vec2(0.0), vec2(0.03), 1.0 - uv);
+  float I = mix(1.0, texture2D(uCauTex, uv).r * 4.0, e.x * e.y);
   float k = I > 1.0 ? 0.85 : 0.6;
   return max(0.0, 1.0 + uCauAmt * up * k * (I - 1.0));
 }`;
