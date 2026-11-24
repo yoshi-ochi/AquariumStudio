@@ -47,7 +47,7 @@ import { AllianceApi } from './online/allianceApi.js';
 import { AllianceView } from './ui/allianceView.js';
 import { MapPage } from './ui/mapPage.js';
 import { LifeSystems } from './game/lifeSystems.js';
-import { BUILDING_VERSION, STORY_H, FLOOR_COUNT, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorLevel, wingCount, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter, ZONES, floorLabel } from './building/blueprint.js';
+import { BUILDING_VERSION, STORY_H, FLOOR_COUNT, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorLevel, wingCount, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter, ZONES, floorLabel, GRID_X, GRID_Z0, CELL_SIZE } from './building/blueprint.js';
 import { ViewModes } from './building/viewModes.js';
 import { buildLowerShell, buildWingShell } from './building/exterior.js';
 import { OutdoorScenery } from './building/outdoorScenery.js';
@@ -168,7 +168,7 @@ async function boot() {
     manager.add('atriumTank', { ...ATRIUM_TANK_POS, floor: 0 });
     manager.setFloor(economy.floor);
   }
-  /** 各階に階段を1つずつ置く（なければ、その階の最初の展示室の中央近くの空いた床へ。動かすのは自由、撤去はできない） */
+  /** 各階に階段を1つずつ置く（なければ、その階の最初の展示室の左奥の隅に近い空いた床へ。動かすのは自由、撤去はできない） */
   function ensureStairs() {
     const def = getDef('stairs');
     for (const floor of floorOrder(unlocked)) {
@@ -177,7 +177,10 @@ async function boot() {
       const open = ZONES.filter((z) => z.floor === floor && unlocked.has(z.id) && !z.facility && z.type !== 'outdoor');
       const zone = open.find((z) => z.type === 'hall') ?? open[0];
       const type = zone?.type === 'hall' ? CELL.FLOOR : CELL.YARD;
-      const spot = zone && freeFloorSpot({ manager, floor, unlocked, hx: def.size.w / 2, hz: def.size.d / 2, target: zoneCenter(zone), type });
+      // 左奥（-X・-Z）の隅から少し内側
+      const [x0, z0] = zone?.rects[0] ?? [];
+      const corner = zone && { x: (x0 - GRID_X / 2) * CELL_SIZE + 1.5, z: (z0 - GRID_Z0) * CELL_SIZE + 2.5 };
+      const spot = zone && freeFloorSpot({ manager, floor, unlocked, hx: def.size.w / 2, hz: def.size.d / 2, target: corner, type });
       if (spot) manager.add('stairs', { ...spot, floor });
     }
   }

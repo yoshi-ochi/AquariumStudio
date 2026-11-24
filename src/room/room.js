@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { FloorPlan, CELL } from './floorPlan.js';
 import { getTexture } from './textures.js';
 import { runTheta } from './embed.js';
-import { LightBaker, LM_SCALE } from './lightBake.js';
 import { ATRIUM_VOID, STORY_H, ZONES, getZone, zoneHas, zoneAt } from '../building/blueprint.js';
 
 const DIRT_MARGIN = 1.6;
@@ -31,8 +30,7 @@ function stripeTexture() {
 }
 
 /**
- * 部屋：マス目の床（館内・バックヤード）、外壁・仕切り壁（埋め込み穴あき）、室内照明、屋外の地面。
- * 室内照明は光源を置かず、床・壁・天井へ焼き付けたライトマップで表す（lightBake.js）。
+ * 部屋：マス目の床（館内・バックヤード）、外壁・仕切り壁（埋め込み穴あき）、室内ライト、屋外の地面。
  * 天井と照明器具は、カメラが天井より下にあるときだけ表示する（上から見下ろすときは隠す）。
  */
 export class Room {
@@ -84,7 +82,6 @@ export class Room {
     this.ceilingMat = new THREE.MeshBasicMaterial({ vertexColors: true });
     this.fixtureMat = new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.5, metalness: 0.4, side: THREE.DoubleSide });
     this.ceilingOn = false;
-    this.baker = new LightBaker();
     this.focusZone = null;
   }
 
@@ -158,7 +155,7 @@ export class Room {
 
   /**
    * 照明を作り直す（数・部屋が変わるとき）。all は全部の照明（各照明は zone に置いた部屋の id を持つ）。
-   * 今の階の照明だけ、床・壁・天井へ焼き付け、天井の器具と編集用のハンドルを作る。
+   * 今の階の照明だけ、スポットライト（壁で光を止めるため影を落とす）と天井の器具、編集用のハンドルを作る。
    * ハンドルは編集中の部屋（focusZone）の照明だけ出す。entry.index は all での番号
    */
   setLights(all) {
@@ -171,9 +168,19 @@ export class Room {
       });
     }
     const floor = this.plan?.floor;
+    this.lightsFloor = floor;
     this.lights = [];
     all.forEach((l, i) => {
       if (getZone(l.zone)?.floor !== floor) return;
+      const spot = new THREE.SpotLight(0xffffff, 1, 0, 1, 0.6, 0);
+      // 壁で光を止めるため影を落とす（スマホ向けに影の解像度は控えめ）
+      spot.castShadow = true;
+      spot.shadow.mapSize.set(512, 512);
+      spot.shadow.bias = -0.0008;
+      spot.shadow.normalBias = 0.03;
+      spot.shadow.camera.near = 0.1;
+      spot.shadow.camera.far = 30;
+      this.lightGroup.add(spot, spot.target);
       // 編集時だけ見えるハンドル：電球と、その真下の床のリング（どちらも移動）、照らす場所の ●（向き）
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshBasicMaterial());
       bulb.userData = { lightIndex: i, handle: 'bulb' };
@@ -200,50 +207,18 @@ export class Room {
       const fixture = this._fixture();
       fixture.visible = this.ceilingOn;
       this.lightGroup.add(fixture);
-      const entry = { index: i, zone: l.zone, handle, bulb, ring, aim, aimEdge, line, drop, fixture };
+      const entry = { index: i, zone: l.zone, spot, handle, bulb, ring, aim, aimEdge, line, drop, fixture };
       this._applyLight(entry, l);
       this.lights.push(entry);
     });
     this.setFocusZone(this.focusZone);
     this.setSelectedLight(this.selectedLight ?? -1);
-    this.bakeLights();
   }
 
   /** 照明を編集する部屋（null で全体表示：ハンドルを出さない） */
   setFocusZone(zone) {
     this.focusZone = zone ?? null;
     for (const e of this.lights) e.handle.visible = e.zone === this.focusZone;
-  }
-
-  /** 床・壁・天井への照明の焼き付けを作り直す */
-  bakeLights() {
-    clearTimeout(this._bakeTimer);
-    this._bakeTimer = null;
-    if (!this.plan || !this.allLights) return;
-    const floor = this.plan.floor;
-    const list = this.allLights.filter((l) => getZone(l.zone)?.floor === floor).map((light) => ({ light, zoneIndex: ZONES.findIndex((z) => z.id === light.zone) }));
-    this.baker.bake(this.plan, list, this.ceilingHeight);
-    this._useLightMaps();
-  }
-
-  /** ドラッグ中などは、まとめて少し後に焼き付ける */
-  scheduleBake() {
-    if (this._bakeTimer) return;
-    this._bakeTimer = setTimeout(() => this.bakeLights(), 90);
-  }
-
-  /** 焼き付けたテクスチャを床・壁・天井の材質に付ける */
-  _useLightMaps() {
-    const set = (m, tex) => {
-      if (!m || m.lightMap === tex) return;
-      m.lightMap = tex;
-      m.lightMapIntensity = LM_SCALE;
-      m.needsUpdate = true;
-    };
-    set(this.floorMat, this.baker.floorTex);
-    set(this.yardFloorMat, this.baker.floorTex);
-    set(this.ceilingMat, this.baker.ceilTex);
-    for (const st of this.baker.strips) set(st.mesh.material, this.baker.wallTex);
   }
 
   /**
@@ -266,7 +241,6 @@ export class Room {
   updateLight(i, l) {
     const e = this.lights.find((x) => x.index === i);
     if (e) this._applyLight(e, l);
-    this.scheduleBake();
   }
 
   /** 選んだ照明のハンドルを濃く、ほかは薄く（i は全照明での番号） */
@@ -283,8 +257,13 @@ export class Room {
     }
   }
 
-  _applyLight({ bulb, ring, aim, line, drop, fixture }, l) {
-    bulb.position.set(l.x, l.height, l.z);
+  _applyLight({ spot, bulb, ring, aim, line, drop, fixture }, l) {
+    spot.color.set(l.color);
+    spot.intensity = l.intensity * 3;
+    spot.angle = THREE.MathUtils.degToRad(l.angle / 2);
+    spot.position.set(l.x, l.height, l.z);
+    spot.target.position.set(l.tx, 0, l.tz);
+    bulb.position.copy(spot.position);
     bulb.material.color.set(l.color);
     ring.position.set(l.x, 0.03, l.z);
     aim.position.set(l.tx, 0.04, l.tz);
@@ -387,10 +366,7 @@ export class Room {
     this.ceiling = this._ceilingMesh(plan);
     this.ceiling.visible = this.ceilingOn;
     this.built.add(this.ceiling);
-    // 照明を焼き付ける壁（展示室の間の壁・仕切り壁・外壁。柵とシャッターは除く）
-    this.baker.layoutWalls(this.built.children.filter((m) => m.userData.wall).map((mesh) => ({ mesh, len: mesh.userData.wall.to - mesh.userData.wall.from, H: mesh.userData.wall.H })));
-    if (this.allLights) this.setLights(this.allLights); // 階が変わったら、その階の照明に
-    else this._useLightMaps();
+    if (this.allLights && this.lightsFloor !== plan.floor) this.setLights(this.allLights); // 階が変わったら、その階の照明に
     const b = plan.bounds();
     this.built.add(this._dirtMesh(b));
     this.sceneMgr.fitShadow(b.cx, b.cz, Math.max(b.w, b.d) / 2 + DIRT_MARGIN);
@@ -400,7 +376,6 @@ export class Room {
   _floorMesh(plan, type, material, y = 0, colorFloor = null) {
     const pos = [];
     const uv = [];
-    const uv1 = [];
     const col = [];
     this._c ??= new THREE.Color();
     const c = plan.cell;
@@ -411,14 +386,12 @@ export class Room {
       for (const [qx, qz] of [[x, z], [x, z + c], [x + c, z], [x + c, z], [x, z + c], [x + c, z + c]]) {
         pos.push(qx, y, qz);
         uv.push(qx, -qz);
-        uv1.push(...this.baker.floorUv(plan, qx, qz));
         if (k) col.push(k.r, k.g, k.b);
       }
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2));
     if (col.length) geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, material);
@@ -429,7 +402,6 @@ export class Room {
   /** 天井：館内とバックヤードのマスの上（1階の吹き抜けの下は2階まで抜けているので張らない） */
   _ceilingMesh(plan) {
     const pos = [];
-    const uv1 = [];
     const col = [];
     const c = plan.cell;
     const H = this.ceilingHeight;
@@ -444,13 +416,11 @@ export class Room {
       // 下向きの面になる頂点の順
       for (const [qx, qz] of [[x, z], [x + c, z], [x, z + c], [x + c, z], [x + c, z + c], [x, z + c]]) {
         pos.push(qx, H, qz);
-        uv1.push(...this.baker.floorUv(plan, qx, qz));
         col.push(k.r, k.g, k.b);
       }
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1, 2));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, this.ceilingMat);
