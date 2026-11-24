@@ -3,6 +3,7 @@ import { buildCreature } from '../expedition/creatureBuilder.js';
 import { getCreature } from '../expedition/creatureData.js';
 import { appealOf, sizeOf, speciesPieces } from '../expedition/growth.js';
 import { disposeObject } from '../tanks/tankBuilder.js';
+import { buildStadium, buildBackdrop } from './stadium.js';
 import { CELL_SIZE, GRID_X, GRID_Z, STORY_H, getZone } from './blueprint.js';
 
 /**
@@ -118,9 +119,14 @@ export class DolphinPool extends EventTarget {
     const concrete = new THREE.MeshStandardMaterial({ color: 0xd9dcd8, roughness: 0.9 });
     // 水の中が見えるよう、縁（筒の外壁と上面の縁取り）と青い底でプールを作る
     const deck = new THREE.Group();
-    const wall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1.2, 48, 1, true), new THREE.MeshStandardMaterial({ color: 0xd9dcd8, roughness: 0.9, side: THREE.DoubleSide }));
+    // 客席側（南）の壁はアクリルの観覧窓、残りはコンクリート
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1.2, 48, 1, true, Math.PI * 0.3, Math.PI * 1.4), new THREE.MeshStandardMaterial({ color: 0xd9dcd8, roughness: 0.9, side: THREE.DoubleSide }));
     wall.scale.set(10, 1, 5.6);
     wall.position.y = 0.6;
+    const acrylic = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1.1, 24, 1, true, -Math.PI * 0.3, Math.PI * 0.6), new THREE.MeshStandardMaterial({ color: 0xbfe8f5, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
+    acrylic.scale.set(10, 1, 5.6);
+    acrylic.position.y = 0.6;
+    deck.add(acrylic);
     const lip = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 48).rotateX(-Math.PI / 2), concrete);
     lip.scale.set(10, 1, 5.6);
     lip.position.y = 1.2;
@@ -134,28 +140,26 @@ export class DolphinPool extends EventTarget {
     water.scale.set(9, 4.8, 1);
     water.position.y = 1.12;
     this.water = water; // タップで展示の画面を開く
-    const stage = new THREE.Mesh(new THREE.BoxGeometry(7, 1.1, 1.6), new THREE.MeshStandardMaterial({ color: 0x2b6f96, roughness: 0.7 }));
-    stage.position.set(0, 0.7, -5.6);
+    // ステージ：トレーナーが立つ張り出し（スライドアウト）と昇降の段、奥の大型ビジョン
+    const stage = new THREE.Mesh(new THREE.BoxGeometry(7, 1.2, 1.6), new THREE.MeshStandardMaterial({ color: 0x2b6f96, roughness: 0.7 }));
+    stage.position.set(0, 0.6, -5.6);
     stage.castShadow = true;
-    this.group.add(deck, water, stage);
+    const slide = new THREE.Mesh(new THREE.BoxGeometry(3, 0.12, 1.4), new THREE.MeshStandardMaterial({ color: 0xe6eef1, roughness: 0.6 }));
+    slide.position.set(0, 1.12, -4.4);
+    const stairs = new THREE.Group();
+    for (let k = 0; k < 4; k++) {
+      const st = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.35), concrete);
+      st.position.set(4.2, 0.15 + k * 0.3, -6.6 + k * 0.35);
+      stairs.add(st);
+    }
+    this.group.add(deck, water, stage, slide, stairs, buildBackdrop({ width: 16, z: -6.8 }));
   }
 
   /** 客席は南（建物側）へ向かって高くなる */
   _buildSeats() {
-    const colors = [0x2f7fb5, 0xeef2f3];
-    const mats = colors.map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, side: THREE.DoubleSide }));
-    for (let k = TIERS - 1; k >= 0; k--) {
-      const r = 5.7 + k * 0.45;
-      const h = ((k + 1) / TIERS) * SEAT_TOP;
-      // 楕円のプールを囲むよう X 方向へ広げた半円
-      const low = (k / TIERS) * SEAT_TOP;
-      const outline = [[r, low], [r, h], [r + 0.45, h], [r + 0.45, 0]].map(([x, y]) => new THREE.Vector2(x, y));
-      const seat = new THREE.Mesh(new THREE.LatheGeometry(outline, 40, -Math.PI / 2, Math.PI), mats[k % 2]);
-      seat.scale.x = 1.55;
-      seat.castShadow = seat.receiveShadow = true;
-      this.group.add(seat);
-    }
+    this.group.add(buildStadium({ tiers: TIERS, seatTop: SEAT_TOP, r0: 5.7, step: 0.45, xScale: 1.55 }));
   }
+
 
   /** 間取りのプール区画に合わせて置き直す（客席の背が建物側に接する） */
   setLayout() {
