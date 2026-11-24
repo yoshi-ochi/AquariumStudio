@@ -24,7 +24,7 @@ export const breedHours = (rarity, level) => Math.round(BREED_HOURS[rarity] * (1
 
 // ---- 魚の保持 ------------------------------------------------------------------
 /** 建物のレベルごとの基本の保持枠 */
-export const HOLD_BY_LEVEL = [30, 60, 100, 160];
+export const HOLD_BY_LEVEL = [30, 60, 100, 160, 240];
 /** 地下の予備水槽1基あたりの保持枠 */
 export const HOLD_PER_TANK = 30;
 /** 拡張工事は建物が最大レベルでも同じ金額で続けられる */

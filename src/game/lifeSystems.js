@@ -34,6 +34,24 @@ export class LifeSystems {
     reportEl.addEventListener('click', (e) => e.target.closest('button') && (reportEl.hidden = true));
   }
 
+  /**
+   * 以前の不具合の救済（1回だけ）：保持枠が満杯で放流され、新種発見のメールが届いたのに1匹も持っていない魚種へ1匹渡す。
+   * 展示中・成長に使った魚種は対象外。shown: 展示中の魚種 id の Set
+   */
+  repairDiscoveries(shown) {
+    if (this.state.flags.discoveryFix) return 0;
+    this.state.flags.discoveryFix = true;
+    const ex = this.expeditions;
+    let n = 0;
+    for (const key of this.mail.keys) {
+      const id = String(key).startsWith('discovery:') ? key.slice(10) : null;
+      if (!id || !getCreature(id) || ex.count(id) > 0 || shown.has(id) || (ex.xp[id] ?? 0) > 0) continue;
+      ex.give(id);
+      n++;
+    }
+    return n;
+  }
+
   /** 新種を初めて発見したら、レア度に応じた報酬を渡す */
   _rewardDiscovery(ids) {
     for (const id of new Set(ids)) {

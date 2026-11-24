@@ -103,9 +103,11 @@ export class Expeditions extends EventTarget {
     const kept = [];
     const fresh = [];
     for (const id of caught) {
-      if (this.seenCount(id) === 0) fresh.push(id);
+      const isNew = this.seenCount(id) === 0;
+      if (isNew) fresh.push(id);
       this.seen[id] = this.seenCount(id) + 1; // 放流しても図鑑には載る
-      if (this.usedSlots + getCreature(id).slots > this.getCapacity()) {
+      // 新種は保持枠が満杯でも1匹目を持ち帰る（図鑑に載ったのに在庫が無い、を防ぐ）
+      if (!isNew && this.usedSlots + getCreature(id).slots > this.getCapacity()) {
         this.released.push(id);
         continue;
       }

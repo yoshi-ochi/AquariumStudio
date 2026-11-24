@@ -532,6 +532,7 @@ async function boot() {
     applyRoom(true);
   }
 
+  let saveAfterLoad = false; // 読み込み時の救済で中身が変わった（すぐクラウドへ保存する）
   /** 保存用データから状態を復元する。β版の生物データのリセットを行ったら true */
   function applySnapshot(data) {
     const reset = applyCreatureReset(data);
@@ -571,6 +572,10 @@ async function boot() {
     delete roomSettings.plan;
     manager.setFloor(economy.floor);
     life.fromJSON(data.life, { own: !visiting, oldShops: data.life ? 0 : data.ops?.shops ?? 0 });
+    if (!visiting) {
+      const shown = new Set(manager.exhibits.flatMap((t) => Object.entries(t.userData.creatures ?? {}).filter(([, n]) => n > 0).map(([id]) => id)));
+      if (life.repairDiscoveries(shown)) saveAfterLoad = true;
+    }
     // 別棟の階が未建設なら本館へ戻す
     if (isWing(economy.floor) && !floorOrder(unlocked).includes(economy.floor)) {
       economy.setFloor(0);
@@ -1084,7 +1089,7 @@ async function boot() {
       },
     });
     autoSave.start();
-    if (layoutChosen || restored || creatureResetDone) autoSave.saveNow().catch((err) => console.warn(err.message));
+    if (layoutChosen || restored || creatureResetDone || saveAfterLoad) autoSave.saveNow().catch((err) => console.warn(err.message));
     if (lastSavedAt) {
       life.settleOffline(lastSavedAt, ops.visitorMult);
       autoSave.flush(); // 受け取った収入をすぐ保存（二重受け取りを防ぐ）
