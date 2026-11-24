@@ -78,7 +78,7 @@ const ZONE_META = [
   { id: 'deep', name: '深海エリア', floor: 1, type: HALL, stage: 2, cost: 2000000, requires: 'gallery', theme: 'cold', color: '#4a5a9c', text: '冷たい海の生き物を展示すると集客+25%' },
   { id: 'archive', name: '資料エリア', floor: 1, type: HALL, stage: 2, cost: 1000000, requires: 'gallery', color: '#b79bd8', text: '研究の進み方が1.5倍になる' },
   { id: 'plaza', name: '屋外ひろば', floor: 0, type: OUTDOOR, open: true, stage: 1, cost: 400000, requires: 'coast', color: '#d9c49a', text: '屋外の多目的エリア。お店や水槽を自由に置ける' },
-  { id: 'marine', name: '海獣エリア', floor: 0, type: OUTDOOR, open: true, stage: 2, cost: 1200000, requires: 'plaza', color: '#8aa6b8', text: 'アザラシのプールがある屋外エリア。海獣用水槽も置ける' },
+  { id: 'marine', name: '海獣エリア', floor: 0, type: OUTDOOR, open: true, stage: 2, cost: 1200000, requires: 'plaza', color: '#8aa6b8', text: '屋外の更地。海獣用水槽など、好きな水槽を自由に置ける' },
   { id: 'nature', name: '自然再現エリア', floor: 0, type: OUTDOOR, open: true, stage: 3, cost: 3000000, requires: 'subtropical', color: '#7fae62', text: '磯・干潟・小川を再現した屋外エリア' },
   { id: 'b1a', name: '地下機械室', floor: BASEMENT, type: YARD, stage: 1, cost: 0, color: '#9aa4ad', text: '水質管理と予備水槽の基本エリア' },
   { id: 'b1b', name: '地下西ブロック', floor: BASEMENT, type: YARD, stage: 2, cost: 800000, requires: 'b1a', color: '#9aa4ad', text: '設備を増やせる地下の拡張区画' },
@@ -177,7 +177,6 @@ for (const l of LAYOUTS) {
 
 /** 作り付けの景観が占める区画（区画の内側に余白をとる） */
 function sceneryRect(id, [x0, z0, x1, z1]) {
-  if (id === 'marine') return [x0 + 2, z0 + 2, x1 - 2, z1 - 5];
   if (id === 'nature') return [x0 + 2, z0 + 2, x1 - 3, z1 - 3];
   return null;
 }

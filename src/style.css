@@ -110,7 +110,7 @@ input[type=color] { width: 44px; height: 32px; border: none; padding: 0; backgro
 #catalog-tabs { display: flex; gap: 6px; padding: 10px 12px 6px; overflow-x: auto; scrollbar-width: none; }
 #catalog-tabs button { min-height: 32px; padding: 4px 14px; border-radius: 16px; }
 #catalog-cards { display: flex; gap: 8px; padding: 4px 12px 12px; overflow-x: auto; scrollbar-width: thin; }
-#catalog-cards[hidden], #room-panel[hidden], #build-panel[hidden] { display: none; }
+#catalog-cards[hidden], #room-panel[hidden], #build-panel[hidden], #expand-panel[hidden] { display: none; }
 .card {
   position: relative; flex: 0 0 auto; width: 104px; padding: 4px;
   display: flex; flex-direction: column; align-items: stretch; text-align: left;
@@ -667,3 +667,15 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 .sp-cell.sel { background: hsl(var(--h) 70% 45%); }
 .sp-cell.pend { background: #ffd36b; }
 .sp-cell.anchor { background: #ffb020; outline: 2px solid #fff; outline-offset: -2px; }
+
+/* レイアウト編集の「増築」タブ（expandPanel.js） */
+#expand-panel { padding: 0 12px 12px; max-height: 42vh; overflow-y: auto; }
+#expand-panel .note { color: var(--muted); font-size: 12px; margin: 4px 0; }
+#expand-panel h4 { margin: 10px 0 4px; font-size: 13px; }
+.ep-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.ep-row > div { min-width: 0; }
+.ep-row small { display: block; color: var(--muted); font-size: 11px; }
+.ep-row .ep-lack { color: #b5651d; }
+.ep-row > span { flex: none; color: var(--muted); font-size: 12px; }
+.ep-row button { flex: none; }
+.ep-row.done b { color: var(--muted); }

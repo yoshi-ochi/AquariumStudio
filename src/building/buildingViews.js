@@ -1,5 +1,4 @@
 import { creatureThumb } from '../ui/creatureThumb.js';
-import { PEN } from './seaPen.js';
 import { PLAN_FLOORS, WING_FLOORS, ZONES, ZONE_TYPE, MAX_ZONE_NAME, defaultZoneName, floorLabel, getZone } from './blueprint.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -11,8 +10,8 @@ const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 
 /** 館内エリアの解放と、解放済みエリアの名前・床と壁の色 */
 export class ZoneView {
-  constructor({ economy, getUnlocked, onUnlock, getLook, onLook, onRename, onSeaPen, seaPen }) {
-    Object.assign(this, { economy, getUnlocked, onUnlock, getLook, onLook, onRename, onSeaPen, seaPen });
+  constructor({ economy, getUnlocked, onUnlock, getLook, onLook, onRename }) {
+    Object.assign(this, { economy, getUnlocked, onUnlock, getLook, onLook, onRename });
     this.editing = null;
   }
 
@@ -29,10 +28,10 @@ export class ZoneView {
   html() {
     const unlocked = this.getUnlocked();
     const level = this.economy.stage.level;
-    // 別棟は建設済みの階と、次に増築できる階だけを並べる
-    const wings = WING_FLOORS.filter((f) => ZONES.some((z) => z.floor === f && (unlocked.has(z.id) || !z.requires || unlocked.has(z.requires))));
+    // 地下展示室・別棟は、解放済みのものだけ並べる（解放はレイアウト編集の「増築」タブから）
+    const wings = WING_FLOORS.filter((f) => ZONES.some((z) => z.floor === f && unlocked.has(z.id)));
     const rows = [...PLAN_FLOORS, ...wings].map((floor) => {
-      const items = ZONES.filter((z) => z.floor === floor).map((z) => {
+      const items = ZONES.filter((z) => z.floor === floor && (!z.annex || unlocked.has(z.id))).map((z) => {
         if (unlocked.has(z.id)) {
           const row = `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small></div><button data-act="zone-edit" data-id="${z.id}">編集</button></div>`;
           return this.editing === z.id ? row + this._editor(z) : row;
@@ -44,19 +43,7 @@ export class ZoneView {
       return `<h4 class="gs-sub">${floorLabel(floor)}</h4>${items.join('')}`;
     });
     const pen = this.seaPen;
-    let penRow = '';
-    if (pen) {
-      // 未解放：レベル5未満は条件を、レベル5以上は解放ボタンを出す。解放済みは区画の編集へ
-      const ready = level >= PEN.unlockLevel;
-      const state = pen.unlocked ? `区画 ${pen.sections.length}` : ready ? '解放できます' : `水族館レベル${PEN.unlockLevel}で解放（現在 Lv${level}）`;
-      const btn = pen.unlocked
-        ? '<button data-act="zone-seapen" class="primary">区画を編集</button>'
-        : ready
-          ? `<button data-act="zone-seapen-unlock" class="primary" ${this.economy.canAfford(PEN.unlockCost) ? '' : 'disabled'}>解放 ${yen(PEN.unlockCost)}</button>`
-          : '<button data-act="zone-seapen">詳しく</button>';
-      penRow = `<h4 class="gs-sub">屋外</h4><div class="gs-row"><div class="gs-info"><b>屋外生け簀</b><small>100m×100m の海の生け簀。自由に区切って大型の生き物を展示できる</small><small>${state}</small></div>${btn}</div>`;
-    }
-    return rows.join('') + penRow;
+    return rows.join('') + '<p class="gs-empty">地下展示室・別棟・屋外生け簀の増築は、レイアウト編集の「増築」タブから行えます。</p>';
   }
 
   /** 色の選択はその場で建物に反映する */
@@ -70,18 +57,6 @@ export class ZoneView {
     else if (act === 'zone-edit-done') this.editing = null;
     else if (act === 'zone-rename') this.onRename(id, b?.closest('.gs-list')?.querySelector('#zn-name')?.value ?? '');
     else if (act === 'zone-color-reset') this.onLook(id, null);
-    else if (act === 'zone-seapen') {
-      this.onSeaPen?.();
-      return false;
-    } else if (act === 'zone-seapen-unlock') {
-      const pen = this.seaPen;
-      if (pen?.canUnlock(this.economy.stage.level) && this.economy.spend(PEN.unlockCost)) {
-        pen.unlock();
-        this.onSeaPen?.();
-        return false;
-      }
-      return true;
-    }
     if (act.startsWith('zone-') && act !== 'zone-open') return true;
     if (act !== 'zone-open') return false;
     const z = getZone(id);
@@ -102,7 +77,7 @@ export class BackyardView {
       const lv = b.level(r.id);
       const cost = researchCost(lv);
       const max = cost == null;
-      return `<div class="gs-row"><div class="gs-info"><b>${r.name} Lv${lv}</b><small>${r.text}</small></div>${max ? '<span class="zn-open">最大</span>' : `<button data-act="lab-up" data-id="${r.id}" class="primary" ${b.points >= cost ? '' : 'disabled'}>${cost}pt</button>`}</div>`;
+      return `<div class="gs-row"><div class="gs-info"><b>${r.name} Lv${lv}</b><small>${r.text}</small></div>${max ? '<span class="zn-open">最大（Lv100）</span>' : `<button data-act="lab-up" data-id="${r.id}" class="primary" ${b.points >= cost ? '' : 'disabled'}>${cost}pt</button>`}</div>`;
     });
     const slots = b.breeders.map((uid, i) => this._slot(uid, i));
     const hold = this.expeditions;
