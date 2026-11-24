@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { FloorPlan, CELL } from '../room/floorPlan.js';
 import { TankManager } from '../tanks/tankManager.js';
 import { CATEGORY } from '../tanks/tankData.js';
-import { CELL_SIZE, GRID_X, GRID_Z, ZONES, floorLabel, zoneCenter, zoneHas } from './blueprint.js';
+import { CELL_SIZE, GRID_X, GRID_Z, GRID_Z0, ZONES, floorLabel, zoneCenter, zoneHas } from './blueprint.js';
 
 export function textSprite(text, bg, w = 6) {
   const canvas = document.createElement('canvas');
@@ -79,7 +79,7 @@ export function buildFloorModel({ floor, unlocked, manager = null }) {
     g.add(s);
   }
   const badge = textSprite(floorLabel(floor), '#e8862e', 5);
-  badge.position.set(-(GRID_X / 2) * CELL_SIZE + 2, 2, (GRID_Z / 2) * CELL_SIZE - 2);
+  badge.position.set(-(GRID_X / 2) * CELL_SIZE + 2, 2, (GRID_Z - GRID_Z0) * CELL_SIZE - 2);
   g.add(badge);
   return g;
 }

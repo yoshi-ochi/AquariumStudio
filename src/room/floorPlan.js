@@ -1,4 +1,4 @@
-import { ATRIUM_VOID, BASEMENT, isWing, CELL_SIZE, EXHIBIT_ZONES, GRID_X, GRID_Z, LAYOUT, SERVICE_WIDTH, WALL_EDITS, ZONES, ZONE_TYPE, zoneHas } from '../building/blueprint.js';
+import { ATRIUM_VOID, BASEMENT, isWing, CELL_SIZE, EXHIBIT_ZONES, GRID_X, GRID_Z, GRID_Z0, LAYOUT, SERVICE_WIDTH, WALL_EDITS, WING_YARD, ZONES, ZONE_TYPE, zoneHas } from '../building/blueprint.js';
 
 /**
  * 建物の1フロア分のマス目。形は間取り（blueprint.js）で決まり、解放済みのエリアだけ使える。
@@ -18,6 +18,7 @@ export class FloorPlan {
     this.cell = CELL_SIZE;
     this.GX = GRID_X;
     this.GZ = GRID_Z;
+    this.Z0 = GRID_Z0; // ワールド座標 z = 0 の行
     this.active = new Uint8Array(this.GX * this.GZ);
     const edits = WALL_EDITS[floor] ?? { add: [], remove: [] };
     this.addedWalls = new Set(edits.add);
@@ -27,6 +28,7 @@ export class FloorPlan {
     ZONES.forEach((zone, n) => {
       if (zone.floor !== floor || (zone.type === ZONE_TYPE.OUTDOOR && !zone.open)) return;
       const open = unlocked.has(zone.id);
+      if (zone.wing && !open) return; // 未建設の別館の階は出さない
       const type = zone.open ? (open ? CELL.OUT : CELL.LOCKED_OUT) : !open ? CELL.LOCKED : zone.type === ZONE_TYPE.YARD ? CELL.YARD : CELL.FLOOR;
       for (const rect of zone.rects) this._fill(rect, type);
       for (let j = 0; j < this.GZ; j++) for (let i = 0; i < this.GX; i++) if (zoneHas(zone, i, j)) this.zoneIds[this.idx(i, j)] = n;
@@ -36,6 +38,30 @@ export class FloorPlan {
     if (floor === ATRIUM_VOID.floor) this._fill(ATRIUM_VOID.rect, unlocked.has(ATRIUM_VOID.zone) ? CELL.VOID : CELL.LOCKED);
     this.doors = this._findDoors();
     if (floor !== BASEMENT && !isWing(floor)) this._carveService(unlocked);
+    this._carveWingYard(unlocked);
+  }
+
+  /** 別館の展示室の周りを、幅 WING_YARD マスのバックヤードで囲む（連絡通路への出入口は空ける） */
+  _carveWingYard(unlocked) {
+    const SERVICE = 100;
+    ZONES.forEach((zone, n) => {
+      if (!zone.wing || zone.floor !== this.floor || !unlocked.has(zone.id)) return;
+      const [x0, z0, x1, z1] = zone.rects[0];
+      const W = WING_YARD;
+      const keep = new Set();
+      for (let j = z0; j <= z1; j++) for (let i = x0; i <= x1; i++) {
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (this._zoneAt(i + a, j + b) === n || !this.doors.has(this.edge(i, j, i + a, j + b))) continue;
+          for (let d = 0; d < W; d++) keep.add(this.idx(i - a * d, j - b * d));
+        }
+      }
+      for (let j = z0; j <= z1; j++) for (let i = x0; i <= x1; i++) {
+        const edge = i < x0 + W || i > x1 - W || j < z0 + W || j > z1 - W;
+        if (!edge || keep.has(this.idx(i, j))) continue;
+        this.active[this.idx(i, j)] = CELL.YARD;
+        this.zoneIds[this.idx(i, j)] = SERVICE;
+      }
+    });
   }
 
   /** 展示室の壁の裏に管理通路を設け、メインバックヤードへつなぐ */
@@ -171,11 +197,11 @@ export class FloorPlan {
   }
 
   cellOf(x, z) {
-    return [Math.floor(x / this.cell + this.GX / 2), Math.floor(z / this.cell + this.GZ / 2)];
+    return [Math.floor(x / this.cell + this.GX / 2), Math.floor(z / this.cell + this.Z0)];
   }
 
   cellMin(i, j) {
-    return [(i - this.GX / 2) * this.cell, (j - this.GZ / 2) * this.cell];
+    return [(i - this.GX / 2) * this.cell, (j - this.Z0) * this.cell];
   }
 
   /** 使える床の上か */
@@ -244,8 +270,8 @@ export class FloorPlan {
       return { kind: 'partition', n: b === CELL.FLOOR ? 1 : -1, side: CELL.FLOOR };
     };
     const push = (axis, lineIdx, cls, a0, a1) => {
-      const halfLine = (axis === 'x' ? this.GZ : this.GX) / 2;
-      const halfAlong = (axis === 'x' ? this.GX : this.GZ) / 2;
+      const halfLine = axis === 'x' ? this.Z0 : this.GX / 2;
+      const halfAlong = axis === 'x' ? this.GX / 2 : this.Z0;
       runs.push({
         key: `${axis}:${lineIdx}:${cls.n}:${cls.kind}`,
         kind: cls.kind,

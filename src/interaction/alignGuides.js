@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { TankManager } from '../tanks/tankManager.js';
-import { ZONES, ZONE_TYPE, CELL_SIZE, GRID_X, GRID_Z } from '../building/blueprint.js';
+import { ZONES, ZONE_TYPE, CELL_SIZE, GRID_X, GRID_Z, GRID_Z0 } from '../building/blueprint.js';
 
 /**
  * 館内レイアウトの整列ガイド。
@@ -181,7 +181,7 @@ export class AlignGuides {
     }
     const pts = [];
     const wx = (i) => (i - GRID_X / 2) * CELL_SIZE;
-    const wz = (j) => (j - GRID_Z / 2) * CELL_SIZE;
+    const wz = (j) => (j - GRID_Z0) * CELL_SIZE;
     for (const zone of ZONES) {
       if (zone.floor !== floor || !unlocked.has(zone.id) || zone.type === ZONE_TYPE.VOID) continue;
       for (const [i0, j0, i1, j1] of zone.rects) {

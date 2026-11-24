@@ -26,8 +26,8 @@ function format(fmt, v) {
  * パネルの追加セクション：岩肌ブラシ（ライブロック）、成長（サンゴ・流木・海藻）、壁埋め込み（水槽・館内編集時）
  */
 export class TankCustomizer {
-  constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode }) {
-    Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode });
+  constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode, stairsTo }) {
+    Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode, stairsTo });
     this.selected = null;
     this.helper = null;
     this.allowEmbed = false;
@@ -85,6 +85,9 @@ export class TankCustomizer {
       btn.setAttribute('aria-label', locked ? 'ロック解除' : 'ロック');
     }
     this.gizmoEl.querySelectorAll('[data-action^="rotate"],[data-action="delete"]').forEach((b) => (b.disabled = locked));
+    // 階段は撤去できない
+    const fixed = !!(obj && this.getDef(obj.userData.defId).stairs);
+    this.gizmoEl.querySelectorAll('[data-action="delete"]').forEach((b) => (b.hidden = fixed));
   }
 
   deselect() {
@@ -96,6 +99,15 @@ export class TankCustomizer {
     this.panelEl.hidden = true;
     this.gizmoEl.hidden = true;
     document.body.classList.remove('has-selection');
+  }
+
+  /** 階段：上下の階へ移動するボタン */
+  _stairsSection(obj) {
+    const go = (dir, mark) => {
+      const to = this.stairsTo?.(obj.userData.floor, dir);
+      return `<button data-action="stairs-${dir}" ${to == null ? 'disabled' : ''}>${mark} ${to == null ? (dir === 'up' ? '上の階なし' : '下の階なし') : `${floorLabel(to)}へ`}</button>`;
+    };
+    return `<div class="actions">${go('up', '▲')}${go('down', '▼')}</div>`;
   }
 
   renderPanel() {
@@ -120,8 +132,9 @@ export class TankCustomizer {
         <button data-action="rotate-left">⟲ 回転</button>
         <button data-action="rotate-right">⟳ 回転</button>
         ${isTank ? '<button data-action="interior">✎ 水槽内</button>' : ''}
-        <button data-action="delete" class="danger">🗑 撤去</button>
+        ${def.stairs ? '' : '<button data-action="delete" class="danger">🗑 撤去</button>'}
       </div>
+      ${def.stairs ? this._stairsSection(obj) : ''}
       ${isTank && this.allowEmbed ? this._lookSection(obj, def) : ''}
       ${isTank && this.allowEmbed && !def.atrium ? this._embedSection(obj) : ''}
       ${def.shape === 'liveRock' && this.getBrush ? this._sculptSection(def) : ''}

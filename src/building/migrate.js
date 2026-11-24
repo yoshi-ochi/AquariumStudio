@@ -1,7 +1,7 @@
 import { TankManager } from '../tanks/tankManager.js';
 import { CATEGORY } from '../tanks/tankData.js';
 import { FloorPlan, CELL } from '../room/floorPlan.js';
-import { ZONES, FLOOR_COUNT, BASEMENT, PLAN_FLOORS, WING_FLOORS, isWing, ATRIUM_TANK_POS, LAYOUT, WING_GRID_CENTER, getZone, inRect, oldZoneOffset, zoneCenter, zoneRectCenter } from './blueprint.js';
+import { ZONES, FLOOR_COUNT, BASEMENT, PLAN_FLOORS, WING_FLOORS, WING_BASE, WING_RECT, WING_YARD, GRID_X, NORTH_ROWS, isWing, ATRIUM_TANK_POS, LAYOUT, WING_GRID_CENTER, getZone, inRect, oldZoneOffset, zoneCenter, zoneRectCenter } from './blueprint.js';
 import { LEGACY_V3 } from './legacyLayoutV3.js';
 
 /** 版3の別館の区画（格子 72×46） */
@@ -90,8 +90,12 @@ export function relocateInvalid({ manager, unlocked, inventory, expeditions, eco
   const carried = new Set([...riders.values()].flat());
   const roots = all.filter((o) => !carried.has(o) && !o.userData.embed && !manager.defOf(o).atrium);
   const box = (o) => ({ x: o.position.x, z: o.position.z, floor: o.userData.floor, ...TankManager.footprintHalf(manager.defOf(o), o.rotation.y) });
-  // 廃止された階（3階以上）にある物は置き直す
-  const fits = (o) => !!plans.get(o.userData.floor)?.containsRect(o.position.x, o.position.z, box(o).hx, box(o).hz);
+  // 廃止された階（3階以上）にある物や、バックヤード専用なのにバックヤードの外にある物は置き直す
+  const fits = (o) => {
+    const plan = plans.get(o.userData.floor);
+    if (!plan?.containsRect(o.position.x, o.position.z, box(o).hx, box(o).hz)) return false;
+    return !manager.defOf(o).yardOnly || plan.typeAt(o.position.x, o.position.z) === CELL.YARD;
+  };
   const placed = roots.filter(fits).map(box);
   for (const o of roots.filter((r) => !fits(r))) {
     const { hx, hz } = box(o);
@@ -147,7 +151,7 @@ export function migrateLayoutV4({ manager }) {
     }
     const floor = o.userData.floor;
     let delta = null;
-    if (isWing(floor)) {
+    if (floor >= WING_BASE) {
       const a = oldCenter(OLD_WING_RECT);
       delta = { x: WING_GRID_CENTER.x - a.x, z: WING_GRID_CENTER.z - a.z };
     } else {
@@ -192,4 +196,87 @@ export function migrateGridV5(data) {
     const [axis, line, ...rest] = String(e.key).split(':');
     if (axis === 'z') e.key = [axis, Number(line) + SHIFT, ...rest].join(':');
   }
+}
+
+/** 版5までの別館の区画（格子 180×86）。中心はワールド座標の原点 */
+const V5_WING_RECT = [73, 26, 106, 59];
+
+/**
+ * 建物の版5 → 6（データの移行）：格子を北へ NORTH_ROWS 行広げ、別館をイルカプールの奥へ移した。
+ * 壁の編集（境目キー）と壁への埋め込み（横の壁の線番号）を新しい格子に直し、別館1F・2F（旧フロア10・11）の
+ * 壁の編集は本館の1F・2F の格子の新しい別館の位置へ移す。今いる階も直す。data を書き換える
+ */
+export function migrateGridV6(data, builtVer) {
+  const remapFloor = (f) => (f >= WING_BASE && f < WING_BASE + FLOOR_COUNT ? f - WING_BASE : f);
+  if (data.economy && Number.isFinite(data.economy.floor)) data.economy.floor = remapFloor(data.economy.floor);
+  if (builtVer < 4) return; // それより前の壁の編集・埋め込みは使わない
+  const [wx0, wz0] = [WING_RECT[0] + WING_YARD, WING_RECT[1] + WING_YARD];
+  const conv = (idx, wing) => {
+    const [i, j] = [idx % GRID_X, Math.floor(idx / GRID_X)];
+    return wing ? (j - V5_WING_RECT[1] + wz0) * GRID_X + (i - V5_WING_RECT[0] + wx0) : (j + NORTH_ROWS) * GRID_X + i;
+  };
+  const walls = data.room?.walls;
+  if (walls) {
+    const out = {};
+    for (const [floor, edits] of Object.entries(walls)) {
+      const f = +floor;
+      const wing = f >= WING_BASE;
+      const to = (out[remapFloor(f)] ??= { add: [], remove: [] });
+      for (const k of ['add', 'remove']) {
+        for (const key of edits[k] ?? []) {
+          const [a, b] = String(key).split('|').map((x) => conv(+x, wing));
+          to[k].push(a < b ? `${a}|${b}` : `${b}|${a}`);
+        }
+      }
+    }
+    data.room.walls = out;
+  }
+  for (const o of data.objects ?? []) {
+    const e = o.embed;
+    if (!e?.key) continue;
+    if (o.floor >= WING_BASE) {
+      delete o.embed; // 別館の物は場所が変わるので床置きに戻す
+      continue;
+    }
+    const [axis, line, ...rest] = String(e.key).split(':');
+    if (axis === 'x') e.key = [axis, Number(line) + NORTH_ROWS, ...rest].join(':');
+  }
+}
+
+/**
+ * 建物の版5 → 6（置いた物の移行）：別館の物を新しい別館の位置へ移し、別館1F・2F の物を本館と同じ 1F・2F に移す。
+ * moved = 版4の移行で、すでに新しい別館の中心へ移してある
+ */
+export function migrateWingV6({ manager, moved }) {
+  const dx = moved ? 0 : WING_GRID_CENTER.x;
+  const dz = moved ? 0 : WING_GRID_CENTER.z;
+  for (const o of manager.objects.values()) {
+    const f = o.userData.floor;
+    if (f < WING_BASE) continue;
+    o.position.x += dx;
+    o.position.z += dz;
+    delete o.userData.embed;
+    if (f < WING_BASE + FLOOR_COUNT) o.userData.floor = f - WING_BASE;
+  }
+}
+
+/**
+ * その階の床（展示室）で、target に一番近い空いている場所。見つからなければ null。
+ * 置いてある物と重ならず、1つの部屋に収まる位置を、近い順に 0.45m 刻みで探す
+ */
+export function freeFloorSpot({ manager, floor, unlocked, hx, hz, target, type = CELL.FLOOR }) {
+  const plan = new FloorPlan(floor, unlocked);
+  const placed = [...manager.objects.values()].filter((o) => o.userData.floor === floor && !o.userData.embed).map((o) => ({ x: o.position.x, z: o.position.z, ...TankManager.footprintHalf(manager.defOf(o), o.rotation.y) }));
+  if (!plan.active.includes(type)) return null;
+  const b = plan.bounds(type);
+  const t = target ?? { x: b.cx, z: b.cz };
+  const cand = [];
+  for (let z = b.z0 + hz; z <= b.z1 - hz; z += 0.45) for (let x = b.x0 + hx; x <= b.x1 - hx; x += 0.45) cand.push([x, z, (x - t.x) ** 2 + (z - t.z) ** 2]);
+  cand.sort((p, q) => p[2] - q[2]);
+  for (const [x, z] of cand) {
+    if (plan.typeAt(x, z) !== type || !plan.containsRect(x, z, hx, hz)) continue;
+    const box = { x, z, hx: hx + 0.4, hz: hz + 0.4 };
+    if (!placed.some((p) => overlaps(p, box))) return { x, z };
+  }
+  return null;
 }

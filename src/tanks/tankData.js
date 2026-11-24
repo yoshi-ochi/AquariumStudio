@@ -46,6 +46,8 @@ export const STRUCTURE_DEFS = [
   { id: 'souvenirShop', name: 'お土産店', shape: 'souvenirShop', size: { w: 1.5, h: 1.9, d: 1.1 }, price: 30000, hidden: true },
   { id: 'cafe', name: 'カフェ', shape: 'cafe', size: { w: 1.7, h: 1.9, d: 1.3 }, price: 50000, hidden: true },
   { id: 'entrance', name: '館内入口', shape: 'entrance', size: { w: 3, h: 2.8, d: 0.6 }, price: 30000 },
+  // 階の移動用の階段：各階に1つずつ自動で置く（動かすのは自由、撤去はできない）
+  { id: 'stairs', name: '階段', shape: 'stairs', size: { w: 1.4, h: 2.6, d: 3.2 }, price: 0, hidden: true, stairs: true },
 ].map(withCategory(CATEGORY.STRUCTURE));
 
 // ---- 水槽内オブジェ ----------------------------------------------------------

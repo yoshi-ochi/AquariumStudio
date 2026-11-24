@@ -104,7 +104,7 @@ export class HallInteraction {
     // 売店・食堂は作り付けの設備で埋まっているので置けない
     if (zoneAt(plan.floor, x, z)?.facility) return false;
     // 地下は設備専用。予備水槽などは地下にだけ置ける
-    if (plan.floor === BASEMENT ? !def.yardOnly : def.basement) return false;
+    if (!def.stairs && (plan.floor === BASEMENT ? !def.yardOnly : def.basement)) return false;
     // 大水槽は2階分の高さがあるので1階にだけ置ける
     if (def.atrium && plan.floor !== 0) return false;
     // 大水槽には重ねて置けない
@@ -230,6 +230,7 @@ export class HallInteraction {
 
   remove(obj) {
     const def = this.manager.defOf(obj);
+    if (def.stairs) return; // 階段は撤去できない
     // 水槽本体は在庫へ戻し、中身は売却する
     const isTank = def.category === CATEGORY.TANK;
     const value = (isTank ? 0 : def.price) + (obj.userData.clip ? this.manager.contentsValue(obj) : 0);

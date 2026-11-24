@@ -345,6 +345,25 @@ function buildEntrance(g, def) {
   g.add(mat);
 }
 
+/** 階段（階の移動用）。手前(+z)から奥へ12段で上る。段鼻の滑り止めと、両側の支柱・斜めの手すり */
+function buildStairs(g, def) {
+  const { w, h, d } = def.size;
+  const n = 12;
+  const rise = h / n;
+  const run = d / n;
+  for (let k = 0; k < n; k++) {
+    const top = rise * (k + 1);
+    box(g, w, top, run, MATERIALS.wall, 0, top / 2, d / 2 - run * (k + 0.5));
+    box(g, w, 0.02, 0.05, MATERIALS.trim, 0, top + 0.01, d / 2 - run * k - 0.03);
+  }
+  const len = Math.hypot(d, h);
+  for (const s of [-1, 1]) {
+    const x = s * (w / 2 - 0.04);
+    for (const t of [0.06, 0.5, 0.94]) box(g, 0.04, 0.9, 0.04, MATERIALS.trim, x, h * t + 0.45, d / 2 - d * t);
+    box(g, 0.05, 0.05, len, MATERIALS.trim, x, h / 2 + 0.9, 0).rotation.x = Math.atan2(h, d);
+  }
+}
+
 /** 飼育員用ドア（壁に埋め込んで使う。両面に枠とドア） */
 function buildStaffDoor(g, def) {
   const { w, h, d } = def.size;
@@ -391,6 +410,7 @@ const BUILDERS = {
   foodPrep: buildFoodPrep,
   wall: buildWall,
   entrance: buildEntrance,
+  stairs: buildStairs,
   liveRock: buildLiveRock,
   driftwood: buildDriftwood,
   plants: buildPlants,

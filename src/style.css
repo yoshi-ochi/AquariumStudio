@@ -681,7 +681,10 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 .ep-row.done b { color: var(--muted); }
 
 /* 表示の一覧：本館・別館の切り替え */
-#view-rail .vr-seg { display: flex; gap: 4px; padding: 4px 6px; border-top: 1px solid var(--bar-line); border-bottom: 1px solid var(--bar-line); }
-#view-rail .vr-list .vr-seg button.vr-bld { flex: 1; min-width: 0; min-height: 30px; padding: 0 10px; border-radius: 8px; text-align: center; background: rgba(255, 255, 255, .08); }
-#view-rail .vr-list .vr-seg button.vr-bld.on { color: #0f3550; background: var(--aqua); }
-#view-rail .vr-list .vr-seg button.vr-bld:disabled { opacity: .4; }
+
+/* 階段のメニュー（閲覧中に階段をタップ） */
+#stairs-pop { position: fixed; z-index: 60; display: flex; flex-direction: column; gap: 6px; min-width: 130px; padding: 10px; border: 1px solid var(--bar-line); border-radius: 12px; color: #fff; background: rgba(15, 53, 80, .94); }
+#stairs-pop[hidden] { display: none; }
+#stairs-pop b { font-size: 13px; }
+#stairs-pop small { font-size: 12px; opacity: .8; }
+#stairs-pop button { min-height: 36px; border: 0; border-radius: 8px; color: #0f3550; font-weight: 700; background: var(--aqua); }

@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { CELL_SIZE, GRID_X, GRID_Z, ZONES, getZone } from './blueprint.js';
+import { CELL_SIZE, GRID_X, GRID_Z, GRID_Z0, ZONES, getZone } from './blueprint.js';
 
 /**
  * 屋外エリアの地面と、売店・食堂の作り付けの設備。
  * 売店：商品の並ぶ棚とレジ。食堂：料理の提供口とテーブル・椅子。タップで補充・提供の画面を開く（facilities）。
  */
 const wx = (i) => (i - GRID_X / 2) * CELL_SIZE;
-const wz = (j) => (j - GRID_Z / 2) * CELL_SIZE;
+const wz = (j) => (j - GRID_Z0) * CELL_SIZE;
 // 同じ色の材質は使い回す（商品の箱が多いため）
 const MATS = new Map();
 const mat = (color, roughness = 0.85) => {
