@@ -15,7 +15,7 @@ export const WALL_TYPES = [
   { id: 'brick', label: 'レンガ' },
 ];
 
-export const MAX_LIGHTS = 4;
+export const MAX_LIGHTS = 6;
 
 /** 室内ライト。(x, height, z) から床の照射点 (tx, tz) へ向ける */
 export function defaultLight(x = 0, z = 0) {

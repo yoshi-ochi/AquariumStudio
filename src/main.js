@@ -17,7 +17,7 @@ import { LightInteraction } from './interaction/lightInteraction.js';
 import { InteriorCamera } from './interior/interiorCamera.js';
 import { Room } from './room/room.js';
 import { CELL } from './room/floorPlan.js';
-import { defaultRoomSettings, defaultLight, normalizeLight } from './room/roomData.js';
+import { defaultRoomSettings, defaultLight, normalizeLight, MAX_LIGHTS } from './room/roomData.js';
 import { findRunByKey, placeEmbedded, holeFor } from './room/embed.js';
 import { normalizeLook } from './tanks/tankLook.js';
 import { Splash } from './ui/splash.js';
@@ -381,6 +381,7 @@ async function boot() {
       else if (kind === 'lights') room.setLights(roomSettings.lights);
       else if (kind === 'light-update') room.updateLight(value, roomSettings.lights[value]);
       else if (kind === 'light-mode') lightCtl.enabled = value;
+      else if (kind === 'light-select') room.setSelectedLight(value);
       else if (kind === 'wall-mode') {
         wallCtl.setEnabled(value);
         room.setWallEditing(value);
@@ -426,9 +427,13 @@ async function boot() {
   // ---- 操作 -----------------------------------------------------------------
   // ライトのハンドルは他の操作より先にイベントを取るため、最初に作る
   const lightCtl = new LightInteraction({
-    sceneMgr, cameraCtl, room,
+    sceneMgr, cameraCtl, room, manager,
     getSettings: () => roomSettings,
     onSelect: (i) => roomPanel.selectLight(i),
+    onChanged: () => roomPanel.render(), // 向き・傾きの表示を合わせる
+    onAdd: (x, z) => {
+      if (!roomPanel.addLightAt(x, z)) toast(`照明は${MAX_LIGHTS}灯までです`, { error: true });
+    },
   });
   const wallCtl = new WallInteraction({
     sceneMgr, room, manager, toast,

@@ -59,13 +59,42 @@ export class RoomPanel {
   selectLight(i) {
     if (this.lightIndex === i) return;
     this.lightIndex = i;
+    this.onChange('light-select', i);
     this.render();
+  }
+
+  /** 床のタップで照明を追加する（上限なら false） */
+  addLightAt(x, z) {
+    const s = this.getSettings();
+    if (s.lights.length >= MAX_LIGHTS) return false;
+    s.lights.push(defaultLight(x, z));
+    this.lightIndex = s.lights.length - 1;
+    this.onChange('lights');
+    this.onChange('light-select', this.lightIndex);
+    this.render();
+    return true;
   }
 
   _lookSection(kind, types, cur) {
     return `
       <div class="seg" ${types.length ? '' : 'hidden'}>${types.map((t) => `<button data-act="${kind}-type" data-v="${t.id}" class="${cur.type === t.id ? 'active' : ''}">${t.label}</button>`).join('')}</div>
       <div class="row"><span class="label">色</span><input type="color" data-field="${kind}-color" value="${cur.color}"></div>`;
+  }
+
+  /** 照らす向き：真上から見た方角（0°=手前）と、真下からの傾き */
+  _aim(l) {
+    const dx = l.tx - l.x;
+    const dz = l.tz - l.z;
+    const reach = Math.hypot(dx, dz);
+    const yaw = reach < 1e-3 ? 0 : (((Math.round((Math.atan2(dx, dz) * 180) / Math.PI / 5) * 5) % 360) + 360) % 360;
+    return { yaw, tilt: Math.round((Math.atan2(reach, Math.max(0.05, l.height)) * 180) / Math.PI) };
+  }
+
+  /** 向き・傾きから照射点を決める */
+  _setAim(l, yaw, tilt) {
+    const reach = Math.max(0.05, l.height) * Math.tan((Math.min(70, tilt) * Math.PI) / 180);
+    l.tx = l.x + Math.sin((yaw * Math.PI) / 180) * reach;
+    l.tz = l.z + Math.cos((yaw * Math.PI) / 180) * reach;
   }
 
   _lightSection(lights) {
@@ -81,8 +110,11 @@ export class RoomPanel {
         <button data-act="light-add" data-repeat ${lights.length >= MAX_LIGHTS ? 'disabled' : ''}>＋</button>
         <button data-act="light-remove" class="danger" ${lights.length <= 1 ? 'disabled' : ''}>削除</button></div>
       ${l ? `
-      <p class="note">💡 電球をドラッグで移動、床の ◎ をドラッグで照らす向きを変えられます。</p>
+      <p class="note">床をタップするとその場所に照明を追加できます。リング（または電球）をドラッグで移動、白い ● をドラッグで照らす場所を変えられます。</p>
       ${range('height', '高さ', 0.5, 5, 0.05, l.height, 'm')}
+      ${range('yaw', '向き', 0, 355, 5, this._aim(l).yaw, '°')}
+      ${range('tilt', '傾き', 0, 70, 1, this._aim(l).tilt, '°')}
+      <div class="row"><button data-act="light-down">真下に向ける</button></div>
       ${range('intensity', '光量', 0, 4, 0.05, l.intensity, '')}
       ${range('angle', '照射角', 20, 150, 5, l.angle, '°')}
       <div class="row"><span class="label">色調</span><input type="color" data-field="light-color" value="${l.color}">
@@ -106,7 +138,15 @@ export class RoomPanel {
     }
     if (act === 'floor-type') s.floor.type = v;
     else if (act === 'wall-type') s.wall.type = v;
-    else if (act === 'light-pick') this.lightIndex = Number(v);
+    else if (act === 'light-pick') {
+      this.lightIndex = Number(v);
+      this.onChange('light-select', this.lightIndex);
+    } else if (act === 'light-down') {
+      const l = s.lights[this.lightIndex];
+      [l.tx, l.tz] = [l.x, l.z];
+      this.onChange('light-update', this.lightIndex);
+      return this.render();
+    }
     else if (act === 'light-add' && s.lights.length < MAX_LIGHTS) {
       const b = this.getPlan().bounds();
       s.lights.push(defaultLight(b.cx, b.cz));
@@ -120,6 +160,7 @@ export class RoomPanel {
       return this.render();
     }
     this.onChange(act.startsWith('light') ? 'lights' : 'look');
+    if (act.startsWith('light')) this.onChange('light-select', this.lightIndex);
     this.render();
   }
 
@@ -128,7 +169,13 @@ export class RoomPanel {
     if (field === 'floor-color') s.floor.color = value;
     else if (field === 'wall-color') s.wall.color = value;
     else if (field === 'ceiling-color') s.ceiling.color = value;
-    else if (field.startsWith('light-')) {
+    else if (field === 'light-yaw' || field === 'light-tilt') {
+      const l = s.lights[this.lightIndex];
+      const cur = this._aim(l);
+      this._setAim(l, field === 'light-yaw' ? value : cur.yaw, field === 'light-tilt' ? value : cur.tilt);
+      input.parentElement.querySelector('output').textContent = `${value}°`;
+      return this.onChange('light-update', this.lightIndex);
+    } else if (field.startsWith('light-')) {
       s.lights[this.lightIndex][field.slice(6)] = value;
       const out = input.parentElement.querySelector('output');
       if (out) out.textContent = `${value}${out.textContent.replace(/^[-\d.]+/, '')}`;

@@ -170,23 +170,35 @@ export class Room {
       spot.shadow.camera.near = 0.1;
       spot.shadow.camera.far = 30;
       this.lightGroup.add(spot, spot.target);
-      // 編集時だけ見えるハンドル：電球（位置）と床の照射点（向き）
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), new THREE.MeshBasicMaterial());
+      // 編集時だけ見えるハンドル：電球と、その真下の床のリング（どちらも移動）、照らす場所の ●（向き）
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshBasicMaterial());
       bulb.userData = { lightIndex: i, handle: 'bulb' };
-      // 中央まで塗った円（リングだと中心をタップしても掴めない）
-      const aim = new THREE.Mesh(new THREE.CircleGeometry(0.2, 24), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.6, depthTest: false }));
-      aim.rotation.x = -Math.PI / 2;
-      aim.renderOrder = 6;
+      const flat = (geo, opacity, order) => {
+        const m = new THREE.Mesh(geo.rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity, depthTest: false, depthWrite: false }));
+        m.renderOrder = order;
+        return m;
+      };
+      const ring = flat(new THREE.RingGeometry(0.34, 0.62, 32), 0.55, 6);
+      ring.userData = { lightIndex: i, handle: 'move' };
+      // 中央まで塗った円（リングだと中心をタップしても掴めない）。白地に色の縁
+      const aim = flat(new THREE.CircleGeometry(0.26, 24), 0.95, 8);
+      aim.material.color.set(0xffffff);
+      const aimEdge = flat(new THREE.RingGeometry(0.26, 0.32, 24), 0.95, 8);
+      aimEdge.raycast = () => {};
+      aim.add(aimEdge);
       aim.userData = { lightIndex: i, handle: 'aim' };
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({ dashSize: 0.1, gapSize: 0.06 }));
-      this.helperGroup.add(bulb, aim, line);
+      const drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ transparent: true, opacity: 0.5 }));
+      drop.raycast = line.raycast = () => {};
+      this.helperGroup.add(bulb, ring, aim, line, drop);
       const fixture = this._fixture();
       fixture.visible = this.ceilingOn;
       this.lightGroup.add(fixture);
-      const entry = { spot, bulb, aim, line, fixture };
+      const entry = { spot, bulb, ring, aim, aimEdge, line, drop, fixture };
       this._applyLight(entry, l);
       return entry;
     });
+    this.setSelectedLight(this.selectedLight ?? 0);
   }
 
   /**
@@ -210,7 +222,21 @@ export class Room {
     if (this.lights[i]) this._applyLight(this.lights[i], l);
   }
 
-  _applyLight({ spot, bulb, aim, line, fixture }, l) {
+  /** 選んだ照明のハンドルを濃く、ほかは薄く */
+  setSelectedLight(i) {
+    this.selectedLight = i;
+    this.lights.forEach((e, k) => {
+      const on = k === i;
+      // 明るい床でも見えるよう、選んだ照明はオレンジ（選択枠と同じ色）、ほかは灰色
+      e.ring.material.color.set(on ? 0xffb300 : 0x9aa4ad);
+      e.ring.material.opacity = on ? 0.85 : 0.45;
+      e.aimEdge.material.color.set(on ? 0x0f3550 : 0x5f6f7c);
+      e.aim.material.opacity = e.aimEdge.material.opacity = on ? 0.95 : 0.5;
+      e.bulb.scale.setScalar(on ? 1.15 : 0.85);
+    });
+  }
+
+  _applyLight({ spot, bulb, ring, aim, aimEdge, line, drop, fixture }, l) {
     spot.color.set(l.color);
     spot.intensity = l.intensity * 3;
     spot.angle = THREE.MathUtils.degToRad(l.angle / 2);
@@ -218,8 +244,10 @@ export class Room {
     spot.target.position.set(l.tx, 0, l.tz);
     bulb.position.copy(spot.position);
     bulb.material.color.set(l.color);
-    aim.position.set(l.tx, 0.03, l.tz);
-    aim.material.color.set(l.color);
+    ring.position.set(l.x, 0.03, l.z);
+    aim.position.set(l.tx, 0.04, l.tz);
+    drop.geometry.setFromPoints([spot.position, ring.position]);
+    drop.material.color.set(l.color);
     line.geometry.setFromPoints([spot.position, aim.position]);
     line.computeLineDistances();
     line.material.color.set(l.color);
@@ -235,7 +263,7 @@ export class Room {
 
   /** ドラッグ可能なハンドル（レイキャスト対象） */
   get handles() {
-    return this.lights.flatMap((e) => [e.bulb, e.aim]);
+    return this.lights.flatMap((e) => [e.bulb, e.ring, e.aim]);
   }
 
   setEditVisible(visible) {
