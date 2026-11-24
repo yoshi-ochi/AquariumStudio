@@ -830,7 +830,9 @@ async function boot() {
             gameSheet.close();
             mapPage.close();
             if (mode !== 'home') goHome();
-            if (economy.floor !== 0) changeFloor(0);
+            // 1階の表示に切り替え（階の表示も合わせる）、切り替えのカメラ移動を止めて生け簀を映す
+            views.goFloor(0);
+            views.tween = null;
             cameraCtl.frameBounds(penScene.bounds());
           },
         }),
