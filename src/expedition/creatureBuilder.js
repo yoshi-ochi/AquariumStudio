@@ -5,6 +5,8 @@ import { extraSoftParts } from './creatureSoft.js';
 import { RIM, bakeFacets, bandsFor, ringStops } from './creatureFacet.js';
 import { ANATOMY } from './creatureAnatomy.js';
 import { tracedParts } from './creatureTraced.js';
+import { FIN, tagFin, ensureFinAttrs } from './finTag.js';
+import { swimOf } from './swimStyles.js';
 
 /**
  * 展示生物のポリゴンアートモデル。+X が頭、原点が体の中心。三角形ごとに塗り分けて質感を統一する。
@@ -206,6 +208,9 @@ function tailFin(f, hex) {
   }, hex, 14);
 }
 
+/** ひれの付け根の関数を点列にする（部位の印に使う） */
+const sampleBase = (fn, n = 10) => Array.from({ length: n + 1 }, (_, i) => fn(i / n));
+
 function fishParts(c, f) {
   const parts = [];
   const finC = c.colors.fin;
@@ -215,22 +220,24 @@ function fishParts(c, f) {
   if (f.dorsal) {
     const [a, b, hK, sw] = f.dorsal;
     const H = f.h * hK;
-    parts.push(rimFin((u) => { const t = a + (b - a) * u; return [X(t), profile(f, t).top * 0.92, 0]; }, (u) => {
+    const base = (u) => { const t = a + (b - a) * u; return [X(t), profile(f, t).top * 0.92, 0]; };
+    parts.push(tagFin(rimFin(base, (u) => {
       const t = a + (b - a) * u;
       const k = Math.sin(Math.PI * Math.min(1, u * 0.92 + 0.08)) ** 0.5;
       return [X(t) - sw * 0.2 * (0.4 + u), profile(f, t).top + H * k, 0];
-    }, finC, f.crest ? 40 : 12));
+    }, finC, f.crest ? 40 : 12), FIN.DORSAL, sampleBase(base)));
   }
   if (f.anal) {
     const [a, b, hK, sw] = f.anal;
     const H = f.h * hK;
-    parts.push(rimFin((u) => { const t = a + (b - a) * u; return [X(t), -profile(f, t).bot * 0.92, 0]; }, (u) => {
+    const base = (u) => { const t = a + (b - a) * u; return [X(t), -profile(f, t).bot * 0.92, 0]; };
+    parts.push(tagFin(rimFin(base, (u) => {
       const t = a + (b - a) * u;
       return [X(t) - sw * 0.2, -profile(f, t).bot - H * Math.sin(Math.PI * Math.min(1, u * 0.92 + 0.08)) ** 0.5, 0];
-    }, finC));
+    }, finC), FIN.ANAL, sampleBase(base)));
   }
   const tail = tailFin(f, finC);
-  if (tail) parts.push(tail);
+  if (tail) parts.push(tagFin(tail, FIN.CAUDAL, sampleBase((u) => [-0.49, (u * 2 - 1) * f.h * f.ped * 0.42, 0])));
   // リュウグウノツカイの冠
   if (f.crest) {
     for (let i = 0; i < 6; i++) {
@@ -244,7 +251,8 @@ function fishParts(c, f) {
   for (const s of [-1, 1]) {
     const z = s * f.w * 0.44;
     const y = -f.h * 0.12;
-    parts.push(rimFin((u) => [px - u * pl * 0.3, y + u * pl * 0.1, z], (u) => [px - pl * (0.55 + u * 0.4), y - pl * (0.32 - u * 0.5), z + s * pl * 0.55], tint(finC, 1.1), 6));
+    const base = (u) => [px - u * pl * 0.3, y + u * pl * 0.1, z];
+    parts.push(tagFin(rimFin(base, (u) => [px - pl * (0.55 + u * 0.4), y - pl * (0.32 - u * 0.5), z + s * pl * 0.55], tint(finC, 1.1), 6), FIN.PAIRED, sampleBase(base, 4)));
   }
   // シュモクザメの頭
   if (f.hammer) {
@@ -427,15 +435,37 @@ function softParts(c) {
   return { parts, mode: 1 };
 }
 
-const VERT_DECL = 'uniform float uTime;\nuniform float uMode;\nuniform float uWave;\n#include <common>';
+const VERT_DECL = 'uniform float uTime;\nuniform float uMode;\nuniform float uWave;\nuniform vec4 uSwimA;\nuniform vec4 uSwimB;\nuniform vec4 uSwimC;\nattribute float aFin;\nattribute float aFinT;\n#include <common>';
 const VERT_BODY = `#include <begin_vertex>
 if (uMode < 0.5) {
-  float amp = smoothstep(0.3, -0.5, position.x);
-  transformed.z += sin(position.x * 7.0 * uWave + uTime * 7.0) * 0.075 * amp;
+  // 魚：泳法ごとに、体の波（頭→尾へ進む）・尾びれ・背びれと尻びれ・胸びれを別々に動かす（swimStyles.js）
+  float ph = uTime * 6.2832 * uSwimA.x;
+  float x = position.x;
+  float amp = uSwimA.z * (1.0 - smoothstep(-0.5, uSwimA.y, x));
+  transformed.z += sin(ph - (0.5 - x) * 6.2832 * uSwimA.w) * amp;
+  if (aFin > 2.5 && aFin < 3.5) {
+    // 尾びれ：体の波より少し遅れて、先ほど大きく振る
+    transformed.z += sin(ph - 1.2) * uSwimB.x * aFinT;
+  } else if (aFin > 0.5 && aFin < 2.5) {
+    // 背びれ・尻びれ：波を流す（モンガラ・リュウグウノツカイ）か、同じ側へそろえて羽ばたく（マンボウ・シーラカンス）
+    if (uSwimB.z < 0.5) transformed.z += sin(ph - (0.5 - x) * 6.2832 * uSwimB.w) * uSwimB.y * aFinT;
+    else transformed.z += sin(ph) * uSwimB.y * aFinT;
+  } else if (aFin > 3.5) {
+    // 胸びれ・腹びれ：前後に漕ぐ／上下に羽ばたく（ベラ型）／左右交互に漕ぐ（シーラカンス）
+    float side = position.z < 0.0 ? -1.0 : 1.0;
+    float pp = ph * uSwimC.z + (uSwimC.y > 1.5 && side > 0.0 ? 3.1416 : 0.0);
+    if (uSwimC.y > 0.5 && uSwimC.y < 1.5) {
+      transformed.y += sin(pp) * uSwimC.x * aFinT;
+      transformed.z += cos(pp) * uSwimC.x * 0.35 * aFinT * side;
+    } else {
+      transformed.x += sin(pp) * uSwimC.x * aFinT;
+      transformed.z += cos(pp) * uSwimC.x * 0.5 * aFinT * side;
+    }
+  }
 } else if (uMode < 1.5) {
   transformed.y += sin(uTime * 2.2 + position.x * 2.0) * 0.5 * abs(position.z) * abs(position.z) * 1.4;
 } else if (uMode < 2.5) {
-  float pulse = 1.0 + sin(uTime * 2.4) * 0.13 * smoothstep(-0.2, 0.3, position.y);
+  float pulse = 1.0 + sin(uTime * 5.0) * 0.13 * smoothstep(-0.2, 0.3, position.y);
   transformed.xz *= pulse;
   transformed.y *= 2.0 - pulse;
 } else if (uMode > 3.5 && uMode < 4.5) {
@@ -446,7 +476,7 @@ if (uMode < 0.5) {
 } else if (uMode > 4.5 && uMode < 5.5) {
   // イルカ・クジラ：体を上下にうねらせ、尾びれで水をかく
   float amp = smoothstep(0.15, -0.5, position.x);
-  transformed.y += sin(position.x * 4.0 + uTime * 4.5) * 0.06 * amp;
+  transformed.y += sin(position.x * 4.0 + uTime * 6.0) * 0.06 * amp; // 尾びれは約1回/秒（イルカの巡航 0.5〜2.9回/秒）
 }`;
 
 /**
@@ -464,7 +494,7 @@ function shapeOf(c) {
       const geo = mergeGeometries(list.map((g) => {
         g.deleteAttribute('uv');
         g.deleteAttribute('normal');
-        return g;
+        return ensureFinAttrs(g);
       }), false);
       bakeFacets(geo, Boolean(a?.cells));
       geo.userData.shared = true;
@@ -493,7 +523,8 @@ export function buildCreature(c) {
   root.userData.creature = c.id;
   const shape = shapeOf(c);
   const { geo, clearGeo, mode, opacity } = shape;
-  const uni = { uTime: { value: 0 }, uMode: { value: mode }, uWave: { value: shape.wave } };
+  const sw = swimOf(c);
+  const uni = { uTime: { value: 0 }, uMode: { value: mode }, uWave: { value: shape.wave }, uSwimA: { value: new THREE.Vector4(...sw.a) }, uSwimB: { value: new THREE.Vector4(...sw.b) }, uSwimC: { value: new THREE.Vector4(...sw.c) } };
   // 色は焼き込み済みなので、館内の照明に左右されない
   const addMesh = (g, alpha, parent = root) => {
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide, transparent: alpha < 1, opacity: alpha, depthWrite: alpha >= 1 });

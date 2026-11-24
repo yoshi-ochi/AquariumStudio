@@ -73,6 +73,42 @@ function curtainWall(group, TOP_ = TOP) {
     fins.setMatrixAt(k, m);
   });
   group.add(panels, fins);
+  // 各階の床の高さに白い帯（スパンドレル）、いちばん上に笠木（パラペット）、足元に黒い幅木
+  const lines = [];
+  for (let y = STORY_H; y < TOP - 0.01; y += STORY_H) lines.push([y, 0.5, 0.16, MAT.white]);
+  lines.push([TOP + 0.35, 0.7, 0.22, MAT.white], [0.15, 0.3, 0.1, MAT.frame]);
+  for (const [y, h, t, material] of lines) {
+    const band = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE + 0.01, h, t), material, edges.length);
+    edges.forEach(([x, z, r], k) => {
+      q.setFromAxisAngle(up, r);
+      m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(1, 1, 1));
+      band.setMatrixAt(k, m);
+    });
+    group.add(band);
+  }
+}
+
+/** 屋上：空調の室外機・換気塔・点検用の通路（2階のある区画の屋上に並べる） */
+function rooftop(group) {
+  const parts = [];
+  const fans = [];
+  for (const z of ZONES.filter((x) => x.floor === 1 && x.type === ZONE_TYPE.YARD)) {
+    for (const [x0, z0, x1, z1] of z.rects) {
+      const w = (x1 - x0 + 1) * CELL_SIZE;
+      const d = (z1 - z0 + 1) * CELL_SIZE;
+      const n = Math.max(1, Math.floor(w / 5));
+      for (let i = 0; i < n; i++) {
+        const x = wx(x0) + (i + 0.5) * (w / n);
+        const cz = wz(z0) + d / 2;
+        parts.push(box(2.2, 1.2, 1.4, x, TOP + 0.95, cz));
+        fans.push(new THREE.CylinderGeometry(0.5, 0.5, 0.08, 14).translate(x - 0.5, TOP + 1.6, cz), new THREE.CylinderGeometry(0.5, 0.5, 0.08, 14).translate(x + 0.5, TOP + 1.6, cz));
+      }
+      // 点検通路
+      parts.push(box(w - 1, 0.08, 0.8, wx(x0) + w / 2, TOP + 0.38, wz(z0) + d / 2 + 1.3));
+    }
+  }
+  if (parts.length) group.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ color: 0xb9c0c4, roughness: 0.6 })));
+  if (fans.length) group.add(new THREE.Mesh(mergeGeometries(fans), MAT.frame));
 }
 
 /** 各階の白いスラブと屋上 */
@@ -347,6 +383,7 @@ export class Exterior {
     slabs(this.group);
     entranceCanopy(this.group);
     sidePavilions(this.group);
+    rooftop(this.group);
     ROOFS[LAYOUT.style](this.group);
     if (this.wings) wing(this.group, this.wings);
     this.key = `${LAYOUT.id}:${this.wings}`;

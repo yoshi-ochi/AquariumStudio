@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RIM } from './creatureFacet.js';
+import { FIN, tagFin, finKindOf } from './finTag.js';
 
 /** トレースした頂点（creatureAnatomy.js）をそのままつないだ低ポリゴンの魚 */
 class Mesh {
@@ -255,7 +256,12 @@ export function tracedParts(c, a) {
   const parts = [tracedBody(a, c, P)];
   for (const f of a.fins) {
     const hex = f.cols ?? f.hex ?? c.colors.fin;
-    for (const side of f.lift ? [-1, 1] : [1]) parts.push(...tracedFin(a, f, hex, P, side));
+    for (const side of f.lift ? [-1, 1] : [1]) {
+      // ひれの部位（背・尻・尾・胸と腹）と付け根を記録する
+      const base = f.base.map((p) => P(p, f.lift ? side * surfaceDepth(a, p) * 0.9 : 0));
+      const kind = f.lift ? FIN.PAIRED : finKindOf(base);
+      parts.push(...tracedFin(a, f, hex, P, side).map((g) => tagFin(g, kind, base)));
+    }
   }
   const face = new Mesh();
   // シュモクザメの頭のように、体の左右へ張り出す板
