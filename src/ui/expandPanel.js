@@ -34,7 +34,7 @@ export class ExpandPanel {
     };
     // 次に解放できるものまでを並べる（その先は隠す）
     const chain = (list) => list.filter((z, i) => unlocked.has(z.id) || i === 0 || unlocked.has(list[i - 1].id) || !z.requires || unlocked.has(z.requires));
-    const annex = chain(ZONES.filter((z) => z.annex && !z.wing)).map(row).join('');
+    const annex = chain(ZONES.filter((z) => z.annex && !z.wing && !z.auto)).map(row).join('');
     const wings = chain(ZONES.filter((z) => z.wing)).map(row).join('');
     const pen = this.seaPen;
     const ready = level >= PEN.unlockLevel;

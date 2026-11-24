@@ -41,21 +41,27 @@ export class FloorPlan {
     this._carveWingYard(unlocked);
   }
 
-  /** 別館の展示室の周りを、幅 WING_YARD マスのバックヤードで囲む（南の中央に来館者の入口を4マス空ける） */
+  /** 別館の展示室の周りを、幅 WING_YARD マスのバックヤードで囲む（連絡通路への出入口は空ける） */
   _carveWingYard(unlocked) {
     const SERVICE = 100;
-    for (const zone of ZONES) {
-      if (!zone.wing || zone.floor !== this.floor || !unlocked.has(zone.id)) continue;
+    ZONES.forEach((zone, n) => {
+      if (!zone.wing || zone.floor !== this.floor || !unlocked.has(zone.id)) return;
       const [x0, z0, x1, z1] = zone.rects[0];
-      const mid = Math.floor((x0 + x1 + 1) / 2);
       const W = WING_YARD;
+      const keep = new Set();
+      for (let j = z0; j <= z1; j++) for (let i = x0; i <= x1; i++) {
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (this._zoneAt(i + a, j + b) === n || !this.doors.has(this.edge(i, j, i + a, j + b))) continue;
+          for (let d = 0; d < W; d++) keep.add(this.idx(i - a * d, j - b * d));
+        }
+      }
       for (let j = z0; j <= z1; j++) for (let i = x0; i <= x1; i++) {
         const edge = i < x0 + W || i > x1 - W || j < z0 + W || j > z1 - W;
-        if (!edge || (j > z1 - W && i >= mid - 2 && i < mid + 2)) continue;
+        if (!edge || keep.has(this.idx(i, j))) continue;
         this.active[this.idx(i, j)] = CELL.YARD;
         this.zoneIds[this.idx(i, j)] = SERVICE;
       }
-    }
+    });
   }
 
   /** 展示室の壁の裏に管理通路を設け、メインバックヤードへつなぐ */

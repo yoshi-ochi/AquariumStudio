@@ -238,6 +238,8 @@ async function boot() {
   }
   let afterApplyRoom = () => {}; // 館内編集の十字線など（操作の準備ができてから差し替える）
   function applyRoom(reframe) {
+    // 別館と一緒にできるエリア（連絡通路）
+    for (const z of ZONES) if (z.auto && unlocked.has(z.auto)) unlocked.add(z.id);
     room.setStage(economy.stage, economy.floor, unlocked);
     pool.setLayout();
     penScene.setLayout();

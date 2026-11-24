@@ -106,6 +106,8 @@ const ZONE_META = [
   ...ANNEX_META(),
   ...WING_META(),
   { id: 'pool', name: 'イルカプール', floor: 0, type: OUTDOOR, stage: 3, cost: 8000000, color: '#54c0d8', text: '2階建ての観客席を備えたショープール' },
+  // 別館を建てると一緒にできる（auto：そのエリアの解放に連動）
+  { id: 'corridor', name: '連絡通路', floor: 0, type: HALL, stage: 4, cost: 0, auto: 'wing1', annex: true, color: '#9fd0df', text: '本館と別館をつなぐ屋根付きの通路。イルカプールを迂回して本館の東側を通る' },
   { id: 'poolyard', name: 'プールバックヤード', floor: 0, type: YARD, stage: 3, cost: 600000, requires: 'pool', color: '#c9ccd0', text: 'イルカプールのステージ裏の、屋根のない職員エリア' },
 ];
 
@@ -187,6 +189,9 @@ const shift = ([x0, z0, x1, z1]) => [x0 + SITE_X, z0 + NORTH_ROWS, x1 + SITE_X, 
 const N = NORTH_ROWS;
 for (const l of LAYOUTS) {
   for (const id of Object.keys(l.rects)) l.rects[id] = l.rects[id].map(shift);
+  // 本館の東端の列と、そこに面する1階の展示室（連絡通路の本館側の出入口）
+  const R = Math.max(...Object.entries(l.rects).filter(([id]) => id !== 'pool').flatMap(([, rs]) => rs.map((r) => r[2])));
+  const east = Object.entries(l.rects).find(([id, rs]) => ZONE_META.find((z) => z.id === id && z.floor === 0 && z.type === HALL) && rs.some((r) => r[2] === R));
   l.voidRect = shift(l.voidRect);
   // 建物の左端から、海獣広場（22マス≒20m）、その左に売店・食堂（各22マス四方）。
   // 屋外バックヤードは海獣広場の北・西・南の縁（幅2マス）を囲む。売店・食堂への出入口の前は空ける
@@ -204,6 +209,12 @@ for (const l of LAYOUTS) {
   l.rects.poolyard = [[pcx - 12, yz1 - 9, pcx + 11, yz1]];
   const W = WING_HALL + WING_YARD * 2;
   l.wingRect = [pcx - W / 2, yz1 - 13 - W, pcx + W / 2 - 1, yz1 - 14];
+  // 連絡通路（幅4マス）：別館の東面の中央から東へ出て、プールを避けて本館の東側を南へ下り、東端の展示室の脇へつなぐ
+  const wc = Math.floor((l.wingRect[1] + l.wingRect[3] + 1) / 2);
+  const [, ez0, , ez1] = east[1].find((r) => r[2] === R);
+  const end = Math.floor((ez0 + ez1) / 2) + 2;
+  l.rects.corridor = [[l.wingRect[2] + 1, wc - 2, R + 4, wc + 1], [R + 1, wc + 2, R + 4, end]];
+  l.links = [...l.links, ['corridor', 'wing1'], ['corridor', east[0]]];
   l.links = [...l.links, ['marine', l.leftLink], ['marine', 'store'], ['marine', 'diner']];
   l.serviceLinks = (l.serviceLinks ?? []).map(shift);
   Object.assign(l.rects, { b1a: [[72, 25 + N, 107, 46 + N]], b1b: [[50, 25 + N, 71, 46 + N]], b1c: [[108, 25 + N, 129, 46 + N]], b1d: [[50, 47 + N, 129, 58 + N]] });
@@ -218,7 +229,7 @@ function sceneryRect(id, [x0, z0, x1, z1]) {
 }
 
 export const DEFAULT_LAYOUT = LAYOUTS[0].id;
-export const START_ZONES = ZONE_META.filter((z) => z.cost === 0).map((z) => z.id);
+export const START_ZONES = ZONE_META.filter((z) => z.cost === 0 && !z.auto).map((z) => z.id);
 export const inRect = ([x0, z0, x1, z1], i, j) => i >= x0 && i <= x1 && j >= z0 && j <= z1;
 const rectCenter = ([x0, z0, x1, z1]) => ({ x: ((x0 + x1 + 1) / 2 - GRID_X / 2) * CELL_SIZE, z: ((z0 + z1 + 1) / 2 - GRID_Z0) * CELL_SIZE });
 

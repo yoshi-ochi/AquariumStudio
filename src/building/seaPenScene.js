@@ -104,7 +104,7 @@ export class SeaPenScene {
   /** 表示の切り替え（解放済みで、本館の地上階を見ているときだけ） */
   /** 本館の右端から GAP 先に、堀の縁が来るよう置き直す（奥行きは本館の中央） */
   setLayout() {
-    const main = ZONES.filter((z) => z.floor < FLOOR_COUNT && z.type !== ZONE_TYPE.OUTDOOR && !z.facility && !z.wing && z.id !== 'yard0' && z.id !== 'poolyard').flatMap((z) => z.rects ?? []);
+    const main = ZONES.filter((z) => z.floor < FLOOR_COUNT && z.type !== ZONE_TYPE.OUTDOOR && !z.facility && !z.wing && !z.auto && z.id !== 'yard0' && z.id !== 'poolyard').flatMap((z) => z.rects ?? []);
     const right = main.length ? Math.max(...main.map((r) => r[2])) + 1 : GRID_X;
     const z0 = main.length ? Math.min(...main.map((r) => r[1])) : 0;
     const z1 = main.length ? Math.max(...main.map((r) => r[3])) + 1 : GRID_Z;
