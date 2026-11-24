@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { FloorPlan, CELL } from './floorPlan.js';
 import { getTexture } from './textures.js';
 import { runTheta } from './embed.js';
-import { ATRIUM_VOID, STORY_H, ZONES, zoneHas, zoneAt } from '../building/blueprint.js';
+import { ATRIUM_VOID, STORY_H, ZONES, getZone, zoneHas, zoneAt } from '../building/blueprint.js';
 
 const DIRT_MARGIN = 1.6;
 const RAIL_H = 1.1;
@@ -82,6 +82,7 @@ export class Room {
     this.ceilingMat = new THREE.MeshBasicMaterial({ vertexColors: true });
     this.fixtureMat = new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.5, metalness: 0.4, side: THREE.DoubleSide });
     this.ceilingOn = false;
+    this.focusZone = null;
   }
 
   /** 天井の高さ(m) */
@@ -152,15 +153,25 @@ export class Room {
     return m;
   }
 
-  /** ライトを作り直す（数が変わるとき） */
-  setLights(list) {
+  /**
+   * 照明を作り直す（数・部屋が変わるとき）。all は全部の照明（各照明は zone に置いた部屋の id を持つ）。
+   * 今の階の照明だけ、スポットライト（壁で光を止めるため影を落とす）と天井の器具、編集用のハンドルを作る。
+   * ハンドルは編集中の部屋（focusZone）の照明だけ出す。entry.index は all での番号
+   */
+  setLights(all) {
+    this.allLights = all;
     for (const o of [...this.lightGroup.children, ...this.helperGroup.children]) {
       o.parent.remove(o);
-      o.geometry?.dispose();
-      o.material?.dispose();
-      o.dispose?.();
+      o.traverse((c) => {
+        c.geometry?.dispose();
+        if (c.material && c.material !== this.fixtureMat) c.material.dispose();
+      });
     }
-    this.lights = list.map((l, i) => {
+    const floor = this.plan?.floor;
+    this.lightsFloor = floor;
+    this.lights = [];
+    all.forEach((l, i) => {
+      if (getZone(l.zone)?.floor !== floor) return;
       const spot = new THREE.SpotLight(0xffffff, 1, 0, 1, 0.6, 0);
       // 壁で光を止めるため影を落とす（スマホ向けに影の解像度は控えめ）
       spot.castShadow = true;
@@ -170,23 +181,44 @@ export class Room {
       spot.shadow.camera.near = 0.1;
       spot.shadow.camera.far = 30;
       this.lightGroup.add(spot, spot.target);
-      // 編集時だけ見えるハンドル：電球（位置）と床の照射点（向き）
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), new THREE.MeshBasicMaterial());
+      // 編集時だけ見えるハンドル：電球と、その真下の床のリング（どちらも移動）、照らす場所の ●（向き）
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshBasicMaterial());
       bulb.userData = { lightIndex: i, handle: 'bulb' };
-      // 中央まで塗った円（リングだと中心をタップしても掴めない）
-      const aim = new THREE.Mesh(new THREE.CircleGeometry(0.2, 24), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.6, depthTest: false }));
-      aim.rotation.x = -Math.PI / 2;
-      aim.renderOrder = 6;
+      const flat = (geo, opacity, order) => {
+        const m = new THREE.Mesh(geo.rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity, depthTest: false, depthWrite: false }));
+        m.renderOrder = order;
+        return m;
+      };
+      const ring = flat(new THREE.RingGeometry(0.34, 0.62, 32), 0.55, 6);
+      ring.userData = { lightIndex: i, handle: 'move' };
+      // 中央まで塗った円（リングだと中心をタップしても掴めない）。白地に色の縁
+      const aim = flat(new THREE.CircleGeometry(0.26, 24), 0.95, 8);
+      aim.material.color.set(0xffffff);
+      const aimEdge = flat(new THREE.RingGeometry(0.26, 0.32, 24), 0.95, 8);
+      aimEdge.raycast = () => {};
+      aim.add(aimEdge);
       aim.userData = { lightIndex: i, handle: 'aim' };
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({ dashSize: 0.1, gapSize: 0.06 }));
-      this.helperGroup.add(bulb, aim, line);
+      const drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ transparent: true, opacity: 0.5 }));
+      drop.raycast = line.raycast = () => {};
+      const handle = new THREE.Group();
+      handle.add(bulb, ring, aim, line, drop);
+      this.helperGroup.add(handle);
       const fixture = this._fixture();
       fixture.visible = this.ceilingOn;
       this.lightGroup.add(fixture);
-      const entry = { spot, bulb, aim, line, fixture };
+      const entry = { index: i, zone: l.zone, spot, handle, bulb, ring, aim, aimEdge, line, drop, fixture };
       this._applyLight(entry, l);
-      return entry;
+      this.lights.push(entry);
     });
+    this.setFocusZone(this.focusZone);
+    this.setSelectedLight(this.selectedLight ?? -1);
+  }
+
+  /** 照明を編集する部屋（null で全体表示：ハンドルを出さない） */
+  setFocusZone(zone) {
+    this.focusZone = zone ?? null;
+    for (const e of this.lights) e.handle.visible = e.zone === this.focusZone;
   }
 
   /**
@@ -205,12 +237,27 @@ export class Room {
     return g;
   }
 
-  /** ライト1灯の値だけ更新（ドラッグ中など） */
+  /** ライト1灯の値だけ更新（ドラッグ中など）。i は全照明での番号 */
   updateLight(i, l) {
-    if (this.lights[i]) this._applyLight(this.lights[i], l);
+    const e = this.lights.find((x) => x.index === i);
+    if (e) this._applyLight(e, l);
   }
 
-  _applyLight({ spot, bulb, aim, line, fixture }, l) {
+  /** 選んだ照明のハンドルを濃く、ほかは薄く（i は全照明での番号） */
+  setSelectedLight(i) {
+    this.selectedLight = i;
+    for (const e of this.lights) {
+      const on = e.index === i;
+      // 明るい床でも見えるよう、選んだ照明はオレンジ（選択枠と同じ色）、ほかは灰色
+      e.ring.material.color.set(on ? 0xffb300 : 0x9aa4ad);
+      e.ring.material.opacity = on ? 0.85 : 0.45;
+      e.aimEdge.material.color.set(on ? 0x0f3550 : 0x5f6f7c);
+      e.aim.material.opacity = e.aimEdge.material.opacity = on ? 0.95 : 0.5;
+      e.bulb.scale.setScalar(on ? 1.15 : 0.85);
+    }
+  }
+
+  _applyLight({ spot, bulb, ring, aim, line, drop, fixture }, l) {
     spot.color.set(l.color);
     spot.intensity = l.intensity * 3;
     spot.angle = THREE.MathUtils.degToRad(l.angle / 2);
@@ -218,9 +265,11 @@ export class Room {
     spot.target.position.set(l.tx, 0, l.tz);
     bulb.position.copy(spot.position);
     bulb.material.color.set(l.color);
-    aim.position.set(l.tx, 0.03, l.tz);
-    aim.material.color.set(l.color);
-    line.geometry.setFromPoints([spot.position, aim.position]);
+    ring.position.set(l.x, 0.03, l.z);
+    aim.position.set(l.tx, 0.04, l.tz);
+    drop.geometry.setFromPoints([bulb.position, ring.position]);
+    drop.material.color.set(l.color);
+    line.geometry.setFromPoints([bulb.position, aim.position]);
     line.computeLineDistances();
     line.material.color.set(l.color);
     // 照明器具：笠はライトの高さ、吊り棒は天井まで
@@ -233,9 +282,9 @@ export class Room {
     glow.material.color.set(l.color);
   }
 
-  /** ドラッグ可能なハンドル（レイキャスト対象） */
+  /** ドラッグ可能なハンドル（レイキャスト対象）：編集中の部屋の照明だけ */
   get handles() {
-    return this.lights.flatMap((e) => [e.bulb, e.aim]);
+    return this.lights.filter((e) => e.handle.visible).flatMap((e) => [e.bulb, e.ring, e.aim]);
   }
 
   setEditVisible(visible) {
@@ -317,6 +366,7 @@ export class Room {
     this.ceiling = this._ceilingMesh(plan);
     this.ceiling.visible = this.ceilingOn;
     this.built.add(this.ceiling);
+    if (this.allLights && this.lightsFloor !== plan.floor) this.setLights(this.allLights); // 階が変わったら、その階の照明に
     const b = plan.bounds();
     this.built.add(this._dirtMesh(b));
     this.sceneMgr.fitShadow(b.cx, b.cz, Math.max(b.w, b.d) / 2 + DIRT_MARGIN);

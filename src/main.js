@@ -47,7 +47,7 @@ import { AllianceApi } from './online/allianceApi.js';
 import { AllianceView } from './ui/allianceView.js';
 import { MapPage } from './ui/mapPage.js';
 import { LifeSystems } from './game/lifeSystems.js';
-import { BUILDING_VERSION, STORY_H, FLOOR_COUNT, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorLevel, wingCount, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter, ZONES, floorLabel } from './building/blueprint.js';
+import { BUILDING_VERSION, STORY_H, FLOOR_COUNT, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorLevel, wingCount, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter, ZONES, floorLabel, GRID_X, GRID_Z0, CELL_SIZE } from './building/blueprint.js';
 import { ViewModes } from './building/viewModes.js';
 import { buildLowerShell, buildWingShell } from './building/exterior.js';
 import { OutdoorScenery } from './building/outdoorScenery.js';
@@ -168,7 +168,7 @@ async function boot() {
     manager.add('atriumTank', { ...ATRIUM_TANK_POS, floor: 0 });
     manager.setFloor(economy.floor);
   }
-  /** 各階に階段を1つずつ置く（なければ、その階の最初の展示室の中央近くの空いた床へ。動かすのは自由、撤去はできない） */
+  /** 各階に階段を1つずつ置く（なければ、その階の最初の展示室の左奥の隅に近い空いた床へ。動かすのは自由、撤去はできない） */
   function ensureStairs() {
     const def = getDef('stairs');
     for (const floor of floorOrder(unlocked)) {
@@ -177,7 +177,10 @@ async function boot() {
       const open = ZONES.filter((z) => z.floor === floor && unlocked.has(z.id) && !z.facility && z.type !== 'outdoor');
       const zone = open.find((z) => z.type === 'hall') ?? open[0];
       const type = zone?.type === 'hall' ? CELL.FLOOR : CELL.YARD;
-      const spot = zone && freeFloorSpot({ manager, floor, unlocked, hx: def.size.w / 2, hz: def.size.d / 2, target: zoneCenter(zone), type });
+      // 左奥（-X・-Z）の隅から少し内側
+      const [x0, z0] = zone?.rects[0] ?? [];
+      const corner = zone && { x: (x0 - GRID_X / 2) * CELL_SIZE + 1.5, z: (z0 - GRID_Z0) * CELL_SIZE + 2.5 };
+      const spot = zone && freeFloorSpot({ manager, floor, unlocked, hx: def.size.w / 2, hz: def.size.d / 2, target: corner, type });
       if (spot) manager.add('stairs', { ...spot, floor });
     }
   }
@@ -380,7 +383,11 @@ async function boot() {
       if (kind === 'look') room.applyLook(roomSettings);
       else if (kind === 'lights') room.setLights(roomSettings.lights);
       else if (kind === 'light-update') room.updateLight(value, roomSettings.lights[value]);
-      else if (kind === 'light-mode') lightCtl.enabled = value;
+      else if (kind === 'light-mode') {
+        lightCtl.enabled = value;
+        if (!value) exitRoomView();
+      } else if (kind === 'room-exit') exitRoomView();
+      else if (kind === 'light-select') room.setSelectedLight(value);
       else if (kind === 'wall-mode') {
         wallCtl.setEnabled(value);
         room.setWallEditing(value);
@@ -426,9 +433,12 @@ async function boot() {
   // ---- 操作 -----------------------------------------------------------------
   // ライトのハンドルは他の操作より先にイベントを取るため、最初に作る
   const lightCtl = new LightInteraction({
-    sceneMgr, cameraCtl, room,
+    sceneMgr, cameraCtl, room, manager,
     getSettings: () => roomSettings,
     onSelect: (i) => roomPanel.selectLight(i),
+    onChanged: () => roomPanel.render(), // 向き・傾きの表示を合わせる
+    onAdd: (x, z) => roomPanel.addLightAt(x, z),
+    onEnterRoom: (zone) => enterRoomView(zone),
   });
   const wallCtl = new WallInteraction({
     sceneMgr, room, manager, toast,
@@ -575,6 +585,7 @@ async function boot() {
 
   function changeFloor(floor) {
     if (!economy.setFloor(floor)) return;
+    exitRoomView();
     hall.cancelPlacement();
     customizer.deselect();
     manager.setFloor(economy.floor);
@@ -619,7 +630,41 @@ async function boot() {
   let pendingLayout = null; // 初期設定で選んだ間取り
   function resetLights() {
     const c = zoneCenter(getZone('entrance'));
-    roomSettings.lights = [defaultLight(c.x, c.z)];
+    roomSettings.lights = [defaultLight(c.x, c.z, 'entrance')];
+  }
+
+  // ---- 部屋の中から照明を編集する画面：部屋の中央の目の高さから、壁や天井を自由に見渡す ----
+  let roomView = null; // { zone, saved }
+  function enterRoomView(zoneId) {
+    const zone = getZone(zoneId);
+    if (!zone) return;
+    const c = cameraCtl.controls;
+    const cam = sceneMgr.camera;
+    if (!roomView) roomView = { saved: { pos: cam.position.clone(), target: c.target.clone(), min: c.minDistance, max: c.maxDistance, minPolar: c.minPolarAngle, maxPolar: c.maxPolarAngle, pan: c.enablePan, zoom: c.enableZoom, speed: c.rotateSpeed } };
+    roomView.zone = zoneId;
+    const center = zoneCenter(zone);
+    // 注視点のすぐ後ろにカメラを置き、回転で見渡す（距離はほぼ0）
+    const dir = new THREE.Vector3().subVectors(c.target, cam.position).setY(0);
+    if (dir.lengthSq() < 1e-6) dir.set(0, 0, -1);
+    dir.normalize();
+    c.target.set(center.x, 1.6, center.z);
+    cam.position.copy(c.target).addScaledVector(dir, -0.05);
+    Object.assign(c, { minDistance: 0.05, maxDistance: 0.05, minPolarAngle: 0.15, maxPolarAngle: Math.PI - 0.15, enablePan: false, enableZoom: false, rotateSpeed: -0.45 });
+    c.update();
+    room.setFocusZone(zoneId);
+    roomPanel.setFocus(zoneId);
+  }
+  function exitRoomView() {
+    if (!roomView) return;
+    const { saved } = roomView;
+    roomView = null;
+    const c = cameraCtl.controls;
+    Object.assign(c, { minDistance: saved.min, maxDistance: saved.max, minPolarAngle: saved.minPolar, maxPolarAngle: saved.maxPolar, enablePan: saved.pan, enableZoom: saved.zoom, rotateSpeed: saved.speed });
+    c.target.copy(saved.target);
+    sceneMgr.camera.position.copy(saved.pos);
+    c.update();
+    room.setFocusZone(null);
+    roomPanel.setFocus(null);
   }
 
   /** 新しいアカウント：選んだ間取りのエントランスに最初の水槽を置く */
@@ -686,7 +731,8 @@ async function boot() {
     if (!visiting) refundOldShops();
     if (!visiting) home = data.home ?? null;
     roomSettings = { ...defaultRoomSettings(), ...(data.room ?? {}) };
-    roomSettings.lights = roomSettings.lights.map(normalizeLight);
+    // 照明は置いた部屋に属する（以前の、全階共通だった照明は1階のその位置の部屋へ）
+    roomSettings.lights = roomSettings.lights.map(normalizeLight).map((l) => (l.zone ? l : { ...l, zone: zoneAt(0, l.x, l.z)?.id ?? 'entrance' }));
     roomSettings.zoneNames = setZoneNames(roomSettings.zoneNames);
     roomSettings.zoneLook = { ...roomSettings.zoneLook };
     manager.deserialize(data.objects);
