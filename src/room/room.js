@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { FloorPlan, CELL } from './floorPlan.js';
 import { getTexture } from './textures.js';
 import { runTheta } from './embed.js';
-import { STORY_H, ZONES, zoneHas, zoneAt } from '../building/blueprint.js';
+import { ATRIUM_VOID, STORY_H, ZONES, zoneHas, zoneAt } from '../building/blueprint.js';
 
 const DIRT_MARGIN = 1.6;
 const RAIL_H = 1.1;
@@ -31,6 +31,7 @@ function stripeTexture() {
 
 /**
  * 部屋：マス目の床（館内・バックヤード）、外壁・仕切り壁（埋め込み穴あき）、室内ライト、屋外の地面。
+ * 天井と照明器具は、カメラが天井より下にあるときだけ表示する（上から見下ろすときは隠す）。
  */
 export class Room {
   constructor(scene, sceneMgr) {
@@ -76,6 +77,25 @@ export class Room {
     this.outdoorMat = new THREE.MeshStandardMaterial({ color: 0xd3cbb9, roughness: 1 });
     this.shutterMat = new THREE.MeshStandardMaterial({ map: stripeTexture(), color: 0x5a5f64, roughness: 0.8, side: THREE.DoubleSide });
     this.railMat = new THREE.MeshStandardMaterial({ color: 0xbfe3ee, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide });
+    // 天井：下向きの面だけ（上からは見えない）。色はエリアごとに頂点色で持つ
+    // 下向きの面は半球光の地面色（暗い緑）を受けて暗く濁るので、照明に左右されない色で塗る
+    this.ceilingMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    this.fixtureMat = new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.5, metalness: 0.4, side: THREE.DoubleSide });
+    this.ceilingOn = false;
+  }
+
+  /** 天井の高さ(m) */
+  get ceilingHeight() {
+    return this.stage?.wallHeight ?? STORY_H;
+  }
+
+  /** 毎フレーム：カメラが天井より下なら、天井と照明器具を出す */
+  updateCeiling(camY) {
+    const on = camY - this.built.position.y < this.ceilingHeight - 0.05;
+    if (on === this.ceilingOn) return;
+    this.ceilingOn = on;
+    if (this.ceiling) this.ceiling.visible = on;
+    for (const e of this.lights) e.fixture.visible = on;
   }
 
   // ---- 設定 -----------------------------------------------------------------
@@ -87,14 +107,14 @@ export class Room {
   }
 
   /** zoneLook: エリアごとの色 { id: { floor, wall } }（無ければ全体の色） */
-  applyLook({ floor, wall, zoneLook }) {
+  applyLook({ floor, wall, ceiling, zoneLook }) {
     // 塗りつぶし：模様なしのマット調。床の色は頂点色で持つ（エリアごとに変えられる）
     this.floorMat.map = floor.type === 'solid' ? null : getTexture(floor.type);
     this.floorMat.roughness = floor.type === 'solid' ? 1 : 0.85;
     this.floorMat.color.set(0xffffff);
     this.floorMat.vertexColors = true;
     this.floorMat.needsUpdate = true;
-    this.look = { floor: floor.color, wall: wall.color, zones: zoneLook ?? {} };
+    this.look = { floor: floor.color, wall: wall.color, ceiling: ceiling?.color ?? '#f2f1ec', zones: zoneLook ?? {} };
     for (const m of this.zoneWallMats?.values() ?? []) m.dispose();
     this.zoneWallMats = new Map();
     this.wallMat.map = getTexture(wall.type);
@@ -106,10 +126,10 @@ export class Room {
     if (this.plan && this.built.children.length) this.rebuild();
   }
 
-  /** そのマスの床の色 */
-  _floorColor(i, j, floor) {
+  /** そのマスの床（kind = 'ceiling' なら天井）の色 */
+  _floorColor(i, j, floor, kind = 'floor') {
     const zone = ZONES.find((z) => z.floor === floor && zoneHas(z, i, j));
-    return this._c.set((zone && this.look.zones[zone.id]?.floor) || this.look.floor);
+    return this._c.set((zone && this.look.zones[zone.id]?.[kind]) || this.look[kind]);
   }
 
   /** エリアの色を指定した壁は、その色の材質にする（面が向いている側のエリア） */
@@ -160,10 +180,29 @@ export class Room {
       aim.userData = { lightIndex: i, handle: 'aim' };
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({ dashSize: 0.1, gapSize: 0.06 }));
       this.helperGroup.add(bulb, aim, line);
-      const entry = { spot, bulb, aim, line };
+      const fixture = this._fixture();
+      fixture.visible = this.ceilingOn;
+      this.lightGroup.add(fixture);
+      const entry = { spot, bulb, aim, line, fixture };
       this._applyLight(entry, l);
       return entry;
     });
+  }
+
+  /**
+   * 天井から吊るしたペンダントライト：天井の受け皿・吊り棒（長さは scale.y）・下向きの笠・光る面。
+   * 原点が笠の高さ（ライトの高さ）
+   */
+  _fixture() {
+    const g = new THREE.Group();
+    const rose = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.03, 16), this.fixtureMat);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 6).translate(0, 0.5, 0), this.fixtureMat);
+    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.17, 0.16, 20, 1, true).translate(0, 0.02, 0), this.fixtureMat);
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.15, 20).rotateX(Math.PI / 2).translate(0, -0.05, 0), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    g.add(rose, stem, shade, glow);
+    g.userData = { rose, stem, glow };
+    g.traverse((o) => (o.raycast = () => {}));
+    return g;
   }
 
   /** ライト1灯の値だけ更新（ドラッグ中など） */
@@ -171,7 +210,7 @@ export class Room {
     if (this.lights[i]) this._applyLight(this.lights[i], l);
   }
 
-  _applyLight({ spot, bulb, aim, line }, l) {
+  _applyLight({ spot, bulb, aim, line, fixture }, l) {
     spot.color.set(l.color);
     spot.intensity = l.intensity * 3;
     spot.angle = THREE.MathUtils.degToRad(l.angle / 2);
@@ -184,6 +223,14 @@ export class Room {
     line.geometry.setFromPoints([spot.position, aim.position]);
     line.computeLineDistances();
     line.material.color.set(l.color);
+    // 照明器具：笠はライトの高さ、吊り棒は天井まで
+    const H = this.ceilingHeight;
+    fixture.position.set(l.x, Math.min(l.height, H - 0.1), l.z);
+    const { rose, stem, glow } = fixture.userData;
+    stem.position.y = 0.1;
+    stem.scale.y = Math.max(0.01, H - fixture.position.y - 0.1);
+    rose.position.y = H - fixture.position.y - 0.015;
+    glow.material.color.set(l.color);
   }
 
   /** ドラッグ可能なハンドル（レイキャスト対象） */
@@ -228,7 +275,8 @@ export class Room {
 
   /** カメラの距離に応じて展示室の壁の高さを変える */
   updateCut(distance, dt) {
-    const target = this.editingWalls ? 0.5 : distance > 11 ? 1.25 : 3.7;
+    // 天井の下から見ているときは、壁を天井まで出す
+    const target = this.editingWalls ? 0.5 : this.ceilingOn || distance <= 11 ? 3.7 : 1.25;
     this.cutPlane.constant += (target - this.cutPlane.constant) * Math.min(1, dt * 6);
   }
 
@@ -266,6 +314,9 @@ export class Room {
         for (const h of hs) this.built.add(this._alcove(run, h));
       }
     }
+    this.ceiling = this._ceilingMesh(plan);
+    this.ceiling.visible = this.ceilingOn;
+    this.built.add(this.ceiling);
     const b = plan.bounds();
     this.built.add(this._dirtMesh(b));
     this.sceneMgr.fitShadow(b.cx, b.cz, Math.max(b.w, b.d) / 2 + DIRT_MARGIN);
@@ -295,6 +346,36 @@ export class Room {
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, material);
     m.receiveShadow = true;
+    return m;
+  }
+
+  /** 天井：館内とバックヤードのマスの上（1階の吹き抜けの下は2階まで抜けているので張らない） */
+  _ceilingMesh(plan) {
+    const pos = [];
+    const col = [];
+    const c = plan.cell;
+    const H = this.ceilingHeight;
+    const voidRect = plan.floor === 0 && ATRIUM_VOID ? ATRIUM_VOID.rect : null;
+    this._c ??= new THREE.Color();
+    for (let j = 0; j < plan.GZ; j++) for (let i = 0; i < plan.GX; i++) {
+      const t = plan.at(i, j);
+      if (t !== CELL.FLOOR && t !== CELL.YARD) continue;
+      if (voidRect && i >= voidRect[0] && i <= voidRect[2] && j >= voidRect[1] && j <= voidRect[3]) continue;
+      const [x, z] = plan.cellMin(i, j);
+      const k = this._floorColor(i, j, plan.floor, 'ceiling');
+      // 下向きの面になる頂点の順
+      for (const [qx, qz] of [[x, z], [x + c, z], [x, z + c], [x + c, z], [x + c, z + c], [x, z + c]]) {
+        pos.push(qx, H, qz);
+        col.push(k.r, k.g, k.b);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, this.ceilingMat);
+    m.receiveShadow = true;
+    m.raycast = () => {};
     return m;
   }
 
