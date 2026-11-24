@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CELL } from '../room/floorPlan.js';
+import { ZONES, ZONE_TYPE } from '../building/blueprint.js';
 
 /** 指で掴みやすいよう、ハンドルの近く（画面上の距離）を押しても掴めるようにする */
 const GRAB_PX = 44;
@@ -8,15 +9,16 @@ const TAP_MS = 450;
 
 /**
  * 室内ライトの操作（部屋 > 照明 を開いている間だけ有効）。
- * - 床（館内・バックヤード）をタップ → その場所に照明を追加（真下を照らす）
+ * - 部屋の外から部屋をタップ → その部屋の中に入って照明を編集する（onEnterRoom）
+ * - 部屋の中で床か天井をタップ → その場所に照明を追加（真下を照らす）
  * - 床のリング、または電球をドラッグ → 照明を移動（照らす向きはそのまま）
  * - リングの中央の ● をドラッグ → 照らす場所（向き）を変える
  * ハンドルは画面上で少し離れた所を押しても掴める。掴んだ位置からずらすので、押した瞬間に飛ばない。
  * ハンドルを掴んだときは他の操作（オブジェ選択・カメラ）にイベントを渡さない。
  */
 export class LightInteraction {
-  constructor({ sceneMgr, cameraCtl, room, manager, getSettings, onSelect, onChanged, onAdd }) {
-    Object.assign(this, { sceneMgr, cameraCtl, room, manager, getSettings, onSelect, onChanged, onAdd });
+  constructor({ sceneMgr, cameraCtl, room, manager, getSettings, onSelect, onChanged, onAdd, onEnterRoom }) {
+    Object.assign(this, { sceneMgr, cameraCtl, room, manager, getSettings, onSelect, onChanged, onAdd, onEnterRoom });
     this.enabled = false;
     this.dom = sceneMgr.renderer.domElement;
     this.raycaster = new THREE.Raycaster();
@@ -40,6 +42,16 @@ export class LightInteraction {
   _onPlane(y) {
     this.plane.constant = -y;
     return this.raycaster.ray.intersectPlane(this.plane, new THREE.Vector3());
+  }
+
+  /** そのマスの部屋（館内・バックヤードのエリア）の id */
+  _zoneAt(x, z) {
+    const plan = this.room.plan;
+    const [i, j] = plan.cellOf(x, z);
+    const t = plan.at(i, j);
+    if (t !== CELL.FLOOR && t !== CELL.YARD) return null;
+    const zone = ZONES[plan.zoneIds[plan.idx(i, j)]];
+    return zone && zone.type !== ZONE_TYPE.OUTDOOR ? zone.id : null;
   }
 
   /** 指の下のハンドル。直接当たらなければ、画面上で一番近いハンドル（GRAB_PX 以内） */
@@ -94,9 +106,9 @@ export class LightInteraction {
     this._ray(e);
     const p = this._onPlane(this.drag.y);
     if (!p) return;
-    const b = this.room.plan.bounds();
-    const x = THREE.MathUtils.clamp(p.x + this.drag.dx, b.x0, b.x1);
-    const z = THREE.MathUtils.clamp(p.z + this.drag.dz, b.z0, b.z1);
+    const x = p.x + this.drag.dx;
+    const z = p.z + this.drag.dz;
+    if (this._zoneAt(x, z) !== l.zone) return; // 照明は置いた部屋の中だけ
     if (this.drag.handle === 'aim') {
       l.tx = x;
       l.tz = z;
@@ -123,10 +135,24 @@ export class LightInteraction {
     if (!this.enabled || !tap || performance.now() - tap.t > TAP_MS || Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > TAP_PX) return;
     if (e.target !== this.dom) return;
     this._ray(e);
+    const focus = this.room.focusZone;
+    if (!focus) {
+      // 部屋の外：タップした部屋の中に入る
+      const p = this._onPlane(0);
+      const zone = p && this._zoneAt(p.x, p.z);
+      if (zone) this.onEnterRoom?.(zone);
+      return;
+    }
     // 水槽やオブジェをタップしたときは追加しない
     if (this.raycaster.intersectObjects(this.manager.getPickables(), true).length) return;
-    const p = this._onPlane(0);
-    const t = p && this.room.plan.typeAt(p.x, p.z);
-    if (t === CELL.FLOOR || t === CELL.YARD) this.onAdd?.(p.x, p.z);
+    // 部屋の中：視線が先に当たる床か天井の位置に追加
+    const ray = this.raycaster.ray;
+    const hits = [0, this.room.ceilingHeight]
+      .map((y) => (Math.abs(ray.direction.y) > 1e-4 ? (y - ray.origin.y) / ray.direction.y : -1))
+      .filter((t) => t > 0)
+      .sort((a, b) => a - b);
+    if (!hits.length) return;
+    const p = ray.at(hits[0], new THREE.Vector3());
+    if (this._zoneAt(p.x, p.z) === focus) this.onAdd?.(p.x, p.z);
   };
 }

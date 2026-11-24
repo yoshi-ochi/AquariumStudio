@@ -1,4 +1,5 @@
-import { FLOOR_TYPES, WALL_TYPES, MAX_LIGHTS, defaultLight } from '../room/roomData.js';
+import { FLOOR_TYPES, WALL_TYPES, defaultLight } from '../room/roomData.js';
+import { getZone, zoneCenter } from '../building/blueprint.js';
 
 /** 壁を自由に編集できるレベル */
 export const WALL_EDIT_LEVEL = 4;
@@ -14,6 +15,7 @@ export class RoomPanel {
     this.brush = 'add';
     this.section = 'floor';
     this.lightIndex = 0;
+    this.zone = null; // 照明を編集中の部屋（部屋の中から見ているとき）
 
     el.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-act]');
@@ -63,11 +65,25 @@ export class RoomPanel {
     this.render();
   }
 
-  /** 床のタップで照明を追加する（上限なら false） */
+  /** 照明を編集する部屋（null で部屋の外） */
+  setFocus(zone) {
+    this.zone = zone;
+    const own = this._zoneLights();
+    if (!own.includes(this.lightIndex)) this.lightIndex = own[0] ?? -1;
+    this.onChange('light-select', this.lightIndex);
+    this.render();
+  }
+
+  /** 編集中の部屋の照明（全照明での番号） */
+  _zoneLights() {
+    return this.getSettings().lights.map((l, i) => (l.zone === this.zone ? i : -1)).filter((i) => i >= 0);
+  }
+
+  /** 部屋の床・天井のタップで照明を追加する */
   addLightAt(x, z) {
+    if (!this.zone) return false;
     const s = this.getSettings();
-    if (s.lights.length >= MAX_LIGHTS) return false;
-    s.lights.push(defaultLight(x, z));
+    s.lights.push(defaultLight(x, z, this.zone));
     this.lightIndex = s.lights.length - 1;
     this.onChange('lights');
     this.onChange('light-select', this.lightIndex);
@@ -98,19 +114,21 @@ export class RoomPanel {
   }
 
   _lightSection(lights) {
-    this.lightIndex = Math.min(this.lightIndex, lights.length - 1);
-    const l = lights[this.lightIndex];
-    const chips = lights
-      .map((_, i) => `<button data-act="light-pick" data-v="${i}" class="${i === this.lightIndex ? 'active' : ''}">💡${i + 1}</button>`)
-      .join('');
+    if (!this.zone) {
+      return '<p class="note">照明を編集する部屋をタップしてください。部屋の中から壁や天井を見渡して、照明を追加・調整できます。照明はその部屋の中だけを照らします（数の上限はありません）。</p>';
+    }
+    const own = this._zoneLights();
+    const l = own.includes(this.lightIndex) ? lights[this.lightIndex] : null;
+    const chips = own.map((i, k) => `<button data-act="light-pick" data-v="${i}" class="${i === this.lightIndex ? 'active' : ''}">💡${k + 1}</button>`).join('');
+    const head = `<div class="row"><b>${getZone(this.zone)?.name ?? ''} の照明</b><button data-act="room-exit">部屋から出る</button></div>`;
     const range = (name, label, min, max, step, value, unit) =>
       `<label class="slider">${label}<input type="range" data-field="light-${name}" min="${min}" max="${max}" step="${step}" value="${value}"><output>${value}${unit}</output></label>`;
-    return `
+    return `${head}
       <div class="seg">${chips}
-        <button data-act="light-add" data-repeat ${lights.length >= MAX_LIGHTS ? 'disabled' : ''}>＋</button>
-        <button data-act="light-remove" class="danger" ${lights.length <= 1 ? 'disabled' : ''}>削除</button></div>
+        <button data-act="light-add" data-repeat>＋</button>
+        <button data-act="light-remove" class="danger" ${l ? '' : 'disabled'}>削除</button></div>
+      <p class="note">ドラッグで見渡し、床や天井をタップするとその場所に照明を追加できます。リング（または電球）をドラッグで移動、白い ● をドラッグで照らす場所を変えられます。</p>
       ${l ? `
-      <p class="note">床をタップするとその場所に照明を追加できます。リング（または電球）をドラッグで移動、白い ● をドラッグで照らす場所を変えられます。</p>
       ${range('height', '高さ', 0.5, 5, 0.05, l.height, 'm')}
       ${range('yaw', '向き', 0, 355, 5, this._aim(l).yaw, '°')}
       ${range('tilt', '傾き', 0, 70, 1, this._aim(l).tilt, '°')}
@@ -147,13 +165,14 @@ export class RoomPanel {
       this.onChange('light-update', this.lightIndex);
       return this.render();
     }
-    else if (act === 'light-add' && s.lights.length < MAX_LIGHTS) {
-      const b = this.getPlan().bounds();
-      s.lights.push(defaultLight(b.cx, b.cz));
+    else if (act === 'room-exit') return this.onChange('room-exit');
+    else if (act === 'light-add' && this.zone) {
+      const c = zoneCenter(getZone(this.zone));
+      s.lights.push(defaultLight(c.x, c.z, this.zone));
       this.lightIndex = s.lights.length - 1;
-    } else if (act === 'light-remove' && s.lights.length > 1) {
+    } else if (act === 'light-remove' && s.lights[this.lightIndex]?.zone === this.zone) {
       s.lights.splice(this.lightIndex, 1);
-      this.lightIndex = 0;
+      this.lightIndex = this._zoneLights()[0] ?? -1;
     } else if (act === 'light-preset') {
       s.lights[this.lightIndex].color = v;
       this.onChange('light-update', this.lightIndex);
