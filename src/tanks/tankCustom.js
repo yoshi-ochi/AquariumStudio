@@ -18,6 +18,7 @@ export function format(fmt, v) {
   if (fmt === 'cm') return `${Math.round(v * 100)} cm`;
   if (fmt === 'm') return `${v.toFixed(2)} m`;
   if (fmt === '%') return `${Math.round(v * 100)}%`;
+  if (fmt === 'lv') return `${Math.round(v / 0.2)} / 20`; // 水槽ライトの光量の段階
   return `${v}`;
 }
 
@@ -152,7 +153,7 @@ export class TankCustomizer {
     return `<div class="section"><h4>底砂</h4>
       <div class="seg"><button data-action="look-sand-on" class="${s.on ? 'active' : ''}">砂あり</button><button data-action="look-sand-off" class="${s.on ? '' : 'active'}">砂なし</button></div>
       ${s.on ? `<div class="seg wrap">${types}</div>${slider('sand-depth', '厚さ', 0.005, maxD, 0.005, Math.min(depth, maxD), 'cm')}` : '<p class="note">底面の色は「バックスクリーン・底面」の「底面」で選べます。</p>'}
-      <div class="seg"><button data-action="look-caustics" class="${look.caustics ? 'active' : ''}">🌊 底のゆらめく光 ${look.caustics ? 'ON' : 'OFF'}</button></div>
+      <div class="seg"><button data-action="look-caustics" class="${look.caustics ? 'active' : ''}">🌊 底のゆらめく光 ${look.caustics ? 'ON' : 'OFF'}</button></div>${look.caustics && !look.light.on ? '<small class="note">水紋は水槽ライトを付けているときに映ります</small>' : ''}
       </div>`;
   }
 
@@ -197,7 +198,7 @@ export class TankCustomizer {
       ${look.light.on ? `
       <div class="look-row"><span>ライト色</span><input type="color" data-look="lightColor" value="${look.light.color}">
         <button data-action="look-lightpreset-#e8f4ff">白</button><button data-action="look-lightpreset-#7fb4ff">青</button><button data-action="look-lightpreset-#ffe2b0">暖色</button></div>
-      ${slider('tanklight-intensity', '明るさ', 0.2, 4, 0.1, look.light.intensity, '')}` : ''}</div>`;
+      ${slider('tanklight-intensity', '光量', 0.2, 4, 0.2, look.light.intensity, 'lv')}<small class="note">光量が強いほど水紋が深くまで届く（n段階で水深 n m までほぼ届く）</small>` : ''}</div>`;
   }
 
   _embedSection(obj) {
