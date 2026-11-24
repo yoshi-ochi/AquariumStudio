@@ -69,8 +69,12 @@ export class FloorPlan {
     const SERVICE = 100;
     const yard = this.floor === 0 ? 'yard1' : 'yard2';
     for (const rect of LAYOUT.serviceLinks) {
-      this._fill(rect, unlocked.has(yard) ? CELL.YARD : CELL.LOCKED);
-      for (let j = rect[1]; j <= rect[3]; j++) for (let i = rect[0]; i <= rect[2]; i++) this.zoneIds[this.idx(i, j)] = SERVICE;
+      for (let j = rect[1]; j <= rect[3]; j++) for (let i = rect[0]; i <= rect[2]; i++) {
+        const k = this.idx(i, j);
+        if (ZONES[this.zoneIds[k]]?.auto && unlocked.has(ZONES[this.zoneIds[k]].id)) continue; // バックヤードを抜ける来館者用の通路は残す
+        this.active[k] = unlocked.has(yard) ? CELL.YARD : CELL.LOCKED;
+        this.zoneIds[k] = SERVICE;
+      }
     }
     ZONES.forEach((zone, n) => {
       if (zone.floor !== this.floor || !EXHIBIT_ZONES.includes(zone.id) || !unlocked.has(zone.id)) return;

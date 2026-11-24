@@ -4,14 +4,13 @@ import { getCreature } from '../expedition/creatureData.js';
 import { appealOf, sizeOf, speciesPieces } from '../expedition/growth.js';
 import { disposeObject } from '../tanks/tankBuilder.js';
 import { buildStadium, buildBackdrop } from './stadium.js';
-import { CELL_SIZE, GRID_X, GRID_Z0, POOL_SEAT_REACH, STORY_H, getZone } from './blueprint.js';
+import { CELL_SIZE, GRID_X, GRID_Z0, LAYOUT, POOL_SEAT, STORY_H, getZone } from './blueprint.js';
 
 /**
  * 屋外イルカプール：楕円のプールと、2階建ての高さまで段になった半円形の観客席。
  * 水槽と同じく、在庫の生き物を入れて展示する（はじめは空）。creatures = { id: 匹数 }
  */
-const SEAT_REACH = POOL_SEAT_REACH;
-const TIERS = 12;
+const TIERS = POOL_SEAT.tiers;
 const SEAT_TOP = STORY_H * 2;
 /** 収容枠（水面 約18m×9.6m の楕円 ≒ 135m²） */
 export const POOL_SLOTS = 130;
@@ -157,14 +156,51 @@ export class DolphinPool extends EventTarget {
 
   /** 客席は南（建物側）へ向かって高くなる */
   _buildSeats() {
-    this.group.add(buildStadium({ tiers: TIERS, seatTop: SEAT_TOP, r0: 5.7, step: 0.45, xScale: 1.55 }));
+    this.group.add(buildStadium({ tiers: TIERS, seatTop: SEAT_TOP, r0: POOL_SEAT.r0, step: POOL_SEAT.step, xScale: POOL_SEAT.xScale }));
+    // 外観だけで出す建物：客席の裏の2階建てのスタジアム通路と、プールの脇から別館へ向かう回廊（館内は各階の表示で見せる）
+    this.shell = new THREE.Group();
+    this.shell.visible = false;
+    this.group.add(this.shell);
+  }
+
+  /** 外観の表示のときだけ、通路と回廊の外壁・屋根を出す */
+  setExterior(on) {
+    this.shell.visible = on;
+  }
+
+  _buildShell() {
+    disposeObject(this.shell);
+    this.shell.clear();
+    const glass = new THREE.MeshStandardMaterial({ color: 0xa8dcea, metalness: 0.25, roughness: 0.08, transparent: true, opacity: 0.85 });
+    const white = new THREE.MeshStandardMaterial({ color: 0xf4f6f6, roughness: 0.45 });
+    const { x: ox, z: oz } = LAYOUT.poolCenter;
+    const cell = (x0, z0, x1, z1) => ({ w: (x1 - x0 + 1) * CELL_SIZE, d: (z1 - z0 + 1) * CELL_SIZE, cx: ((x0 + x1 + 1) / 2 - GRID_X / 2) * CELL_SIZE - ox, cz: ((z0 + z1 + 1) / 2 - GRID_Z0) * CELL_SIZE - oz });
+    const add = (rect, h) => {
+      const { w, d, cx, cz } = cell(...rect);
+      const g = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), glass);
+      g.position.set(cx, h / 2, cz);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.3, d + 0.3), white);
+      roof.position.set(cx, h + 0.15, cz);
+      this.shell.add(g, roof);
+    };
+    const [stand] = getZone('stand1').rects;
+    add(stand, SEAT_TOP);
+    const band = cell(...stand);
+    const mid = new THREE.Mesh(new THREE.BoxGeometry(band.w + 0.05, 0.4, band.d + 0.05), white);
+    mid.position.set(band.cx, STORY_H, band.cz);
+    this.shell.add(mid);
+    for (const r of LAYOUT.corridorLegs) add(r, 3);
   }
 
 
-  /** 間取りのプール区画に合わせて置き直す（客席の背が建物側に接する） */
+  /** 間取りに合わせて置き直す（客席の背がスタジアム通路に接する） */
   setLayout() {
-    const [x0, , x1, z1] = getZone('pool').rects[0];
-    this.group.position.set(((x0 + x1 + 1) / 2 - GRID_X / 2) * CELL_SIZE, 0, (z1 + 1 - GRID_Z0) * CELL_SIZE - SEAT_REACH);
+    const { x, z } = LAYOUT.poolCenter;
+    this.group.position.set(x, 0, z);
+    if (this._shellKey !== LAYOUT.id) {
+      this._shellKey = LAYOUT.id;
+      this._buildShell();
+    }
   }
 
   setUnlocked(v) {

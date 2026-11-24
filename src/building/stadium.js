@@ -29,14 +29,15 @@ export function buildStadium({ tiers = 12, seatTop = 7.2, r0 = 5.7, step = 0.45,
     outline.push(new THREE.Vector2(r, k * rise), new THREE.Vector2(r, (k + 1) * rise));
   }
   const rMax = r0 + tiers * step;
-  outline.push(new THREE.Vector2(rMax + 1.2, seatTop), new THREE.Vector2(rMax + 1.2, 0));
+  // 最上段の通路まで。背面は壁にせず、段床の下は回廊（1階分の高さがとれる所）として使う
+  outline.push(new THREE.Vector2(rMax + 1.2, seatTop));
   const steps = new THREE.Mesh(new THREE.LatheGeometry(outline, 64, -Math.PI / 2, Math.PI), M.concrete);
   steps.scale.x = xScale;
   steps.receiveShadow = true;
   g.add(steps);
 
-  // 通路（客席を5ブロックに分ける階段）の角度
-  const AISLES = [-0.6, -0.2, 0.2, 0.6].map((k) => k * Math.PI);
+  // 通路（半円の客席を5ブロックに分ける階段）の角度。客席は -π/2〜π/2 の範囲
+  const AISLES = [-0.3, -0.1, 0.1, 0.3].map((k) => k * Math.PI);
   const nearAisle = (phi, r) => AISLES.some((a) => Math.abs(phi - a) * r * 1.2 < 0.45);
   // 椅子：座面と背もたれを1つの形にして、まとめて並べる
   const seatGeo = mergeGeometries([new THREE.BoxGeometry(0.42, 0.06, 0.38).translate(0, 0.42, 0), new THREE.BoxGeometry(0.42, 0.4, 0.06).translate(0, 0.62, 0.18), new THREE.BoxGeometry(0.06, 0.4, 0.06).translate(0, 0.2, 0)]);
@@ -91,13 +92,13 @@ export function buildStadium({ tiers = 12, seatTop = 7.2, r0 = 5.7, step = 0.45,
 
   // 膜屋根：客席の上半分を覆い、背面の柱で支える（ステージ側へ少し下がる）
   const roofR0 = r0 + tiers * step * 0.45;
-  const roofPts = [new THREE.Vector2(roofR0, seatTop + 3.2), new THREE.Vector2(rMax + 1.4, seatTop + 4.2)];
+  const roofPts = [new THREE.Vector2(roofR0, seatTop + 3.2), new THREE.Vector2(rMax + 1.2, seatTop + 4.2)];
   const roof = new THREE.Mesh(new THREE.LatheGeometry(roofPts, 48, -Math.PI / 2, Math.PI), M.roof);
   roof.scale.x = xScale;
   g.add(roof);
   const cols = [];
   for (let i = 0; i <= 8; i++) {
-    const p = at(rMax + 1.3, -Math.PI / 2 + (i / 8) * Math.PI, 0);
+    const p = at(rMax + 1.0, -Math.PI / 2 + (i / 8) * Math.PI, 0);
     cols.push(new THREE.CylinderGeometry(0.16, 0.2, seatTop + 4.2, 8).translate(p.x, (seatTop + 4.2) / 2, p.z));
   }
   g.add(new THREE.Mesh(mergeGeometries(cols), M.steel));
