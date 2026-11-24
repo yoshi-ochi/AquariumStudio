@@ -25,6 +25,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # 魚種の公開日の記録漏れを警告（公開は止めない。記録は npm run species:release）
+      - run: node tools/species-release.mjs --check || echo "::warning::公開日が未記録の魚種があります（npm run species:release）"
       # オンライン機能（Supabase）。公開キーなので Actions の Variables に置く。未設定ならオフラインのみ
       - run: npm run build
         env:

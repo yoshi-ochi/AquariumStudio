@@ -35,6 +35,7 @@ import { Online } from './online/online.js';
 import { AutoSave } from './online/autoSave.js';
 import { FriendPanel } from './ui/friendPanel.js';
 import { runLoginGate } from './ui/loginGate.js';
+import { showNewSpecies } from './ui/newSpecies.js';
 import { Hud } from './ui/hud.js';
 import { BottomNav } from './ui/bottomNav.js';
 import { GameSheet } from './ui/gameSheet.js';
@@ -1431,6 +1432,8 @@ async function boot() {
   }
   await splash.hide();
   splashDone = true;
+  // 前回から追加された魚種・採取地を知らせる（他人の水族館を見ているときは出さない）
+  if (!visiting) showNewSpecies({ previews, uid: online.user?.id, onOpenMap: () => mapPage.open() }).catch((err) => console.warn(err));
 }
 
 boot().catch((err) => {

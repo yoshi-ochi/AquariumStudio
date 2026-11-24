@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getCreature } from '../expedition/creatureData.js';
+import { behaviorOf } from '../expedition/behaviorData.js';
 import { buildCreature } from '../expedition/creatureBuilder.js';
 import { sizeOf, speciesPieces } from '../expedition/growth.js';
 import { disposeObject } from '../tanks/tankBuilder.js';
@@ -178,7 +179,7 @@ export class SeaPenScene {
         const ax = Math.max(0.5, (w / 2 - len / 2 - 1) * (0.45 + rand() * 0.5));
         const az = Math.max(0.5, (d / 2 - len / 2 - 1) * (0.45 + rand() * 0.5));
         const depth = Math.min(PEN.depth / 2, Math.max(0.6, len * 0.3));
-        f.userData.swim = { cx: mx, cz: mz, ax, az, cy: WATER_Y - 0.4 - depth / 2 - rand() * 2, speed: (0.6 + rand() * 0.6) / Math.max(ax, az), p: rand() * Math.PI * 2, dir: rand() < 0.5 ? -1 : 1, tempo: 0.6 + rand() * 0.6 };
+        f.userData.swim = { cx: mx, cz: mz, ax, az, cy: WATER_Y - 0.4 - depth / 2 - rand() * 2, speed: (Math.min(3, Math.max(0.15, behaviorOf(c).cruise * len)) * (0.8 + rand() * 0.4)) / Math.max(ax, az), p: rand() * Math.PI * 2, dir: rand() < 0.5 ? -1 : 1, tempo: 0.6 + rand() * 0.6 };
         g.add(f);
         this.fish.push(f);
       }

@@ -42,6 +42,11 @@ const FORM_STYLE = {
 const ID_STYLE = {
   // マグロ型（高速の外洋魚）
   katsuo: 'thu', kuromaguro: 'thu', bashou: 'thu', shiira: 'thu',
+  atlbluefin: 'thu', rouninaji: 'thu',
+  // 背びれ・尻びれで進む（ヘラヤガラ）、胸びれで漕ぐ（ニシキテグリ・スズメダイの仲間）
+  herayagara: 'bal', nishikiteguri: 'lab', garibaldi: 'lab', hanagoi: 'lab',
+  // デンキウナギは体をまっすぐ保ち、長い尻びれの波で前後に進む
+  denkiunagi: 'amii',
   // モンガラカワハギ型（背びれと尻びれで進む）
   kawahagi: 'bal', umazura: 'bal', mongara: 'bal', murasame: 'bal', gomamongara: 'bal',
   // ハコフグ・フグ型
