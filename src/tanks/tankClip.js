@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { addCaustics } from './caustics.js';
 
 /**
  * 水槽内オブジェの側面クリッピング。
  * フラグメントのワールド座標を水槽のローカル座標に戻し、
  * 円形水槽なら半径の外、箱型なら XZ の範囲外を discard する。Y（上方向）は制限しない。
+ * 水槽の水紋（caustics.js）も、ここで一緒に組み込む（水槽ごとの uCauOn で ON/OFF）。
  */
 
 /** 水槽ごとに1つ作る共有 uniform */
@@ -13,6 +15,7 @@ export function createClipUniforms(interior) {
     uClipShape: { value: interior.shape === 'cylinder' ? 1 : 0 },
     uClipHalf: { value: new THREE.Vector3(interior.halfW, interior.halfD, interior.radius ?? 0) },
     uTunnel: { value: new THREE.Vector2(interior.tunnel?.r ?? 0, interior.tunnel?.straightH ?? 0) },
+    uCauOn: { value: 1 }, // 水紋を映すか（水槽の見た目の「底のゆらめく光」）
   };
 }
 
@@ -77,8 +80,9 @@ function clipMaterial(material, uniforms) {
       .replace('#include <common>', FRAG_DECL)
       .replace('#include <clipping_planes_fragment>', FRAG_BODY)
       .replace('#include <normal_fragment_maps>', FRAG_CAP);
+    addCaustics(shader, uniforms.uCauOn, 'vClipWorld');
   };
-  m.customProgramCacheKey = () => 'tank-clip';
+  m.customProgramCacheKey = () => 'tank-clip-cau';
   m.needsUpdate = true;
   return m;
 }

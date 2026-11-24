@@ -1355,7 +1355,7 @@ async function boot() {
     manager.updateClips();
     manager.updateAeration(clock.elapsedTime);
     manager.updateLife(clock.elapsedTime);
-    updateCaustics(clock.elapsedTime);
+    updateCaustics(clock.elapsedTime, sceneMgr.renderer);
     penScene.update(clock.elapsedTime);
     pool.update(clock.elapsedTime);
     scenery.update(clock.elapsedTime);
