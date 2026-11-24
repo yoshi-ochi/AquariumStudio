@@ -29,7 +29,16 @@ export class InteriorCamera {
       maxDistance: c.maxDistance,
       enablePan: c.enablePan,
       screenSpacePanning: c.screenSpacePanning,
+      // 真上から見た部屋の編集（回転なし・1本指で移動）から入ったときのため、回転の設定も保存して水槽内では回せるようにする
+      enableRotate: c.enableRotate,
+      minPolarAngle: c.minPolarAngle,
+      maxPolarAngle: c.maxPolarAngle,
+      touches: { ...c.touches },
+      mouseButtons: { ...c.mouseButtons },
     };
+    Object.assign(c, { enableRotate: true, minPolarAngle: 0, maxPolarAngle: Math.PI / 2 - 0.03 });
+    c.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
     // 水槽本体（中身を除く）のバウンディング球
     const box = new THREE.Box3().setFromObject(tank.getObjectByName('body'));
@@ -57,6 +66,7 @@ export class InteriorCamera {
     this.saved = null;
     this.controls.enablePan = s.enablePan;
     this.controls.screenSpacePanning = s.screenSpacePanning;
+    Object.assign(this.controls, { enableRotate: s.enableRotate, minPolarAngle: s.minPolarAngle, maxPolarAngle: s.maxPolarAngle, touches: s.touches, mouseButtons: s.mouseButtons });
     this.panBox = null;
     this._tweenTo(s.pos, s.target, { minDistance: s.minDistance, maxDistance: s.maxDistance });
   }

@@ -9,7 +9,7 @@ import { Inventory } from './management/inventory.js';
 import { HALL_DEFS, INTERIOR_DEFS, ALL_DEFS, CATEGORY, getDef } from './tanks/tankData.js';
 import { buildObject, disposeObject } from './tanks/tankBuilder.js';
 import { TankManager } from './tanks/tankManager.js';
-import { TankCustomizer } from './tanks/tankCustom.js';
+import { TankCustomizer, format as formatParam } from './tanks/tankCustom.js';
 import { HallInteraction } from './interaction/hallInteraction.js';
 import { InteriorInteraction } from './interaction/interiorInteraction.js';
 import { ViewInteraction } from './interaction/viewInteraction.js';
@@ -326,6 +326,7 @@ async function boot() {
       if (action === 'param-embed-ratio') return hall.setEmbedParam(obj, 'ratio', value);
       if (action === 'param-embed-bottom') return hall.setEmbedParam(obj, 'bottom', value);
       if (action === 'embed') return hall.embed(obj);
+      if (action === 'tank-edit') return openTankSheet(obj, 'manage');
       if (action === 'param-bubbles') return (obj.userData.bubbles = value);
       if (action.startsWith('look-') || action === 'param-tanklight-intensity' || action === 'param-side-alpha' || action === 'param-sand-depth') return changeTankLook(obj, action, value);
       if (action === 'unembed') return hall.unembed(obj);
@@ -380,7 +381,10 @@ async function boot() {
       manager.setTankLook(tank, { light: { intensity: value } });
       rerender = false;
     }
-    if (rerender) customizer.renderPanel();
+    if (rerender) {
+      customizer.renderPanel();
+      if (gameSheet.view === 'tank') gameSheet.render();
+    }
   }
 
   const roomPanel = new RoomPanel({
@@ -541,11 +545,33 @@ async function boot() {
   }
 
   /** 水槽の管理シート（名前・展示生物・エサ・掃除） */
-  function openTankSheet(tank) {
+  function openTankSheet(tank, tab = 'manage') {
     if (visiting) return;
     friendPanel.close();
-    tankView.open(tank);
+    tankView.open(tank, tab);
     gameSheet.openPanel('tank');
+  }
+
+  // 水槽の編集シートの「見た目」タブ：ボタン・スライダー・色は館内レイアウトの詳細パネルと同じ処理へ
+  {
+    const sheet = $('game-sheet');
+    const target = () => (gameSheet.view === 'tank' && tankView.tank && manager.objects.has(tankView.tank.userData.uid) ? tankView.tank : null);
+    sheet.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-action]');
+      const t = target();
+      if (b && t) customizer.onAction(b.dataset.action, t);
+    });
+    sheet.addEventListener('input', (e) => {
+      const t = target();
+      if (!t) return;
+      const look = e.target.closest('input[data-look]');
+      if (look) return customizer.onAction(`look-color-${look.dataset.look}`, t, look.value);
+      const p = e.target.closest('input[data-param]');
+      if (!p) return;
+      customizer.onAction(`param-${p.dataset.param}`, t, Number(p.value));
+      const out = p.parentElement.querySelector('output');
+      if (out) out.textContent = formatParam(p.dataset.fmt, p.value);
+    });
   }
 
   function enterHallEdit() {
@@ -1074,7 +1100,9 @@ async function boot() {
   const tankView = new TankView({
     manager, expeditions, economy, previews, toast, cleanView,
     careView: life.panels.care.view,
-    onInterior: (tank) => enterInteriorEdit(tank, 'tank'),
+    // 館内レイアウト編集から開いたときは、水槽内の編集を終えたら館内レイアウト編集へ戻る
+    onInterior: (tank) => enterInteriorEdit(tank, mode === 'hall-edit' ? 'hall' : 'tank'),
+    lookHtml: (tank) => customizer.lookHtml(tank),
     onGrow: (id) => {
       life.panels.zukan.view.focus(id); // 図鑑の育成カードを開く
       gameSheet.openPanel('zukan');

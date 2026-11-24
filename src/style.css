@@ -692,3 +692,9 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 /* ホームの部屋のプレビューを終わるボタン・レイアウト編集で部屋を選び直すボタン */
 #preview-exit, #room-back { position: fixed; z-index: 55; left: 50%; top: 104px; transform: translateX(-50%); max-width: calc(100vw - 32px); min-height: 36px; padding: 0 16px; border: 1px solid var(--bar-line); border-radius: 18px; color: #fff; font-weight: 700; background: rgba(15, 53, 80, .92); }
 #preview-exit[hidden], #room-back[hidden] { display: none; }
+
+/* 水槽の編集シートのタブと見た目の設定 */
+.tv-tabs { margin: 2px 0 10px; }
+.tv-tabs button.active { color: #0f3550; background: var(--aqua); }
+.tv-look .section { margin-bottom: 12px; }
+.tv-look h4 { margin: 8px 0 6px; font-size: 13px; }

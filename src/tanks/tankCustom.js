@@ -13,7 +13,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 function slider(name, label, min, max, step, value, fmt) {
   return `<label class="slider">${label}<input type="range" data-param="${name}" data-fmt="${fmt}" min="${min}" max="${max}" step="${step}" value="${value}"><output>${format(fmt, value)}</output></label>`;
 }
-function format(fmt, v) {
+export function format(fmt, v) {
   v = Number(v);
   if (fmt === 'cm') return `${Math.round(v * 100)} cm`;
   if (fmt === 'm') return `${v.toFixed(2)} m`;
@@ -132,11 +132,10 @@ export class TankCustomizer {
         ${obj.userData.interiorItem ? `<button data-action="lock">${obj.userData.locked ? '🔒 ロック解除' : '🔓 ロック'}</button>` : ''}
         <button data-action="rotate-left">⟲ 回転</button>
         <button data-action="rotate-right">⟳ 回転</button>
-        ${isTank ? '<button data-action="interior">✎ 水槽内</button>' : ''}
+        ${isTank ? '<button data-action="tank-edit" class="primary">🐟 水槽を編集</button><button data-action="interior">✎ 水槽内</button>' : ''}
         ${def.stairs ? '' : '<button data-action="delete" class="danger">🗑 撤去</button>'}
       </div>
       ${def.stairs ? this._stairsSection(obj) : ''}
-      ${isTank && this.allowEmbed ? this._lookSection(obj, def) : ''}
       ${isTank && this.allowEmbed && !def.atrium ? this._embedSection(obj) : ''}
       ${def.shape === 'liveRock' && this.getBrush ? this._sculptSection(def) : ''}
       ${def.growth && this.getGrowMode ? this._growthSection(obj, def) : ''}
@@ -156,6 +155,12 @@ export class TankCustomizer {
       ${s.on ? `<div class="seg wrap">${types}</div>${slider('sand-depth', '厚さ', 0.005, maxD, 0.005, Math.min(depth, maxD), 'cm')}` : `<div class="look-row"><span>底面の色</span></div><div class="palette frames">${floors}</div>`}
       <div class="seg"><button data-action="look-caustics" class="${look.caustics ? 'active' : ''}">🌊 底のゆらめく光 ${look.caustics ? 'ON' : 'OFF'}</button></div>
       </div>`;
+  }
+
+  /** 水槽の見た目の設定（水槽の編集シートの「見た目」タブで使う） */
+  lookHtml(obj) {
+    const def = this.getDef(obj.userData.defId);
+    return this._lookSection(obj, def);
   }
 
   _lookSection(obj, def) {

@@ -11,12 +11,16 @@ const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const span = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}時間${Math.floor((s % 3600) / 60)}分` : `${Math.max(1, Math.ceil(s / 60))}分`);
 
 /**
- * 水槽をタップしたときの管理シート：名前・展示生物の追加と削除・エサやり・水温・掃除・水槽内編集。
+ * 水槽の編集シート（ホームで水槽をタップしたときと、館内レイアウト編集で水槽を選んだときの共通の画面）。
+ *   管理：名前・展示生物の追加と削除・エサやり・水温・掃除
+ *   見た目：バックスクリーン・フレーム・底砂・底の光・水槽ライト（HTML と操作は TankCustomizer と共通）
+ *   どちらのタブからも水槽内レイアウトの編集へ進める。
  * エサと掃除の処理は既存の CareView / CleanView に任せる。
  */
 export class TankView {
-  constructor({ manager, expeditions, economy, previews, toast, careView, cleanView, onInterior, onGrow, onChanged }) {
-    Object.assign(this, { manager, expeditions, economy, previews, toast, careView, cleanView, onInterior, onGrow, onChanged });
+  constructor({ manager, expeditions, economy, previews, toast, careView, cleanView, onInterior, onGrow, onChanged, lookHtml }) {
+    Object.assign(this, { manager, expeditions, economy, previews, toast, careView, cleanView, onInterior, onGrow, onChanged, lookHtml });
+    this.tab = 'manage';
     this.tank = null;
     this.adding = false;
     this.sel = null; // 4列の一覧で選んでいる生き物
@@ -27,8 +31,9 @@ export class TankView {
     return this.tank ? tankLabel(this.manager, this.tank) : '水槽';
   }
 
-  open(tank) {
+  open(tank, tab = 'manage') {
     this.tank = tank;
+    this.tab = tab;
     this.adding = false;
     this.sel = null;
   }
@@ -40,7 +45,11 @@ export class TankView {
   html() {
     const t = this.tank;
     if (!t || !this.manager.objects.has(t.userData.uid)) return '<p class="gs-empty">水槽がありません。</p>';
-    return this.adding ? this._picker(t) : this._main(t);
+    if (this.adding) return this._picker(t);
+    const tab = (id, label) => `<button data-act="tv-tab" data-id="${id}" class="${this.tab === id ? 'active' : ''}">${label}</button>`;
+    const body = this.tab === 'look' ? `<div class="tv-look">${this.lookHtml(t)}</div>` : this._main(t);
+    return `<div class="seg tv-tabs">${tab('manage', '🐟 生物・飼育')}${tab('look', '🎨 見た目')}</div>${body}
+      <button data-act="tank-interior" class="tv-wide">✎ 水槽内レイアウトを編集</button>`;
   }
 
   _main(t) {
@@ -65,8 +74,7 @@ export class TankView {
     const life = `<h4 class="gs-sub">展示生物（収容枠 ${used}/${cap}）</h4>${over}
       ${shown.join('') || '<p class="gs-empty">展示している生物はいません。</p>'}
       <button data-act="tank-add" class="primary tv-wide">＋ 生物を追加</button>`;
-    return `${name}${life}${this._care(t, uid)}<h4 class="gs-sub">掃除</h4>${this.cleanView._row(t, Date.now())}
-      <button data-act="tank-interior" class="tv-wide">✎ 水槽内レイアウトを編集</button>`;
+    return `${name}${life}${this._care(t, uid)}<h4 class="gs-sub">掃除</h4>${this.cleanView._row(t, Date.now())}`;
   }
 
   _care(t, uid) {
@@ -120,6 +128,9 @@ export class TankView {
       else delete t.userData.name;
       this.toast(name ? `「${name}」と名付けました` : '名前を外しました');
       this.onChanged();
+    } else if (act === 'tv-tab') {
+      this.tab = id;
+      this.adding = false;
     } else if (act === 'cg-pick') {
       this.sel = this.sel === id ? null : id;
       this.qty = 1;
