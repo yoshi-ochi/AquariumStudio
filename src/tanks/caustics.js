@@ -13,8 +13,8 @@ import * as THREE from 'three';
  *  - 底・水槽内オブジェ・生き物の材質には、ワールド座標の XZ でこのテクスチャを引いて
  *    「明るい網目（光）とそのあいだ（影）」を掛け合わせるだけの数行を足す
  */
-/** 模様の繰り返しの1辺(m) */
-export const TILE = 0.9;
+/** 模様の繰り返しの1辺(m)。網目1つは約10〜15cm */
+export const TILE = 0.6;
 const RES = 256;
 const SEG = 200;
 /** 区画の外から入ってくる光も数えるための余白（区画の幅に対する割合） */
@@ -143,8 +143,9 @@ float cauFactor(vec3 wp) {
  * three.js の標準の材質（MeshStandard / MeshBasic など）のシェーダーに水紋を足す（onBeforeCompile の中で呼ぶ）。
  * worldVar：フラグメントで使えるワールド座標の varying 名（無ければ null で、ここで足す）
  * cauOn：水紋を出すかどうかの uniform（{ value: 0|1 }）
+ * mask：水紋を映す割合の GLSL の式（0〜1。水面より上を 0 にするなど）
  */
-export function addCaustics(shader, cauOn, worldVar = null) {
+export function addCaustics(shader, cauOn, worldVar = null, mask = '1.0') {
   Object.assign(shader.uniforms, CAUSTIC_UNIFORMS, { uCauOn: cauOn });
   let v = worldVar;
   if (!v) {
@@ -156,7 +157,7 @@ export function addCaustics(shader, cauOn, worldVar = null) {
   }
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>\n${CAU_DECL}`)
-    .replace('#include <opaque_fragment>', `outgoingLight *= cauFactor(${v});\n#include <opaque_fragment>`);
+    .replace('#include <opaque_fragment>', `outgoingLight *= mix(1.0, cauFactor(${v}), ${mask});\n#include <opaque_fragment>`);
 }
 
 /** 材質に水紋を組み込む（すでに onBeforeCompile があれば、その後に続けて足す） */
