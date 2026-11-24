@@ -5,10 +5,10 @@ import { applySand } from './sandLook.js';
 /**
  * 水槽ごとの見た目：背面・左右側面のバックスクリーン（色＋透明度）、フレーム（あり＋色／フレームレス）、水槽用ライト。
  * look = {
- *   back|left|right: { color: '#rrggbb', alpha: 0..1 },   // alpha 0 = 透明（貼っていないのと同じ）
+ *   back|left|right|bottom: { color: '#rrggbb', alpha: 0..1 },   // alpha 0 = 透明（貼っていないのと同じ）。bottom は水槽の内側の底面
  *   frame: boolean, frameColor: '#rrggbb',
  *   light: { on, color, intensity },
- *   sand: { on, type, depth }（depth: 砂の厚さ m。null なら水槽の大きさに合わせた標準）, floorColor: 砂なしの底面の色,
+ *   sand: { on, type, depth }（depth: 砂の厚さ m。null なら水槽の大きさに合わせた標準）,
  *   caustics: 水面のゆらぎが底に映す光の模様,
  * }
  */
@@ -35,11 +35,11 @@ export function defaultTankLook() {
     back: { ...side },
     left: { ...side },
     right: { ...side },
+    bottom: { ...side },
     frame: true,
     frameColor: FRAME_COLORS[0],
     light: { on: false, color: '#e8f4ff', intensity: 1.5 },
     sand: { on: true, type: 'fine', depth: null },
-    floorColor: '#2b2f33',
     caustics: true,
   };
 }
@@ -57,11 +57,12 @@ export function normalizeLook(look = {}) {
     back: normSide(look.back, d.back),
     left: normSide(look.left, d.left),
     right: normSide(look.right, d.right),
+    // 以前の「砂なしの底面の色」は、底面の色（不透明）として引き継ぐ
+    bottom: look.bottom ? normSide(look.bottom, d.bottom) : look.floorColor ? { color: look.floorColor, alpha: 1 } : { ...d.bottom },
     frame: look.frame ?? d.frame,
     frameColor: look.frameColor ?? d.frameColor,
     light: { ...d.light, ...(look.light ?? {}) },
     sand: { ...d.sand, ...(look.sand ?? {}) },
-    floorColor: look.floorColor ?? d.floorColor,
     caustics: look.caustics ?? d.caustics,
   };
 }
@@ -114,6 +115,9 @@ export function applyTankLook(tank, def, lookIn) {
       transparent: true,
       opacity: side.alpha,
       depthWrite: side.alpha > 0.99,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -4,
     });
     const m = new THREE.Mesh(geo, mat);
     m.renderOrder = 1.8;

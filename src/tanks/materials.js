@@ -18,6 +18,9 @@ export const MATERIALS = {
     opacity: 0.2,
     side: THREE.DoubleSide,
     depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 2,
   })),
   water: shared(new THREE.MeshStandardMaterial({
     color: 0x2a92cf,
@@ -26,6 +29,10 @@ export const MATERIALS = {
     opacity: 0.32,
     side: THREE.DoubleSide,
     depthWrite: false,
+    // 砂・底面と面が重なっても奥側に回り、ちらつかない
+    polygonOffset: true,
+    polygonOffsetFactor: 2,
+    polygonOffsetUnits: 4,
   })),
   frame: shared(new THREE.MeshStandardMaterial({ color: 0x1d2329, roughness: 0.5, metalness: 0.3 })),
   sand: shared(new THREE.MeshStandardMaterial({ color: 0xe6d6b0, roughness: 0.95 })),

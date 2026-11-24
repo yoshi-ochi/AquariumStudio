@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 
 /**
- * 水槽の底：底砂（種類・厚さ／砂なし）と、砂なしのときの底面の色、水面のゆらぎが底に映す光の模様（コースティクス）。
+ * 水槽の底：底砂（種類・厚さ／砂なし）と、底面の色（バックスクリーンと同じ色＋不透明度）、水面のゆらぎが底に映す光の模様（コースティクス）。
+ * 同じ高さに重なる面（ガラス・水・砂・底面）は polygonOffset で前後を決め、視点を動かしてもちらつかないようにする。
  * 水槽の形を作る関数が、砂のメッシュに name='sand' と userData.sandBase = { y0, h, centered }、
  * 底の形を body.userData.bottom = { kind: 'box'|'circle'|'shape', w, d, r, shape, y0 } として残しておく。
  */
@@ -12,7 +13,6 @@ export const SAND_TYPES = [
   { id: 'black', label: '黒い砂', color: '#3d3d40' },
   { id: 'soil', label: 'ソイル', color: '#4f3b2b' },
 ];
-export const FLOOR_COLORS = ['#f2f2f2', '#c9c9c9', '#7d8790', '#2b2f33', '#101214', '#1b3a5c', '#3a6f8f', '#e6d6b0', '#6b4a32', '#2f5d3a'];
 
 const texCache = new Map();
 /** 種類ごとの粒の模様（128px の繰り返しテクスチャ） */
@@ -95,7 +95,7 @@ function causticMaterials() {
   t2.repeat.set(0.77, 0.77);
   t2.needsUpdate = true;
   const mat = (map, opacity) => {
-    const m = new THREE.MeshBasicMaterial({ map, color: 0xd8f4ff, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
+    const m = new THREE.MeshBasicMaterial({ map, color: 0xd8f4ff, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 });
     m.userData.shared = true;
     return m;
   };
@@ -156,20 +156,24 @@ export function applySand(tank, look) {
     }
     const size = Math.max(b.w ?? 0, b.d ?? 0, (b.r ?? 0) * 2, 0.2);
     m.map.repeat.set(size / 0.25, size / 0.25);
-    sand.scale.y = depth / base.h;
+    sand.scale.set(0.996, depth / base.h, 0.996);
     sand.position.y = base.centered ? base.y0 + depth / 2 : base.y0;
   }
-  // 砂なし：底面の板（色を選べる）
+  // 底面：内側の底に貼る色の板（砂の有無によらない。砂を敷くと砂の下になる）
   let plate = body.getObjectByName('bottom-plate');
-  if (!s.on) {
+  const bottom = look.bottom;
+  if (bottom.alpha > 0.001) {
     if (!plate) {
-      plate = new THREE.Mesh(bottomGeometry(b), new THREE.MeshStandardMaterial({ roughness: 0.6 }));
+      plate = new THREE.Mesh(bottomGeometry(b), new THREE.MeshStandardMaterial({ roughness: 0.6, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
       plate.name = 'bottom-plate';
-      plate.position.y = base.y0 + 0.001;
+      plate.position.y = base.y0 + 0.002;
+      plate.renderOrder = 0.8;
       plate.receiveShadow = true;
       body.add(plate);
     }
-    plate.material.color.set(look.floorColor);
+    plate.material.color.set(bottom.color);
+    plate.material.opacity = bottom.alpha;
+    plate.material.depthWrite = bottom.alpha > 0.99;
   } else if (plate) {
     body.remove(plate);
     plate.geometry.dispose();
