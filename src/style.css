@@ -136,21 +136,21 @@ input[type=color] { width: 44px; height: 32px; border: none; padding: 0; backgro
 #detail-panel dt { color: var(--muted); }
 #detail-panel dd { margin: 0; }
 #detail-panel .actions { display: flex; flex-wrap: wrap; gap: 6px; }
-#detail-panel .section { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+#detail-panel .section, .tv-look .section { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
 #detail-panel h4 { margin: 0 0 6px; font-size: 13px; }
 .seg { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
 .seg button { flex: 1; min-height: 34px; padding: 4px 6px; }
 .slider { display: grid; grid-template-columns: 64px 1fr 52px; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .slider output { text-align: right; color: var(--text); }
 
-#detail-panel .palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin: 6px 0; }
-#detail-panel .palette.frames { grid-template-columns: repeat(6, 36px); }
-#detail-panel .swatch { min-height: 0; aspect-ratio: 1; padding: 0; border-radius: 5px; border: 1px solid rgba(0,0,0,.15); }
-#detail-panel .swatch.on { outline: 3px solid var(--accent); outline-offset: 1px; }
-#detail-panel .chip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(0,0,0,.2); }
-#detail-panel .look-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 12px; }
-#detail-panel .look-row span { min-width: 56px; color: var(--muted); }
-#detail-panel .look-row button { min-height: 30px; padding: 2px 10px; }
+#detail-panel .palette, .tv-look .palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin: 6px 0; }
+#detail-panel .palette.frames, .tv-look .palette.frames { grid-template-columns: repeat(6, 36px); }
+#detail-panel .swatch, .tv-look .swatch { min-height: 0; aspect-ratio: 1; padding: 0; border-radius: 5px; border: 1px solid rgba(0,0,0,.15); }
+#detail-panel .swatch.on, .tv-look .swatch.on { position: relative; z-index: 1; outline: 3px solid var(--accent); outline-offset: 1px; border: 2px solid #fff; transform: scale(1.15); }
+#detail-panel .chip, .tv-look .chip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(0,0,0,.2); }
+#detail-panel .look-row, .tv-look .look-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 12px; }
+#detail-panel .look-row span, .tv-look .look-row span { min-width: 56px; color: var(--muted); }
+#detail-panel .look-row button, .tv-look .look-row button { min-height: 30px; padding: 2px 10px; }
 
 /* ---------- 部屋パネル ---------- */
 #room-panel { padding: 0 12px 12px; max-height: 42vh; overflow-y: auto; }

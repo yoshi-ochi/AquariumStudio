@@ -367,8 +367,7 @@ async function boot() {
     else if (action === 'param-sand-depth') {
       manager.setTankLook(tank, { sand: { ...look.sand, depth: value } });
       rerender = false;
-    } else if (action.startsWith('look-floor-')) manager.setTankLook(tank, { floorColor: action.slice(11) });
-    else if (action === 'look-caustics') manager.setTankLook(tank, { caustics: !look.caustics });
+    } else if (action === 'look-caustics') manager.setTankLook(tank, { caustics: !look.caustics });
     else if (action === 'look-frame-on') manager.setTankLook(tank, { frame: true });
     else if (action === 'look-frame-off') manager.setTankLook(tank, { frame: false });
     else if (action.startsWith('look-framecolor-')) manager.setTankLook(tank, { frameColor: action.slice(16) });

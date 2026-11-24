@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CATEGORY, CATEGORY_LABELS } from './tankData.js';
 import { EMBED_RATIO_MIN, EMBED_RATIO_MAX } from '../room/embed.js';
 import { normalizeLook, PALETTE, FRAME_COLORS } from './tankLook.js';
-import { SAND_TYPES, FLOOR_COLORS } from './sandLook.js';
+import { SAND_TYPES } from './sandLook.js';
 import { floorLabel } from '../building/blueprint.js';
 
 const yen = (n) => `¥${Math.round(n).toLocaleString('ja-JP')}`;
@@ -149,10 +149,9 @@ export class TankCustomizer {
     const depth = s.depth ?? base?.h ?? 0.03;
     const maxD = Math.max(0.1, (obj.userData.interior?.waterTop ?? 0.4) * 0.4);
     const types = SAND_TYPES.map((t) => `<button data-action="look-sandtype-${t.id}" class="${s.type === t.id ? 'active' : ''}"><i class="chip" style="background:${t.color}"></i>${t.label}</button>`).join('');
-    const floors = FLOOR_COLORS.map((c) => `<button class="swatch big${c === look.floorColor ? ' on' : ''}" style="background:${c}" data-action="look-floor-${c}" aria-label="${c}"></button>`).join('');
     return `<div class="section"><h4>底砂</h4>
       <div class="seg"><button data-action="look-sand-on" class="${s.on ? 'active' : ''}">砂あり</button><button data-action="look-sand-off" class="${s.on ? '' : 'active'}">砂なし</button></div>
-      ${s.on ? `<div class="seg wrap">${types}</div>${slider('sand-depth', '厚さ', 0.005, maxD, 0.005, Math.min(depth, maxD), 'cm')}` : `<div class="look-row"><span>底面の色</span></div><div class="palette frames">${floors}</div>`}
+      ${s.on ? `<div class="seg wrap">${types}</div>${slider('sand-depth', '厚さ', 0.005, maxD, 0.005, Math.min(depth, maxD), 'cm')}` : '<p class="note">底面の色は「バックスクリーン・底面」の「底面」で選べます。</p>'}
       <div class="seg"><button data-action="look-caustics" class="${look.caustics ? 'active' : ''}">🌊 底のゆらめく光 ${look.caustics ? 'ON' : 'OFF'}</button></div>
       </div>`;
   }
@@ -165,7 +164,8 @@ export class TankCustomizer {
 
   _lookSection(obj, def) {
     const look = normalizeLook(obj.userData.look);
-    const sides = def.shape === 'cylinder' || def.shape === 'tunnel' ? [['back', '背面']] : [['back', '背面'], ['left', '左側面'], ['right', '右側面']];
+    const hasBottom = def.shape === 'box' || def.shape === 'cylinder' || def.shape === 'poly';
+    const sides = [...(def.shape === 'cylinder' || def.shape === 'tunnel' ? [['back', '背面']] : [['back', '背面'], ['left', '左側面'], ['right', '右側面']]), ...(hasBottom ? [['bottom', '底面']] : [])];
     if (!sides.some(([k]) => k === this.lookSide)) this.lookSide = 'back';
     const cur = look[this.lookSide];
     const tab = ([k, label]) => {
@@ -179,7 +179,7 @@ export class TankCustomizer {
     const frameSw = FRAME_COLORS.map(
       (c) => `<button class="swatch big${c === look.frameColor ? ' on' : ''}" style="background:${c}" data-action="look-framecolor-${c}" aria-label="${c}"></button>`,
     ).join('');
-    return `<div class="section"><h4>バックスクリーン（色と透明度）</h4>
+    return `<div class="section"><h4>バックスクリーン・底面（色と透明度）</h4>
       <div class="seg">${sides.map(tab).join('')}</div>
       <div class="palette">${swatches}</div>
       ${slider('side-alpha', '不透明度', 0, 1, 0.05, cur.alpha, '%')}

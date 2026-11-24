@@ -80,6 +80,10 @@ export class Room {
     // 天井：下向きの面だけ（上からは見えない）。色はエリアごとに頂点色で持つ
     // 下向きの面は半球光の地面色（暗い緑）を受けて暗く濁るので、照明に左右されない色で塗る
     this.ceilingMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    // 床・壁は置いた物（台・水槽・バックスクリーン）と面が重なっても負けるよう、奥へずらして描く
+    for (const m of [this.floorMat, this.wallMat, this.yardFloorMat, this.yardWallMat, this.alcoveMat, this.roomWallMat, this.lockedFloorMat, this.outdoorMat]) {
+      Object.assign(m, { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 4 });
+    }
     this.fixtureMat = new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.5, metalness: 0.4, side: THREE.DoubleSide });
     this.ceilingOn = false;
     this.focusZone = null;
