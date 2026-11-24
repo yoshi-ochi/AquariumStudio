@@ -103,6 +103,7 @@ export class ViewModes {
     const under = floor && this.getFloor() === BASEMENT;
     this.room.setUnderground(under);
     this.pool.group.visible = mode !== 'stack' && !under && this.getUnlocked().has('pool');
+    this.pool.setExterior(mode === 'exterior');
     this.scenery.group.visible = mode !== 'stack' && !under;
     if (mode === 'stack') this._buildStack();
     const c = this.cameraCtl.controls;

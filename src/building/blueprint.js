@@ -17,10 +17,18 @@ export const GRID_Z = 86 + NORTH_ROWS;
 /** ワールド座標 z = 0 になる行（版5までの格子の中央） */
 export const GRID_Z0 = 43 + NORTH_ROWS;
 /** 建物の版（間取りの大きさを変えたら上げる。セーブの移行に使う） */
-export const BUILDING_VERSION = 6;
-/** イルカプールの客席の奥行き（客席の背から水面の中心まで）と、中心からステージ奥の壁まで(m) */
-export const POOL_SEAT_REACH = 10.7;
+export const BUILDING_VERSION = 7;
+/**
+ * イルカスタジアムの寸法(m)：客席は水面の中心から半径 SEAT_R0 から段になり、最上段の通路の外側まで POOL_SEAT_REACH。
+ * X 方向は楕円に合わせて POOL_X_SCALE 倍。中心からステージ奥の壁まで POOL_BACK
+ */
+export const POOL_SEAT = { r0: 5.7, step: 0.45, tiers: 12, xScale: 1.55 };
+export const POOL_SEAT_REACH = POOL_SEAT.r0 + POOL_SEAT.tiers * POOL_SEAT.step + 1.2;
 const POOL_BACK = 7.2;
+/** 版6までのスタジアムの奥行き（別館の位置を変えないために使う） */
+const OLD_SEAT_REACH = 10.7;
+/** 観客席の下の回廊の内側・外側の半径（内側は天井の高さが1階分とれる所から） */
+const GALLERY_R = [8.7, 12.2];
 export const FLOOR_COUNT = 2;
 /** 地下1階のフロア番号（地上は 0, 1） */
 export const BASEMENT = 2;
@@ -107,8 +115,11 @@ const ZONE_META = [
   ...WING_META(),
   { id: 'pool', name: 'イルカプール', floor: 0, type: OUTDOOR, stage: 3, cost: 8000000, color: '#54c0d8', text: '2階建ての観客席を備えたショープール' },
   // 別館を建てると一緒にできる（auto：そのエリアの解放に連動）
-  { id: 'corridor', name: '連絡通路', floor: 0, type: HALL, stage: 4, cost: 0, auto: 'wing1', annex: true, color: '#9fd0df', text: '本館と別館をつなぐ屋根付きの通路。イルカプールを迂回して本館の東側を通る' },
   { id: 'poolyard', name: 'プールバックヤード', floor: 0, type: YARD, stage: 3, cost: 600000, requires: 'pool', color: '#c9ccd0', text: 'イルカプールのステージ裏の、屋根のない職員エリア' },
+  // イルカプールと一緒にできる来館者用の通路（auto：そのエリアの解放に連動）
+  { id: 'stand1', name: 'スタジアム通路1F', floor: 0, type: HALL, stage: 3, cost: 0, auto: 'pool', annex: true, color: '#9fd0df', text: '大水槽ホールのバックヤードの裏の来館者用通路。観客席と、観客席の下の回廊へつながる' },
+  { id: 'stand2', name: 'スタジアム通路2F', floor: 1, type: HALL, stage: 3, cost: 0, auto: 'pool', annex: true, color: '#9fd0df', text: '2階の来館者用通路。観客席の中段へつながる' },
+  { id: 'corridor', name: '観客席下の回廊', floor: 0, type: HALL, stage: 3, cost: 0, auto: 'pool', annex: true, color: '#9fd0df', text: '観客席の下を半円にめぐり、プールの両脇を通って別館へつながる回廊' },
 ];
 
 /** 吹き抜けを囲む2階の回廊 */
@@ -184,14 +195,80 @@ export const LAYOUTS = [
   },
 ];
 
+const within = ([x0, z0, x1, z1], i, j) => i >= x0 && i <= x1 && j >= z0 && j <= z1;
+
+/**
+ * イルカプールまわり（間取りごと）。北（奥）へ順に：
+ *   本館の大水槽ホールの裏のバックヤード → 来館者用のスタジアム通路（1F・2F、幅4マス）→ 観客席（背が通路に接する）
+ *   → プール → ステージ → プールバックヤード → 別館。
+ * 通路は真ん中の4マスでバックヤード（と管理通路）を抜けて、その奥の展示室（1F は大水槽ホール、2F は回廊）とつなぐ。
+ * 観客席の下は半円の回廊で、両端からプールの脇を北へ進み、別館の南面につながる。
+ */
+function poolSite(l) {
+  const [px0, , px1, pz1] = l.rects.pool[0];
+  const pcx = Math.round((px0 + px1 + 1) / 2);
+  const cx = ((px0 + px1 + 1) / 2 - GRID_X / 2) * CELL_SIZE;
+  // 別館は版6の位置のまま（以前の計算で決める）
+  const oldBack = (pz1 + 1 - GRID_Z0) * CELL_SIZE - OLD_SEAT_REACH - POOL_BACK;
+  const oldYz1 = Math.floor(oldBack / CELL_SIZE + GRID_Z0) - 1;
+  const W = WING_HALL + WING_YARD * 2;
+  l.wingRect = [pcx - W / 2, oldYz1 - 13 - W, pcx + W / 2 - 1, oldYz1 - 14];
+  // スタジアム通路（プールの区画の南端の4行）と、観客席の背がその北端に来るプールの中心
+  const sz0 = pz1 - 3;
+  l.poolCenter = { x: cx, z: (sz0 - GRID_Z0) * CELL_SIZE - POOL_SEAT_REACH };
+  for (const [id, f] of [['stand1', 0], ['stand2', 1]]) {
+    l.rects[id] = [[pcx - 22, sz0, pcx + 21, pz1]];
+    const cols = [pcx - 2, pcx - 1, pcx, pcx + 1];
+    const rectsOf = (type) => ZONE_META.filter((z) => z.floor === f && z.type === type && !z.wing && !z.annex && !z.facility && l.rects[z.id]).map((z) => [z.id, l.rects[z.id]]);
+    const covered = (pairs, j) => pairs.find(([, rs]) => cols.every((i) => rs.some((r) => within(r, i, j))));
+    const yards = [...rectsOf(YARD), ['service', l.serviceLinks]];
+    for (let j = pz1 + 1; j < pz1 + 30; j++) {
+      const hall = covered(rectsOf(HALL), j);
+      if (hall && !(f === 1 && cols.some((i) => within(l.voidRect, i, j)))) {
+        if (j > pz1 + 1) l.rects[id].push([pcx - 2, pz1 + 1, pcx + 1, j - 1]); // バックヤードを抜ける通路
+        l.links.push([id, hall[0]]);
+        break;
+      }
+      if (!covered(yards, j)) break;
+    }
+  }
+  // ステージ奥の壁より北の、別館までのあいだにプールバックヤード
+  const yz1 = Math.floor((l.poolCenter.z - POOL_BACK) / CELL_SIZE + GRID_Z0) - 1;
+  l.rects.poolyard = [[pcx - 12, l.wingRect[3] + 2, pcx + 11, yz1]];
+  // 観客席の下の回廊（半円）と、両端からプールの脇を北へ別館まで伸びる通路。1行ごとの区画にまとめる
+  const [g0, g1] = GALLERY_R;
+  const inGallery = (i, j) => {
+    const dx = (i + 0.5 - GRID_X / 2) * CELL_SIZE - cx;
+    const dz = (j + 0.5 - GRID_Z0) * CELL_SIZE - l.poolCenter.z;
+    if (dz >= 0) {
+      const r = Math.hypot(dx / POOL_SEAT.xScale, dz);
+      return r >= g0 && r <= g1;
+    }
+    return Math.abs(dx) >= g0 * POOL_SEAT.xScale && Math.abs(dx) <= g1 * POOL_SEAT.xScale;
+  };
+  const rects = [];
+  for (let j = l.wingRect[3] + 1; j < sz0; j++) {
+    let start = null;
+    for (let i = pcx - 30; i <= pcx + 30; i++) {
+      const on = inGallery(i, j);
+      if (on && start === null) start = i;
+      if (!on && start !== null) {
+        rects.push([start, j, i - 1, j]);
+        start = null;
+      }
+    }
+  }
+  l.rects.corridor = rects;
+  // 屋外に出ている部分（プールの脇の通路）。外観で屋根とガラスを付ける
+  l.corridorLegs = rects.filter(([, j]) => (j + 0.5 - GRID_Z0) * CELL_SIZE < l.poolCenter.z);
+  l.links.push(['corridor', 'stand1'], ['corridor', 'wing1']);
+}
+
 // 建物の区画を敷地の中央へ寄せ、北へ広げた分だけ行をずらす（ワールド座標は変わらない）
 const shift = ([x0, z0, x1, z1]) => [x0 + SITE_X, z0 + NORTH_ROWS, x1 + SITE_X, z1 + NORTH_ROWS];
 const N = NORTH_ROWS;
 for (const l of LAYOUTS) {
   for (const id of Object.keys(l.rects)) l.rects[id] = l.rects[id].map(shift);
-  // 本館の東端の列と、そこに面する1階の展示室（連絡通路の本館側の出入口）
-  const R = Math.max(...Object.entries(l.rects).filter(([id]) => id !== 'pool').flatMap(([, rs]) => rs.map((r) => r[2])));
-  const east = Object.entries(l.rects).find(([id, rs]) => ZONE_META.find((z) => z.id === id && z.floor === 0 && z.type === HALL) && rs.some((r) => r[2] === R));
   l.voidRect = shift(l.voidRect);
   // 建物の左端から、海獣広場（22マス≒20m）、その左に売店・食堂（各22マス四方）。
   // 屋外バックヤードは海獣広場の北・西・南の縁（幅2マス）を囲む。売店・食堂への出入口の前は空ける
@@ -201,22 +278,9 @@ for (const l of LAYOUTS) {
     yard0: [[L - 22, 2 + N, L - 1, 3 + N], [L - 22, 4 + N, L - 21, 38 + N], [L - 22, 43 + N, L - 21, 60 + N], [L - 22, 65 + N, L - 21, 83 + N], [L - 22, 84 + N, L - 1, 85 + N]],
     store: [[L - 44, 30 + N, L - 23, 51 + N]], diner: [[L - 44, 52 + N, L - 23, 73 + N]],
   });
-  // プールのステージ奥の壁より北に、プールバックヤード（24×10マス）。その北に4マス空けて別館（展示室34マス＋周りのバックヤード）
-  const [px0, , px1, pz1] = l.rects.pool[0];
-  const pcx = Math.round((px0 + px1 + 1) / 2);
-  const back = (pz1 + 1 - GRID_Z0) * CELL_SIZE - POOL_SEAT_REACH - POOL_BACK;
-  const yz1 = Math.floor(back / CELL_SIZE + GRID_Z0) - 1;
-  l.rects.poolyard = [[pcx - 12, yz1 - 9, pcx + 11, yz1]];
-  const W = WING_HALL + WING_YARD * 2;
-  l.wingRect = [pcx - W / 2, yz1 - 13 - W, pcx + W / 2 - 1, yz1 - 14];
-  // 連絡通路（幅4マス）：別館の東面の中央から東へ出て、プールを避けて本館の東側を南へ下り、東端の展示室の脇へつなぐ
-  const wc = Math.floor((l.wingRect[1] + l.wingRect[3] + 1) / 2);
-  const [, ez0, , ez1] = east[1].find((r) => r[2] === R);
-  const end = Math.floor((ez0 + ez1) / 2) + 2;
-  l.rects.corridor = [[l.wingRect[2] + 1, wc - 2, R + 4, wc + 1], [R + 1, wc + 2, R + 4, end]];
-  l.links = [...l.links, ['corridor', 'wing1'], ['corridor', east[0]]];
   l.links = [...l.links, ['marine', l.leftLink], ['marine', 'store'], ['marine', 'diner']];
   l.serviceLinks = (l.serviceLinks ?? []).map(shift);
+  poolSite(l);
   Object.assign(l.rects, { b1a: [[72, 25 + N, 107, 46 + N]], b1b: [[50, 25 + N, 71, 46 + N]], b1c: [[108, 25 + N, 129, 46 + N]], b1d: [[50, 47 + N, 129, 58 + N]] });
   ANNEX_RECTS.forEach((r, i) => (l.rects[ANNEX_IDS[i]] = [r]));
   WING_FLOORS.forEach((_, i) => (l.rects[`wing${i + 1}`] = [l.wingRect]));

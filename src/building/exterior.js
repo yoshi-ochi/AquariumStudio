@@ -299,7 +299,6 @@ function wing(group, floors) {
   parts.push(box(S * 0.3, 2.4, S * 0.2, x + S * 0.2, H + 1.2, z - S * 0.15));
   parts.push(box(6, 0.25, 3, x, 3, z + S / 2 + 1.5));
   group.add(paving, glass, new THREE.Mesh(mergeGeometries(parts), MAT.white));
-  corridor(group);
   // 棟名の看板（正面＝本館側）
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -319,20 +318,6 @@ function wing(group, floors) {
     sign.position.set(x + s * 9, H - 1.2, z + S / 2 + 0.12);
     group.add(sign);
   }
-}
-
-/** 本館と別館の連絡通路：平屋のガラスの通路と白い屋根（区画ごと） */
-function corridor(group) {
-  const parts = [];
-  for (const [x0, z0, x1, z1] of getZone('corridor')?.rects ?? []) {
-    const w = (x1 - x0 + 1) * CELL_SIZE;
-    const d = (z1 - z0 + 1) * CELL_SIZE;
-    const cx = wx(x0) + w / 2;
-    const cz = wz(z0) + d / 2;
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(w, 3, d).translate(cx, 1.5, cz), MAT.glass));
-    parts.push(box(w + 0.4, 0.3, d + 0.4, cx, 3.05, cz));
-  }
-  if (parts.length) group.add(new THREE.Mesh(mergeGeometries(parts), MAT.white));
 }
 
 /** 左の売店・食堂：平屋のガラスの棟と白い屋根（屋外バックヤードは屋根なし） */
