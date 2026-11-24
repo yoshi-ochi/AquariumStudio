@@ -5,10 +5,11 @@ const TAP_TOLERANCE = 8; // px
 
 /** 閲覧モード（ホーム）：タップした水槽を onTankTap で知らせる。ドラッグはカメラ操作に任せる */
 export class ViewInteraction {
-  constructor({ sceneMgr, manager, onTankTap }) {
+  constructor({ sceneMgr, manager, onTankTap, extraTargets = () => [] }) {
     this.sceneMgr = sceneMgr;
     this.manager = manager;
     this.onTankTap = onTankTap;
+    this.extraTargets = extraTargets; // 水槽以外の展示 [[Object3D, onTap], ...]
     this.enabled = false;
     this.dom = sceneMgr.renderer.domElement;
     this.raycaster = new THREE.Raycaster();
@@ -25,7 +26,11 @@ export class ViewInteraction {
       if (!this.enabled || !d || !e.isPrimary) return;
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_TOLERANCE || performance.now() - d.t > 500) return;
       const tank = this._pickTank(e);
-      if (tank) this.onTankTap(tank);
+      if (tank) return this.onTankTap(tank);
+      // 水槽に当たらなければ、プール・生け簀など水槽以外の展示
+      for (const [obj, onTap] of this.extraTargets()) {
+        if (this.raycaster.intersectObject(obj, true).length) return onTap();
+      }
     });
   }
 

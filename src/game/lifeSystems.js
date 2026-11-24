@@ -2,6 +2,7 @@ import { INCOME_PER_VISITOR } from '../management/stageData.js';
 import { CREATURES, DISCOVERY_REWARD, RARITY_NAME, getCreature } from '../expedition/creatureData.js';
 import { feed, feedCost, isHungry, hasLife, setCareFacilities } from '../expedition/husbandry.js';
 import { Backyard } from '../building/backyard.js';
+import { researchBonus } from '../building/backyardData.js';
 import { setCleanIntervalBoost } from '../tanks/tankCleaning.js';
 import { BackyardView } from '../building/buildingViews.js';
 import { Crowd } from '../visitors/crowd.js';
@@ -83,7 +84,7 @@ export class LifeSystems {
   get visitorMult() {
     const e = this.state.event;
     const event = e && e.until > Date.now() ? EVENTS.find((x) => x.id === e.id).mult : 1;
-    return event * (1 + this.backyard.level('display') * 0.05) * this.monthly.bonus;
+    return event * (1 + researchBonus(this.backyard.level('display'))) * this.monthly.bonus;
   }
 
   // ---- 毎秒の処理 ------------------------------------------------------------
@@ -93,7 +94,7 @@ export class LifeSystems {
     const count = (id) => [...this.manager.objects.values()].filter((o) => o.userData.defId === id).length;
     this.ops.shops = s.shops;
     this.ops.cafes = s.cafes;
-    this.ops.wageMult = 1 - this.backyard.level('welfare') * 0.05;
+    this.ops.wageMult = 1 - researchBonus(this.backyard.level('welfare'));
     this.ops.cleanerRelief = count('cleanCenter');
     setCleanIntervalBoost(1 + Math.min(4, count('waterPlant')) * 0.25);
     setCareFacilities({ freezer: count('freezer'), liveFeed: count('liveFeed'), foodPrep: count('foodPrep') });

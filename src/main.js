@@ -55,8 +55,11 @@ import { pickLayout } from './ui/layoutPicker.js';
 import { ZoneLabels } from './building/zoneLabels.js';
 import { DolphinPool } from './building/dolphinPool.js';
 import { SeaPen } from './building/seaPen.js';
+import { researchBonus } from './building/backyardData.js';
 import { SeaPenScene } from './building/seaPenScene.js';
 import { SeaPenView } from './ui/seaPenView.js';
+import { PoolView } from './ui/poolView.js';
+import { ExpandPanel } from './ui/expandPanel.js';
 import { ZoneView } from './building/buildingViews.js';
 import { migrateToLayout, relocateInvalid, migrateLayoutV4, zonesForLegacyStage } from './building/migrate.js';
 import { FishingScene } from './expedition/fishingScene.js';
@@ -80,7 +83,7 @@ import { tankLabel } from './tanks/tankLabel.js';
 
 const $ = (id) => document.getElementById(id);
 const MIN_SPLASH_MS = 1800;
-const POOL_APPEAL = 150;
+const POOL_APPEAL = 30; // プールの設備そのものの魅力（生き物は展示した分を別に数える）
 const OUTDOOR_APPEAL = { plaza: 20, marine: 60, nature: 90 };
 const THEME_BONUS = 1.25;
 const HINT = {
@@ -147,8 +150,9 @@ async function boot() {
   // 屋外生け簀（レベル5で解放。100m×100m を区切って展示）
   const seaPen = new SeaPen();
   const penScene = new SeaPenScene(sceneMgr.scene, seaPen);
-  manager.extraExhibitAppeal = () => seaPen.appeal();
-  manager.extraExhibits = () => seaPen.exhibits;
+  pool.isOpen = () => unlocked.has('pool');
+  manager.extraExhibitAppeal = () => seaPen.appeal() + pool.appeal();
+  manager.extraExhibits = () => [...seaPen.exhibits, pool.exhibit];
   manager.themeBonus = (tank) => {
     const theme = zoneAt(tank.userData.floor, tank.position.x, tank.position.z)?.theme;
     const ids = Object.keys(tank.userData.creatures ?? {});
@@ -301,6 +305,13 @@ async function boot() {
     },
   });
 
+  // 地下展示室・別棟・屋外生け簀の解放（レイアウト編集の「増築」タブからだけ）
+  const expandPanel = new ExpandPanel({
+    el: $('expand-panel'), economy, getUnlocked: () => unlocked, seaPen,
+    onUnlockZone: (id) => unlockZone(id),
+    onSeaPen: () => gameSheet.openPanel('seapen'),
+  });
+
   const catalog = new Catalog({
     tabsEl: $('catalog-tabs'),
     cardsEl: $('catalog-cards'),
@@ -321,6 +332,7 @@ async function boot() {
       if (mode !== 'hall-edit') return;
       hall.cancelPlacement();
       roomPanel.setVisible(extra && id === 'room');
+      expandPanel.setVisible(extra && id === 'expand');
       inPlace.setActive(extra && id === 'build');
       if (!extra) shell.setHint(HINT.hall);
     },
@@ -341,7 +353,14 @@ async function boot() {
       room.setWallEditing(true);
     },
   });
-  const view = new ViewInteraction({ sceneMgr, manager, onTankTap: (tank) => openTank(tank) });
+  // 水槽のほか、イルカプールと生け簀もタップで展示の画面を開く
+  const view = new ViewInteraction({
+    sceneMgr, manager, onTankTap: (tank) => openTank(tank),
+    extraTargets: () => [
+      ...(pool.group.visible ? [[pool.water, () => gameSheet.openPanel('pool')]] : []),
+      ...(penScene.group.visible ? [[penScene.group, () => gameSheet.openPanel('seapen')]] : []),
+    ],
+  });
   const hall = new HallInteraction({
     sceneMgr, cameraCtl, manager, economy, inventory, customizer, room, toast,
     getUnlocked: () => unlocked,
@@ -390,6 +409,7 @@ async function boot() {
     hall.setEnabled(false);
     room.setEditVisible(false);
     roomPanel.setVisible(false);
+    expandPanel.setVisible(false);
     inPlace.setActive(false);
     customizer.deselect();
     view.enabled = views.mode === 'floor';
@@ -423,7 +443,7 @@ async function boot() {
     customizer.allowEmbed = true;
     hall.setEnabled(true);
     room.setEditVisible(true);
-    catalog.setDefs(HALL_DEFS, [{ id: 'build', label: '水槽建造' }, { id: 'room', label: '部屋' }]);
+    catalog.setDefs(HALL_DEFS, [{ id: 'build', label: '水槽建造' }, { id: 'room', label: '部屋' }, { id: 'expand', label: '増築' }]);
     shell.setMode('hall-edit', '館内レイアウト編集');
     shell.setHint(HINT.hall);
   }
@@ -434,6 +454,7 @@ async function boot() {
     focusTank = tank;
     hall.setEnabled(false);
     roomPanel.setVisible(false);
+    expandPanel.setVisible(false);
     inPlace.setActive(false);
     customizer.deselect();
     customizer.allowEmbed = false;
@@ -504,7 +525,7 @@ async function boot() {
 
   /** 現在の状態を保存用データにする */
   function snapshot() {
-    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
+    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), dolphinPool: pool.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
   }
 
   let pendingLayout = null; // 初期設定で選んだ間取り
@@ -549,6 +570,7 @@ async function boot() {
     expeditions.fromJSON(data.expedition);
     ops.fromJSON(data.ops);
     seaPen.fromJSON(data.seaPen);
+    pool.fromJSON(data.dolphinPool);
     if (!visiting) home = data.home ?? null;
     roomSettings = { ...defaultRoomSettings(), ...(data.room ?? {}) };
     roomSettings.lights = roomSettings.lights.map(normalizeLight);
@@ -720,7 +742,7 @@ async function boot() {
     onVisit: (id, name) => visitAquarium(id, name),
     onChanged: () => mapPage.refresh(),
   });
-  const expeditionView = new ExpeditionView({ economy, expeditions, toast, previews, getHome: () => home, getDiscount: () => life.backyard.level('field') * 0.1, getCapacity: () => life.backyard.capacity, fishing: new FishingScene($('fishing-scene')) });
+  const expeditionView = new ExpeditionView({ economy, expeditions, toast, previews, getHome: () => home, getDiscount: () => researchBonus(life.backyard.level('field')), getCapacity: () => life.backyard.capacity, fishing: new FishingScene($('fishing-scene')) });
   // 地図で選んだ仲間の水族館
   const placeView = {
     pin: null,
@@ -822,6 +844,7 @@ async function boot() {
       shop: { title: '店舗運営', live: true, view: new ShopView({ ops, economy, inventory, onPlace: (id) => { gameSheet.close(); mapPage.close(); if (mode !== 'hall-edit') enterHallEdit(); hall.startPlacement(id); } }) },
       ...life.panels,
       mail: { title: 'メール', live: true, view: mailView },
+      pool: { title: 'イルカプール', view: new PoolView({ pool, expeditions, previews, toast }) },
       seapen: {
         title: '屋外生け簀',
         view: new SeaPenView({
@@ -840,7 +863,7 @@ async function boot() {
       zones: {
         title: '館内エリア',
         view: new ZoneView({
-          economy, getUnlocked: () => unlocked, onUnlock: unlockZone, seaPen, onSeaPen: () => gameSheet.openPanel('seapen'),
+          economy, getUnlocked: () => unlocked, onUnlock: unlockZone,
           getLook: (id) => ({ floor: roomSettings.floor.color, wall: roomSettings.wall.color, ...roomSettings.zoneLook?.[id] }),
           onLook: (id, kind, color) => {
             const all = { ...roomSettings.zoneLook };

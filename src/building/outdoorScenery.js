@@ -17,30 +17,6 @@ function mesh(group, geo, material, x, y, z) {
 
 const rectInfo = ([x0, z0, x1, z1]) => ({ x: (wx(x0) + wx(x1 + 1)) / 2, z: (wz(z0) + wz(z1 + 1)) / 2, w: wx(x1 + 1) - wx(x0), d: wz(z1 + 1) - wz(z0) });
 
-/** 海獣エリア：岩場のあるプールとアザラシ */
-function buildMarine(group, rect) {
-  const r = rectInfo(rect);
-  const rock = mat(0x7d7f7a);
-  mesh(group, new THREE.BoxGeometry(r.w, 0.5, r.d), mat(0xb9c0c2), r.x, 0.25, r.z);
-  const water = mesh(group, new THREE.CircleGeometry(1, 36).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2f9fc8, roughness: 0.2 }), r.x, 0.52, r.z);
-  water.scale.set(r.w * 0.43, 1, r.d * 0.42);
-  for (let k = 0; k < 7; k++) {
-    const a = (k / 7) * Math.PI * 2;
-    const s = 0.7 + (k % 3) * 0.3;
-    mesh(group, new THREE.DodecahedronGeometry(s, 0), rock, r.x + Math.cos(a) * r.w * 0.42, 0.7, r.z + Math.sin(a) * r.d * 0.42).rotation.set(k, k * 2, 0);
-  }
-  const seals = [];
-  for (let k = 0; k < 3; k++) {
-    const seal = new THREE.Group();
-    const body = new THREE.SphereGeometry(0.42, 12, 8).scale(1.7, 0.75, 0.8);
-    mesh(seal, body, mat(0x77838a, 0.5), 0, 0, 0);
-    mesh(seal, new THREE.SphereGeometry(0.24, 10, 8), mat(0x687379, 0.5), 0.72, 0.16, 0);
-    group.add(seal);
-    seals.push({ seal, phase: (k / 3) * Math.PI * 2, rx: r.w * 0.28, rz: r.d * 0.27, cx: r.x, cz: r.z });
-  }
-  return seals;
-}
-
 /** 自然再現エリア：磯・干潟・マングローブの小川 */
 function buildNature(group, rect) {
   const r = rectInfo(rect);
@@ -95,7 +71,7 @@ export class OutdoorScenery {
       const r = rectInfo(zone.rects[0]);
       mesh(this.group, new THREE.PlaneGeometry(r.w, r.d).rotateX(-Math.PI / 2), mat(GROUND[zone.id]), r.x, -0.008, r.z);
     }
-    if (unlocked.has('marine')) this.seals = buildMarine(this.group, getZone('marine').scenery);
+    // 海獣エリアは作り付けの景観を置かず、水槽を自由に置ける更地にする
     if (unlocked.has('nature')) buildNature(this.group, getZone('nature').scenery);
   }
 

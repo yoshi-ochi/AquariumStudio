@@ -1,5 +1,5 @@
 import { getCreature } from '../expedition/creatureData.js';
-import { ARCHIVE_BONUS, EXPAND_SLOTS, HOLD_BY_LEVEL, HOLD_PER_TANK, POINTS_PER_MIN, breedHours, researchCost, BREED_HARD_RARITY } from './backyardData.js';
+import { ARCHIVE_BONUS, EXPAND_SLOTS, HOLD_BY_LEVEL, HOLD_PER_TANK, POINTS_PER_MIN, breedHours, researchCost, migrateResearchLevel, BREED_HARD_RARITY } from './backyardData.js';
 
 /** バックヤードの研究室と繁殖水槽。state は保存データの一部 */
 export class Backyard {
@@ -9,7 +9,7 @@ export class Backyard {
   }
 
   static emptyState() {
-    return { points: 0, levels: {}, jobs: {}, expansions: 0 };
+    return { points: 0, levels: {}, jobs: {}, expansions: 0, rv: 2 };
   }
 
   get expansions() {
@@ -100,5 +100,10 @@ export class Backyard {
 
   fromJSON(data) {
     this.state = { ...Backyard.emptyState(), ...(data ?? {}) };
+    // 研究の版2（最大Lv100）より前のセーブは、効果が同じくらいになるレベルへ直す
+    if (data && (data.rv ?? 1) < 2) {
+      this.state.levels = Object.fromEntries(Object.entries(this.state.levels ?? {}).map(([id, lv]) => [id, migrateResearchLevel(id, lv)]));
+      this.state.rv = 2;
+    }
   }
 }
