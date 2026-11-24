@@ -5,7 +5,7 @@ const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /**
- * レイアウト編集の「増築」タブ：地下展示室・別棟・屋外生け簀の解放（ここからだけ行える）。
+ * レイアウト編集の「増築」タブ：地下展示室・別館・屋外生け簀の解放（ここからだけ行える）。
  */
 export class ExpandPanel {
   constructor({ el, economy, getUnlocked, seaPen, onUnlockZone, onSeaPen }) {
@@ -42,9 +42,9 @@ export class ExpandPanel {
       ? '<button data-act="pen-open" class="primary">区画を編集</button>'
       : `<button data-act="pen-unlock" class="primary" ${ready && this.economy.canAfford(PEN.unlockCost) ? '' : 'disabled'}>解放 ${yen(PEN.unlockCost)}</button>`;
     const penState = pen.unlocked ? `区画 ${pen.sections.length}` : ready ? '' : `水族館レベル${PEN.unlockLevel}で解放できます（現在 Lv${level}）`;
-    this.el.innerHTML = `<p class="note">地下展示室・別棟・屋外生け簀は、ここから増築・解放します。</p>
+    this.el.innerHTML = `<p class="note">地下展示室・別館・屋外生け簀は、ここから増築・解放します。</p>
       <h4>地下展示室</h4>${annex}
-      <h4>別棟</h4>${wings}
+      <h4>別館</h4>${wings}
       <h4>屋外生け簀</h4><div class="ep-row ${pen.unlocked ? 'done' : ''}"><div><b>屋外生け簀</b><small>100m×100m の海の生け簀。自由に区切って大型の生き物を展示できる</small>${penState ? `<small class="ep-lack">${penState}</small>` : ''}</div>${penBtn}</div>`;
   }
 

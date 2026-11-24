@@ -5,14 +5,16 @@ import { sizeOf, speciesPieces } from '../expedition/growth.js';
 import { disposeObject } from '../tanks/tankBuilder.js';
 import { mulberry32 } from '../tanks/random.js';
 import { PEN, sectionSize } from './seaPen.js';
-import { GRID_X, CELL_SIZE } from './blueprint.js';
+import { GRID_X, GRID_Z, CELL_SIZE, getZone } from './blueprint.js';
 
 /**
  * 生け簀の3D表示。本館の右手の海に、100m 四方の浮き桟橋と網の区画を並べる。
  * 区画の中の生き物は実寸（成長に応じた大きさ）で泳がせる。
  */
-/** 生け簀の中心（ワールド座標）。敷地の右端から桟橋を渡った先 */
-export const PEN_CENTER = { x: (GRID_X * CELL_SIZE) / 2 + 10 + PEN.size / 2, z: 0 };
+/** 生け簀の中心（ワールド座標）。売店・食堂の左から桟橋を渡った先の海（間取りで変わるので setLayout で決める） */
+export const PEN_CENTER = { x: 0, z: 0 };
+const wx = (i) => (i - GRID_X / 2) * CELL_SIZE;
+const wz = (j) => (j - GRID_Z / 2) * CELL_SIZE;
 const WATER_Y = -0.3;
 const MAX_PER_SPECIES = 8;
 
@@ -36,8 +38,11 @@ export class SeaPenScene {
     this.pen = pen;
     this.group = new THREE.Group();
     this.group.name = 'sea-pen';
-    this.group.position.set(PEN_CENTER.x, 0, PEN_CENTER.z);
-    this.group.visible = false;
+    // 解放前は区画のない真っ暗な海（ブラックアウト）
+    this.blackout = new THREE.Mesh(new THREE.PlaneGeometry(PEN.size + 4, PEN.size + 4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x05080b }));
+    this.blackout.position.y = 0.05;
+    this.group.add(this.blackout);
+    this.setLayout();
     scene.add(this.group);
     this.base = this._base();
     this.group.add(this.base);
@@ -45,6 +50,7 @@ export class SeaPenScene {
     this.group.add(this.sections);
     this.fish = [];
     this.shown = true;
+    this._showParts();
     pen.addEventListener('change', () => this.rebuild());
   }
 
@@ -62,20 +68,31 @@ export class SeaPenScene {
     const rim = 2;
     g.add(box(S + rim * 2, 0.4, rim, 0, 0, -S / 2 - rim / 2, MAT.deck), box(S + rim * 2, 0.4, rim, 0, 0, S / 2 + rim / 2, MAT.deck));
     g.add(box(rim, 0.4, S, -S / 2 - rim / 2, 0, 0, MAT.deck), box(rim, 0.4, S, S / 2 + rim / 2, 0, 0, MAT.deck));
-    // 本館側から渡る桟橋
-    g.add(box(10, 0.4, 3, -S / 2 - rim - 5, 0, 0, MAT.deck));
+    // 陸（売店・食堂）側から渡る桟橋
+    g.add(box(10, 0.4, 3, S / 2 + rim + 5, 0, 0, MAT.deck));
     return g;
   }
 
   /** 表示の切り替え（解放済みで、本館の地上階を見ているときだけ） */
+  /** 売店・食堂の左端から10m 先に、生け簀の右端が来るよう置き直す */
+  setLayout() {
+    const left = Math.min(...['store', 'diner'].map((id) => getZone(id)?.rects[0][0] ?? GRID_X / 2));
+    const rows = getZone('marine')?.rects[0] ?? [0, 0, 0, GRID_Z - 1];
+    PEN_CENTER.x = wx(left) - 10 - PEN.size / 2;
+    PEN_CENTER.z = (wz(rows[1]) + wz(rows[3] + 1)) / 2;
+    this.group.position.set(PEN_CENTER.x, 0, PEN_CENTER.z);
+  }
+
   setVisible(on) {
     this.shown = on;
-    this.group.visible = on && this.pen.unlocked;
+    this.group.visible = on;
+    this._showParts();
   }
 
   /** 区画と生き物を作り直す */
   rebuild() {
-    this.group.visible = this.shown && this.pen.unlocked;
+    this.group.visible = this.shown;
+    this._showParts();
     disposeObject(this.sections);
     this.group.remove(this.sections);
     this.sections = new THREE.Group();
@@ -83,6 +100,14 @@ export class SeaPenScene {
     this.fish = [];
     for (const s of this.pen.sections) this._section(s);
     this._key = this._growthKey();
+  }
+
+  /** 解放前はブラックアウトだけ、解放後は桟橋・海面・区画 */
+  _showParts() {
+    const on = this.pen.unlocked;
+    this.blackout.visible = !on;
+    this.base.visible = on;
+    this.sections.visible = on;
   }
 
   _section(s) {

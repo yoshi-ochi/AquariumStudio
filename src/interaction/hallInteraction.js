@@ -4,7 +4,7 @@ import { buildObject, disposeObject } from '../tanks/tankBuilder.js';
 import { TankManager } from '../tanks/tankManager.js';
 import { REFUND_RATE } from '../management/stageData.js';
 import { CELL } from '../room/floorPlan.js';
-import { BASEMENT } from '../building/blueprint.js';
+import { BASEMENT, zoneAt } from '../building/blueprint.js';
 import { findNearestRun, findRunByKey, placeEmbedded, alongOf, EMBED_RATIO_MAX } from '../room/embed.js';
 import { AlignGuides } from './alignGuides.js';
 
@@ -101,6 +101,8 @@ export class HallInteraction {
     const plan = this.room.plan;
     if (!plan.containsRect(x, z, hx, hz)) return false;
     if (def.yardOnly && plan.typeAt(x, z) !== CELL.YARD) return false;
+    // 売店・食堂は作り付けの設備で埋まっているので置けない
+    if (zoneAt(plan.floor, x, z)?.facility) return false;
     // 地下は設備専用。予備水槽などは地下にだけ置ける
     if (plan.floor === BASEMENT ? !def.yardOnly : def.basement) return false;
     // 大水槽は2階分の高さがあるので1階にだけ置ける

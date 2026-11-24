@@ -64,7 +64,7 @@ export class GameSheet {
   }
 
   render() {
-    if (!this.view) return; // 操作の結果シートが閉じた（別棟の建設で階を移るなど）
+    if (!this.view) return; // 操作の結果シートが閉じた（別館の建設で階を移るなど）
     // 水槽のシート以外は、地図と同じく画面全体を切り替えて表示する
     const full = this.view !== 'tank';
     this.el.classList.toggle('gs-full', full);

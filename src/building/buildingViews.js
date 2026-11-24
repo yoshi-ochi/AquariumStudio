@@ -28,7 +28,7 @@ export class ZoneView {
   html() {
     const unlocked = this.getUnlocked();
     const level = this.economy.stage.level;
-    // 地下展示室・別棟は、解放済みのものだけ並べる（解放はレイアウト編集の「増築」タブから）
+    // 地下展示室・別館は、解放済みのものだけ並べる（解放はレイアウト編集の「増築」タブから）
     const wings = WING_FLOORS.filter((f) => ZONES.some((z) => z.floor === f && unlocked.has(z.id)));
     const rows = [...PLAN_FLOORS, ...wings].map((floor) => {
       const items = ZONES.filter((z) => z.floor === floor && (!z.annex || unlocked.has(z.id))).map((z) => {
@@ -43,7 +43,7 @@ export class ZoneView {
       return `<h4 class="gs-sub">${floorLabel(floor)}</h4>${items.join('')}`;
     });
     const pen = this.seaPen;
-    return rows.join('') + '<p class="gs-empty">地下展示室・別棟・屋外生け簀の増築は、レイアウト編集の「増築」タブから行えます。</p>';
+    return rows.join('') + '<p class="gs-empty">地下展示室・別館・屋外生け簀の増築は、レイアウト編集の「増築」タブから行えます。</p>';
   }
 
   /** 色の選択はその場で建物に反映する */

@@ -47,8 +47,9 @@ import { AllianceApi } from './online/allianceApi.js';
 import { AllianceView } from './ui/allianceView.js';
 import { MapPage } from './ui/mapPage.js';
 import { LifeSystems } from './game/lifeSystems.js';
-import { BUILDING_VERSION, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter } from './building/blueprint.js';
+import { BUILDING_VERSION, STORY_H, START_ZONES, ATRIUM_TANK_POS, BASEMENT, isWing, floorOrder, DEFAULT_LAYOUT, LAYOUT, WALL_EDITS, zonesUpToLevel, getZone, setLayout, setWallEdits, setZoneNames, zoneAt, zoneCenter } from './building/blueprint.js';
 import { ViewModes } from './building/viewModes.js';
+import { buildLowerShell, buildWingShell } from './building/exterior.js';
 import { OutdoorScenery } from './building/outdoorScenery.js';
 import { WallInteraction } from './interaction/wallInteraction.js';
 import { pickLayout } from './ui/layoutPicker.js';
@@ -59,9 +60,10 @@ import { researchBonus } from './building/backyardData.js';
 import { SeaPenScene } from './building/seaPenScene.js';
 import { SeaPenView } from './ui/seaPenView.js';
 import { PoolView } from './ui/poolView.js';
+import { DinerView } from './ui/dinerView.js';
 import { ExpandPanel } from './ui/expandPanel.js';
 import { ZoneView } from './building/buildingViews.js';
-import { migrateToLayout, relocateInvalid, migrateLayoutV4, zonesForLegacyStage } from './building/migrate.js';
+import { migrateToLayout, relocateInvalid, migrateLayoutV4, migrateGridV5, zonesForLegacyStage } from './building/migrate.js';
 import { FishingScene } from './expedition/fishingScene.js';
 import { zoneOf } from './expedition/husbandry.js';
 import { isHungry } from './expedition/husbandry.js';
@@ -84,7 +86,7 @@ import { tankLabel } from './tanks/tankLabel.js';
 const $ = (id) => document.getElementById(id);
 const MIN_SPLASH_MS = 1800;
 const POOL_APPEAL = 30; // プールの設備そのものの魅力（生き物は展示した分を別に数える）
-const OUTDOOR_APPEAL = { plaza: 20, marine: 60, nature: 90 };
+const OUTDOOR_APPEAL = { marine: 60, store: 20, diner: 30 };
 const THEME_BONUS = 1.25;
 const HINT = {
   home: '水槽をタップすると名前・展示生物・エサ・掃除を管理できます ・ ドラッグで回転 / 2本指でズーム',
@@ -195,9 +197,10 @@ async function boot() {
   function applyRoom(reframe) {
     room.setStage(economy.stage, economy.floor, unlocked);
     pool.setLayout();
+    penScene.setLayout();
     zoneLabels.update(economy.floor, unlocked);
     const under = economy.floor === BASEMENT;
-    const away = under || isWing(economy.floor); // 別棟では本館の屋外（プール・景観）を出さない
+    const away = under || isWing(economy.floor); // 別館では本館の屋外（プール・景観）を出さない
     room.setUnderground(under);
     pool.setUnlocked(unlocked.has('pool') && !away);
     scenery.group.visible = !away;
@@ -209,7 +212,36 @@ async function boot() {
     room.setLights(roomSettings.lights);
     refreshRoom();
     afterApplyRoom();
+    syncGround();
     if (reframe) cameraCtl.frameBounds(room.plan.bounds(CELL.FLOOR));
+  }
+
+  // ---- 上の階の表示：今の階を床の高さ0に置いたまま、地面・屋外・下の階の外壁を階の高さだけ下げる ----
+  const lowerShell = buildLowerShell();
+  lowerShell.visible = false;
+  sceneMgr.scene.add(lowerShell);
+  let wingShell = null;
+  let viewMode = 'floor'; // 表示の切り替え（ViewModes の mode）
+  function syncGround() {
+    const floorView = viewMode === 'floor';
+    const main = economy.floor !== BASEMENT && !isWing(economy.floor);
+    const drop = floorView && main ? economy.floor * STORY_H : 0;
+    room.grass.position.y = -0.03 - drop;
+    for (const g of [scenery.group, pool.group, penScene.group]) g.position.y = -drop;
+    // 下の階の外壁（地面からの高さが分かるように）
+    lowerShell.visible = drop > 0;
+    lowerShell.position.y = -drop;
+    lowerShell.scale.y = Math.max(1, economy.floor);
+    // 本館の各階からも、裏に建つ別館の外観を見せる
+    const wings = floorOrder(unlocked).filter(isWing).length;
+    if (wingShell?.userData.floors !== wings) {
+      if (wingShell) sceneMgr.scene.remove(wingShell);
+      wingShell = buildWingShell(wings);
+      wingShell.userData.floors = wings;
+      sceneMgr.scene.add(wingShell);
+    }
+    wingShell.visible = floorView && main && wings > 0;
+    wingShell.position.y = -drop;
   }
   applyRoom(true);
   const views = new ViewModes({
@@ -219,6 +251,8 @@ async function boot() {
     onFloor: (floor) => changeFloor(floor),
     onModeChange: (m) => {
       view.enabled = m === 'floor' && mode === 'home';
+      viewMode = m;
+      syncGround();
       document.body.dataset.view = m;
     },
   });
@@ -305,7 +339,7 @@ async function boot() {
     },
   });
 
-  // 地下展示室・別棟・屋外生け簀の解放（レイアウト編集の「増築」タブからだけ）
+  // 地下展示室・別館・屋外生け簀の解放（レイアウト編集の「増築」タブからだけ）
   const expandPanel = new ExpandPanel({
     el: $('expand-panel'), economy, getUnlocked: () => unlocked, seaPen,
     onUnlockZone: (id) => unlockZone(id),
@@ -359,6 +393,8 @@ async function boot() {
     extraTargets: () => [
       ...(pool.group.visible ? [[pool.water, () => gameSheet.openPanel('pool')]] : []),
       ...(penScene.group.visible ? [[penScene.group, () => gameSheet.openPanel('seapen')]] : []),
+      // 売店は商品の補充（店舗運営）、食堂は料理の提供
+      ...scenery.facilities.map(([obj, kind]) => [obj, () => gameSheet.openPanel(kind === 'store' ? 'shop' : 'diner')]),
     ],
   });
   const hall = new HallInteraction({
@@ -553,6 +589,26 @@ async function boot() {
     applyRoom(true);
   }
 
+  /** 廃止したお土産店・カフェの置物は撤去して代金を返す（在庫の分も） */
+  function refundOldShops() {
+    let yen = 0;
+    for (const o of [...manager.objects.values()]) {
+      const def = manager.defOf(o);
+      if (def.id !== 'souvenirShop' && def.id !== 'cafe') continue;
+      manager.remove(o);
+      yen += def.price;
+    }
+    for (const id of ['souvenirShop', 'cafe']) {
+      const n = inventory.count(id);
+      for (let k = 0; k < n; k++) inventory.take(id);
+      yen += getDef(id).price * n;
+    }
+    if (yen > 0) {
+      economy.earn(yen);
+      saveAfterLoad = true;
+      life.mail.add({ key: 'shops-retired', kind: 'room', title: 'お土産店・カフェの置物を払い戻しました', body: `売店・食堂のエリアに置き換えたため、置物を撤去して ¥${yen.toLocaleString('ja-JP')} を払い戻しました。館内エリアで売店・食堂を開けます。` });
+    }
+  }
   let saveAfterLoad = false; // 読み込み時の救済で中身が変わった（すぐクラウドへ保存する）
   /** 保存用データから状態を復元する。β版の生物データのリセットを行ったら true */
   function applySnapshot(data) {
@@ -561,8 +617,11 @@ async function boot() {
     views.setMode('floor');
     setLayout(data.room?.layout ?? pendingLayout ?? DEFAULT_LAYOUT);
     // 間取りを広げる前（版4未満）の壁の編集は、壁の位置が変わるので使わない
-    const oldBuilding = data.room?.layout && (data.room.building ?? 0) < BUILDING_VERSION;
-    setWallEdits(data.room?.layout && !oldBuilding ? data.room.walls : null);
+    const builtVer = data.room?.building ?? 0;
+    const oldBuilding = data.room?.layout && builtVer < BUILDING_VERSION;
+    const oldGrid = data.room?.layout && builtVer < 4; // 間取りを広げる前（版3まで）
+    if (data.room?.layout && builtVer === 4) migrateGridV5(data); // 敷地の格子を左右に広げた
+    setWallEdits(data.room?.layout && !oldGrid ? data.room.walls : null);
     // 建造した水槽の定義を先に登録する（ID に寸法が入っている）
     registerCustomIds([...(data.objects ?? []).map((o) => o.defId), ...Object.keys(data.inventory?.stock ?? {}), ...(data.inventory?.orders ?? []).map((o) => o.defId)]);
     economy.fromJSON(data.economy);
@@ -571,6 +630,7 @@ async function boot() {
     ops.fromJSON(data.ops);
     seaPen.fromJSON(data.seaPen);
     pool.fromJSON(data.dolphinPool);
+    if (!visiting) refundOldShops();
     if (!visiting) home = data.home ?? null;
     roomSettings = { ...defaultRoomSettings(), ...(data.room ?? {}) };
     roomSettings.lights = roomSettings.lights.map(normalizeLight);
@@ -587,9 +647,10 @@ async function boot() {
       economy.setFloor(0);
     } else if (oldBuilding) {
       // 間取りを広げた：物を元のエリアの新しい位置へ移し、置けない物だけ空いている場所へ（照明は置き直す）
-      migrateLayoutV4({ manager });
+      if (oldGrid) migrateLayoutV4({ manager });
+      // 版5：屋外ひろば・自然再現エリアを廃止し、左に海獣広場・売店・食堂を設けた。置けなくなった物だけ移す
       relocateInvalid({ manager, unlocked, inventory, expeditions, economy });
-      resetLights();
+      if (oldGrid) resetLights();
     }
     delete roomSettings.plan;
     manager.setFloor(economy.floor);
@@ -598,7 +659,7 @@ async function boot() {
       const shown = new Set(manager.exhibits.flatMap((t) => Object.entries(t.userData.creatures ?? {}).filter(([, n]) => n > 0).map(([id]) => id)));
       if (life.repairDiscoveries(shown)) saveAfterLoad = true;
     }
-    // 別棟の階が未建設なら本館へ戻す
+    // 別館の階が未建設なら本館へ戻す
     if (isWing(economy.floor) && !floorOrder(unlocked).includes(economy.floor)) {
       economy.setFloor(0);
       manager.setFloor(0);
@@ -699,7 +760,7 @@ async function boot() {
     shell.update();
     const z = getZone(id);
     toast(z.wing ? `${z.name} を建設しました` : `${z.name} を解放しました`);
-    // 別棟は建てたらその階へ移動して見せる
+    // 別館は建てたらその階へ移動して見せる
     if (z.wing) {
       gameSheet.close();
       views.goFloor(z.floor);
@@ -845,6 +906,7 @@ async function boot() {
       ...life.panels,
       mail: { title: 'メール', live: true, view: mailView },
       pool: { title: 'イルカプール', view: new PoolView({ pool, expeditions, previews, toast }) },
+      diner: { title: '食堂', view: new DinerView({ expeditions, economy, previews, isOpen: () => unlocked.has('diner') }) },
       seapen: {
         title: '屋外生け簀',
         view: new SeaPenView({
@@ -882,7 +944,7 @@ async function boot() {
         }),
       },
     },
-    creatureView: new CreatureView({ manager, expeditions, previews, toast, economy, onChanged: () => shell.update(), hasCafe: () => [...manager.objects.values()].some((o) => o.userData.defId === 'cafe') }),
+    creatureView: new CreatureView({ manager, expeditions, previews, toast, economy, onChanged: () => shell.update(), hasCafe: () => unlocked.has('diner') }),
     onPlace: (id) => {
       if (mode !== 'hall-edit') enterHallEdit();
       hall.startPlacement(id);

@@ -5,29 +5,32 @@
  * 大きさ：大水槽ホールは 48×38マス（43×34m）で、30×40×10m の大水槽が入る。その他の展示室は 22×22マス（約20m四方）。
  */
 export const CELL_SIZE = 0.9;
-/** 建物の左右に屋外エリアの敷地（各18マス）を持つ */
-export const GRID_X = 128;
-const SITE_X = 18;
+/**
+ * 建物の左に屋外の敷地（44マス）：海獣広場（幅20m）・屋外バックヤード、その左に売店・食堂。さらに左の海に生け簀。
+ * 建物の位置（ワールド座標）を変えないよう、左右に同じだけ広げている（右側は空き地）。
+ */
+export const GRID_X = 180;
+const SITE_X = 44;
 export const GRID_Z = 86;
 /** 建物の版（間取りの大きさを変えたら上げる。セーブの移行に使う） */
-export const BUILDING_VERSION = 4;
+export const BUILDING_VERSION = 5;
 export const FLOOR_COUNT = 2;
 /** 地下1階のフロア番号（地上は 0, 1） */
 export const BASEMENT = 2;
 export const PLAN_FLOORS = [0, 1, BASEMENT];
 
 /**
- * 別棟：最大レベルの後に建てる、30m四方の独立した建物。中は1つの広い展示室で、壁を立てて自由に使い、階を積み増せる。
- * 階番号は WING_BASE から（別棟1F = WING_BASE）。各階は本館と同じ敷地の格子を使い、表示は1階ずつ切り替える。
+ * 別館：最大レベルの後に建てる、30m四方の独立した建物。中は1つの広い展示室で、壁を立てて自由に使い、階を積み増せる。
+ * 階番号は WING_BASE から（別館1F = WING_BASE）。各階は本館と同じ敷地の格子を使い、表示は1階ずつ切り替える。
  */
 export const WING_BASE = 10;
 export const WING_MAX = 8;
 export const WING_FLOORS = Array.from({ length: WING_MAX }, (_, i) => WING_BASE + i);
 export const isWing = (floor) => floor >= WING_BASE && floor < WING_BASE + WING_MAX;
 /** 34マス × 0.9m ≒ 30m 四方 */
-const WING_RECT = [47, 26, 80, 59];
-export const floorLabel = (floor) => (floor === BASEMENT ? 'B1' : isWing(floor) ? `別棟${floor - WING_BASE + 1}F` : `${floor + 1}F`);
-/** 階の並び（下から）。別棟は解放済みの階だけ */
+const WING_RECT = [73, 26, 106, 59];
+export const floorLabel = (floor) => (floor === BASEMENT ? 'B1' : isWing(floor) ? `別館${floor - WING_BASE + 1}F` : `${floor + 1}F`);
+/** 階の並び（下から）。別館は解放済みの階だけ */
 export const floorOrder = (unlocked) => [BASEMENT, 0, 1, ...WING_FLOORS.filter((f) => unlocked.has(`wing${f - WING_BASE + 1}`))];
 /** 展示室の壁の裏に設ける管理通路の幅（2マス = 1.8m） */
 export const SERVICE_WIDTH = 2;
@@ -43,8 +46,8 @@ const { HALL, YARD, OUTDOOR } = ZONE_TYPE;
  * rects は敷地の絶対マス（全間取り共通）。
  */
 const ANNEX_RECTS = [
-  [2, 3, 23, 24], [24, 3, 45, 24], [46, 3, 67, 24], [68, 3, 89, 24],
-  [90, 3, 111, 24], [104, 25, 125, 46], [2, 25, 23, 46], [2, 47, 23, 68],
+  [28, 3, 49, 24], [50, 3, 71, 24], [72, 3, 93, 24], [94, 3, 115, 24],
+  [116, 3, 137, 24], [130, 25, 151, 46], [28, 25, 49, 46], [28, 47, 49, 68],
 ];
 export const ANNEX_IDS = ANNEX_RECTS.map((_, i) => `annex${i + 1}`);
 const ANNEX_LINKS = [['annex1', 'annex2'], ['annex2', 'annex3'], ['annex3', 'annex4'], ['annex4', 'annex5'], ['annex5', 'annex6'], ['annex1', 'annex7'], ['annex7', 'annex8']];
@@ -59,11 +62,11 @@ function ANNEX_META() {
 
 function WING_META() {
   return WING_FLOORS.map((floor, i) => ({
-    id: `wing${i + 1}`, name: `別棟${i + 1}F`, floor, type: HALL, stage: 4,
+    id: `wing${i + 1}`, name: `別館${i + 1}F`, floor, type: HALL, stage: 4,
     cost: i === 0 ? 30000000 : Math.round((12000000 * 1.35 ** (i - 1)) / 1000000) * 1000000,
     requires: i === 0 ? null : `wing${i}`,
     color: '#5aa8a0', annex: true, wing: true,
-    text: i === 0 ? '30m四方の別棟を建てる。壁を自由に立てて、好きなように使える' : `別棟に${i + 1}階を増築する`,
+    text: i === 0 ? '30m四方の別館を建てる。壁を自由に立てて、好きなように使える' : `別館に${i + 1}階を増築する`,
   }));
 }
 
@@ -77,9 +80,10 @@ const ZONE_META = [
   { id: 'atrium', name: '大水槽ホール', floor: 0, type: HALL, stage: 2, cost: 1500000, color: '#3f8fd0', text: '2階まで吹き抜けの大水槽を備えたホール' },
   { id: 'deep', name: '深海エリア', floor: 1, type: HALL, stage: 2, cost: 2000000, requires: 'gallery', theme: 'cold', color: '#4a5a9c', text: '冷たい海の生き物を展示すると集客+25%' },
   { id: 'archive', name: '資料エリア', floor: 1, type: HALL, stage: 2, cost: 1000000, requires: 'gallery', color: '#b79bd8', text: '研究の進み方が1.5倍になる' },
-  { id: 'plaza', name: '屋外ひろば', floor: 0, type: OUTDOOR, open: true, stage: 1, cost: 400000, requires: 'coast', color: '#d9c49a', text: '屋外の多目的エリア。お店や水槽を自由に置ける' },
-  { id: 'marine', name: '海獣エリア', floor: 0, type: OUTDOOR, open: true, stage: 2, cost: 1200000, requires: 'plaza', color: '#8aa6b8', text: '屋外の更地。海獣用水槽など、好きな水槽を自由に置ける' },
-  { id: 'nature', name: '自然再現エリア', floor: 0, type: OUTDOOR, open: true, stage: 3, cost: 3000000, requires: 'subtropical', color: '#7fae62', text: '磯・干潟・小川を再現した屋外エリア' },
+  { id: 'marine', name: '海獣広場', floor: 0, type: OUTDOOR, open: true, stage: 1, cost: 400000, color: '#8aa6b8', text: '建物の左の屋外の更地（幅20m）。海獣用水槽など、好きな水槽を自由に置ける' },
+  { id: 'yard0', name: '屋外バックヤード', floor: 0, type: YARD, stage: 1, cost: 300000, requires: 'marine', color: '#c9ccd0', text: '海獣広場の奥の職員エリア。設備や予備の水槽を置ける' },
+  { id: 'store', name: '売店', floor: 0, type: HALL, stage: 1, cost: 300000, requires: 'marine', color: '#e6a15c', facility: 'store', text: '棚に商品が並ぶお土産の売店。タップで商品を補充できる' },
+  { id: 'diner', name: '食堂', floor: 0, type: HALL, stage: 1, cost: 500000, requires: 'marine', color: '#e0c46c', facility: 'diner', text: '提供口とテーブルのある食堂。タップで料理を提供できる' },
   { id: 'b1a', name: '地下機械室', floor: BASEMENT, type: YARD, stage: 1, cost: 0, color: '#9aa4ad', text: '水質管理と予備水槽の基本エリア' },
   { id: 'b1b', name: '地下西ブロック', floor: BASEMENT, type: YARD, stage: 2, cost: 800000, requires: 'b1a', color: '#9aa4ad', text: '設備を増やせる地下の拡張区画' },
   { id: 'b1c', name: '地下東ブロック', floor: BASEMENT, type: YARD, stage: 3, cost: 2500000, requires: 'b1a', color: '#9aa4ad', text: '設備を増やせる地下の拡張区画' },
@@ -99,16 +103,16 @@ export const LAYOUTS = [
     inspired: '大阪・海遊館の、中央の大水槽を巡りながら見る構成に着想',
     summary: '中央の大水槽をぐるりと囲む王道の間取り。どの展示室からも大水槽へ戻れます。',
     style: 'spiral',
+    leftLink: 'coast',
     rects: {
       entrance: [[35, 58, 56, 79]], yard1: [[13, 14, 78, 19]], coast: [[13, 58, 34, 79]], subtropical: [[57, 58, 78, 79]],
       atrium: [[22, 20, 69, 57]], pool: [[29, 0, 62, 13]],
       gallery: [[35, 58, 56, 79], ...ring(22, 20, 69, 57)], yard2: [[13, 14, 78, 19]], deep: [[13, 58, 34, 79]], archive: [[57, 58, 78, 79]],
     },
-    outdoor: { plaza: [14, 40, 30, 85], marine: [14, 2, 30, 39], nature: [97, 2, 113, 85] },
     voidRect: [23, 21, 68, 56],
     // 大水槽ホールの両脇を通る管理通路で、手前の展示室を裏のバックヤードへつなぐ
     serviceLinks: [[13, 20, 14, 57], [77, 20, 78, 57]],
-    links: [['entrance', 'atrium'], ['atrium', 'coast'], ['atrium', 'subtropical'], ['entrance', 'coast'], ['entrance', 'subtropical'], ['gallery', 'deep'], ['gallery', 'archive'], ['coast', 'plaza'], ['subtropical', 'nature']],
+    links: [['entrance', 'atrium'], ['atrium', 'coast'], ['atrium', 'subtropical'], ['entrance', 'coast'], ['entrance', 'subtropical'], ['gallery', 'deep'], ['gallery', 'archive']],
   },
   {
     id: 'descent',
@@ -121,10 +125,10 @@ export const LAYOUTS = [
       yard1: [[48, 14, 65, 51]], pool: [[15, 0, 50, 13]],
       gallery: [[44, 52, 65, 73]], archive: [[22, 52, 43, 73]], deep: [[0, 52, 21, 73]], yard2: [[48, 14, 65, 51]],
     },
-    outdoor: { plaza: [1, 46, 17, 85], marine: [1, 2, 17, 45], nature: [84, 2, 100, 85] },
     voidRect: [1, 15, 46, 50],
-    links: [['entrance', 'coast'], ['coast', 'subtropical'], ['subtropical', 'atrium'], ['gallery', 'archive'], ['archive', 'deep'], ['subtropical', 'plaza'], ['entrance', 'nature']],
-    requires: { subtropical: 'coast', atrium: 'subtropical', deep: 'archive', plaza: 'subtropical', nature: 'entrance' },
+    links: [['entrance', 'coast'], ['coast', 'subtropical'], ['subtropical', 'atrium'], ['gallery', 'archive'], ['archive', 'deep']],
+    requires: { subtropical: 'coast', atrium: 'subtropical', deep: 'archive' },
+    leftLink: 'subtropical',
   },
   {
     id: 'radial',
@@ -132,14 +136,14 @@ export const LAYOUTS = [
     inspired: 'ジョージア水族館の、中央ホールから各展示棟へ分かれる構成に着想',
     summary: '十字に広がる展示棟の中心が大ホール。好きな順に回れて、来館者が滞りにくい間取りです。',
     style: 'radial',
+    leftLink: 'coast',
     rects: {
       atrium: [[22, 18, 69, 55]], entrance: [[35, 56, 56, 77]], coast: [[0, 18, 21, 39]], subtropical: [[70, 18, 91, 39]],
       yard1: [[0, 40, 21, 61], [70, 40, 91, 61]], pool: [[32, 0, 59, 16]],
       gallery: [[35, 56, 56, 77], ...ring(22, 18, 69, 55)], deep: [[0, 18, 21, 39]], archive: [[70, 18, 91, 39]], yard2: [[0, 40, 21, 61], [70, 40, 91, 61]],
     },
-    outdoor: { plaza: [1, 18, 17, 85], marine: [1, 0, 17, 17], nature: [110, 0, 126, 85] },
     voidRect: [23, 19, 68, 54],
-    links: [['entrance', 'atrium'], ['atrium', 'coast'], ['atrium', 'subtropical'], ['gallery', 'deep'], ['gallery', 'archive'], ['coast', 'plaza'], ['subtropical', 'nature']],
+    links: [['entrance', 'atrium'], ['atrium', 'coast'], ['atrium', 'subtropical'], ['gallery', 'deep'], ['gallery', 'archive']],
     // 大ホールの裏で東西の管理通路をつなぐ
     serviceLinks: [[0, 17, 91, 17]],
   },
@@ -149,14 +153,14 @@ export const LAYOUTS = [
     inspired: 'バレンシア・オセアノグラフィックの、海域ごとに建物を分ける構成に着想',
     summary: '海域ごとの独立した棟を渡り廊下でつなぎます。棟ごとに世界観をはっきり分けられます。',
     style: 'pavilion',
+    leftLink: 'coast',
     rects: {
       entrance: [[35, 62, 56, 83], [45, 52, 46, 61], [22, 66, 34, 67], [57, 66, 69, 67]], coast: [[0, 56, 21, 77]], subtropical: [[70, 56, 91, 77]],
       atrium: [[22, 14, 69, 51]], yard1: [[0, 14, 21, 35]], pool: [[28, 0, 63, 12]],
       gallery: [[35, 62, 56, 83], [45, 52, 46, 61], [22, 66, 34, 67], [57, 66, 69, 67], ...ring(22, 14, 69, 51)], deep: [[0, 56, 21, 77]], archive: [[70, 56, 91, 77]], yard2: [[0, 14, 21, 35]],
     },
-    outdoor: { plaza: [1, 46, 17, 85], marine: [1, 2, 17, 45], nature: [110, 2, 126, 85] },
     voidRect: [23, 15, 68, 50],
-    links: [['entrance', 'coast'], ['entrance', 'subtropical'], ['entrance', 'atrium'], ['gallery', 'deep'], ['gallery', 'archive'], ['coast', 'plaza'], ['subtropical', 'nature']],
+    links: [['entrance', 'coast'], ['entrance', 'subtropical'], ['entrance', 'atrium'], ['gallery', 'deep'], ['gallery', 'archive']],
     // 離れた棟の管理通路をメインバックヤードへつなぐ渡り通路
     serviceLinks: [[4, 36, 5, 55], [88, 13, 89, 55], [0, 13, 89, 13]],
   },
@@ -167,9 +171,15 @@ const shift = ([x0, z0, x1, z1]) => [x0 + SITE_X, z0, x1 + SITE_X, z1];
 for (const l of LAYOUTS) {
   for (const id of Object.keys(l.rects)) l.rects[id] = l.rects[id].map(shift);
   l.voidRect = shift(l.voidRect);
-  for (const [id, rect] of Object.entries(l.outdoor)) l.rects[id] = [rect];
+  // 建物の左端から、海獣広場（22マス≒20m）と屋外バックヤード、その左に売店・食堂（各22マス四方）
+  const L = Math.min(...Object.entries(l.rects).filter(([id]) => id !== 'pool').flatMap(([, rs]) => rs.map((r) => r[0])));
+  Object.assign(l.rects, {
+    marine: [[L - 22, 30, L - 1, 85]], yard0: [[L - 22, 2, L - 1, 29]],
+    store: [[L - 44, 30, L - 23, 51]], diner: [[L - 44, 52, L - 23, 73]],
+  });
+  l.links = [...l.links, ['marine', l.leftLink], ['marine', 'store'], ['marine', 'diner']];
   l.serviceLinks = (l.serviceLinks ?? []).map(shift);
-  Object.assign(l.rects, { b1a: [[46, 25, 81, 46]], b1b: [[24, 25, 45, 46]], b1c: [[82, 25, 103, 46]], b1d: [[24, 47, 103, 58]] });
+  Object.assign(l.rects, { b1a: [[72, 25, 107, 46]], b1b: [[50, 25, 71, 46]], b1c: [[108, 25, 129, 46]], b1d: [[50, 47, 129, 58]] });
   ANNEX_RECTS.forEach((r, i) => (l.rects[ANNEX_IDS[i]] = [r]));
   WING_FLOORS.forEach((_, i) => (l.rects[`wing${i + 1}`] = [WING_RECT]));
   l.links = [...l.links, ...ANNEX_LINKS];
@@ -177,7 +187,6 @@ for (const l of LAYOUTS) {
 
 /** 作り付けの景観が占める区画（区画の内側に余白をとる） */
 function sceneryRect(id, [x0, z0, x1, z1]) {
-  if (id === 'nature') return [x0 + 2, z0 + 2, x1 - 3, z1 - 3];
   return null;
 }
 
@@ -236,7 +245,7 @@ export function zoneAt(floor, x, z) {
 export const zoneRectCenter = (rect) => rectCenter(rect);
 /** エリアの中心（最初の区画の中心。ワールド座標） */
 export const zoneCenter = (zone) => rectCenter(zone.rects[0]);
-/** 別棟の区画の中心（各階の格子上。ワールド座標） */
+/** 別館の区画の中心（各階の格子上。ワールド座標） */
 export const WING_GRID_CENTER = rectCenter(WING_RECT);
 
 /** 間取りを選ぶ前の建物（旧セーブの移行に使う） */

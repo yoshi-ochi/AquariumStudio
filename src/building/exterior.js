@@ -37,7 +37,8 @@ function surface(nu, nv, fn) {
   return g;
 }
 
-const buildingZones = () => ZONES.filter((z) => z.type !== ZONE_TYPE.OUTDOOR && !z.wing);
+/** 本館（地上の階）のエリア。地下・別館・左の売店や食堂は含めない */
+const buildingZones = () => ZONES.filter((z) => z.type !== ZONE_TYPE.OUTDOOR && z.floor < FLOOR_COUNT && !z.facility && z.id !== 'yard0');
 
 /** 全エリアの外接矩形（ワールド座標） */
 function footprint() {
@@ -49,7 +50,8 @@ function footprint() {
 }
 
 /** 外周に沿ってガラス面と縦の方立てを並べる */
-function curtainWall(group) {
+function curtainWall(group, TOP_ = TOP) {
+  const TOP = TOP_;
   const solid = (i, j) => buildingZones().some((z) => zoneHas(z, i, j));
   const edges = [];
   for (let j = 0; j < GRID_Z; j++) for (let i = 0; i < GRID_X; i++) {
@@ -236,10 +238,10 @@ function shellRoofs(group) {
 
 const ROOFS = { spiral: spiralRoof, descent: waveRoof, radial: domeRoof, pavilion: shellRoofs };
 
-/** 別棟：本館の裏に建つ30m四方のガラスの棟。階数ぶんの高さで、本館とは渡り廊下でつなぐ */
+/** 別館：本館の裏に建つ30m四方のガラスの棟。階数ぶんの高さで、本館とは渡り廊下でつなぐ */
 export const WING_SIZE = 34 * CELL_SIZE;
 export const WING_GAP = 9;
-/** 別棟の中心（本館の裏側。ワールド座標） */
+/** 別館の中心（本館の裏側。ワールド座標） */
 export function wingCenter() {
   const b = footprint();
   return { x: (b.x0 + b.x1) / 2, z: b.z0 - WING_GAP - WING_SIZE / 2 };
@@ -279,7 +281,7 @@ function wing(group, floors) {
   c.font = '700 64px system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.fillText(`別棟 ${floors}F`, 256, 68);
+  c.fillText(`別館 ${floors}F`, 256, 68);
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
   for (const s of [-1, 1]) {
@@ -287,6 +289,39 @@ function wing(group, floors) {
     sign.position.set(x + s * 9, H - 1.2, z + S / 2 + 0.12);
     group.add(sign);
   }
+}
+
+/** 左の売店・食堂・屋外バックヤード：平屋のガラスの棟と白い屋根 */
+function sidePavilions(group) {
+  const parts = [];
+  for (const id of ['store', 'diner', 'yard0']) {
+    const [x0, z0, x1, z1] = getZone(id)?.rects[0] ?? [];
+    if (x0 == null) continue;
+    const w = (x1 - x0 + 1) * CELL_SIZE;
+    const d = (z1 - z0 + 1) * CELL_SIZE;
+    const cx = wx(x0) + w / 2;
+    const cz = wz(z0) + d / 2;
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(w, STORY_H, d).translate(cx, STORY_H / 2, cz), MAT.glass));
+    parts.push(box(w + 0.6, 0.34, d + 0.6, cx, STORY_H, cz));
+  }
+  if (parts.length) group.add(new THREE.Mesh(mergeGeometries(parts), MAT.white));
+}
+
+/** 上の階を見ているときに、その下の階の外壁（ガラスと方立て）を1階分の高さで出す。高さは scale.y で階数分に伸ばす */
+export function buildLowerShell() {
+  const g = new THREE.Group();
+  g.name = 'lower-shell';
+  curtainWall(g, STORY_H);
+  sidePavilions(g); // 左の売店・食堂（平屋）
+  return g;
+}
+
+/** 各階の表示で、本館の裏に建つ別館の外観だけを出す */
+export function buildWingShell(floors) {
+  const g = new THREE.Group();
+  g.name = 'wing-shell';
+  if (floors) wing(g, floors);
+  return g;
 }
 
 export class Exterior {
@@ -311,12 +346,13 @@ export class Exterior {
     curtainWall(this.group);
     slabs(this.group);
     entranceCanopy(this.group);
+    sidePavilions(this.group);
     ROOFS[LAYOUT.style](this.group);
     if (this.wings) wing(this.group, this.wings);
     this.key = `${LAYOUT.id}:${this.wings}`;
   }
 
-  /** wings: 建設済みの別棟の階数 */
+  /** wings: 建設済みの別館の階数 */
   show(v, wings = 0) {
     this.wings = wings;
     if (v && this.key !== `${LAYOUT.id}:${wings}`) this.build();
