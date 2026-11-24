@@ -1,4 +1,4 @@
-import { ROLES, STARTING_STAFF, requiredStaff, PRODUCTS, PRICE_TIERS, BUY_RATE, SALES_PER_STAFF, LOT_SIZE, CAFE_RATE, CAFE_PRICE } from './opsData.js';
+import { ROLES, STARTING_STAFF, GUIDE_MAX, requiredStaff, PRODUCTS, PRICE_TIERS, BUY_RATE, SALES_PER_STAFF, LOT_SIZE, CAFE_RATE, CAFE_PRICE } from './opsData.js';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 /** 満足度が目標値へ近づく速さ（1秒あたりの割合） */
@@ -62,6 +62,7 @@ export class Operations extends EventTarget {
   }
 
   hire(role) {
+    if (role === 'guide' && this.staff.guide >= GUIDE_MAX) return;
     this.staff[role]++;
     this._emit();
   }
@@ -154,6 +155,8 @@ export class Operations extends EventTarget {
 
   fromJSON(data) {
     this.staff = { ...STARTING_STAFF, ...(data?.staff ?? {}) };
+    // 以前の計算（上限なし）で雇いすぎた案内係は上限まで減らす（賃金がかさむため）
+    this.staff.guide = Math.min(GUIDE_MAX, this.staff.guide);
     this.shops = data?.shops ?? 0;
     this.prices = { ...(data?.prices ?? {}) };
     this.satisfaction = data?.live?.satisfaction ?? 80;
