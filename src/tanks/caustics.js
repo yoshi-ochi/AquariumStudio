@@ -5,26 +5,29 @@ import * as THREE from 'three';
  * 「水面の格子を光が通り抜けたとき、三角形の面積が縮んだ所に光が集まる（明るさ＝元の面積 ÷ 屈折後の面積）」計算を、
  * 水族館向けに軽くしたもの。
  *
- * 水面：50m 四方で繰り返す1枚の大きな水面。向きも波長（8〜45cm）もばらばらな 28 の波を重ねるので、
- *   水槽の大きさでは繰り返しも規則性も見えない（波数は 50m あたりの整数なので、50m ごとにだけつながる）。
+ * 水面：5m 四方で継ぎ目なく繰り返す水面。向きも波長（8〜45cm）もばらばらな 28 の波を重ねるので、
+ *   普通の水槽の大きさでは繰り返しも規則性も見えない（波数は 5m あたりの整数なので、5m ごとにつながる）。
  * くり抜き：水槽ごとに、その水槽の真上にあたる範囲だけを計算する（水槽ごとに違う模様になり、隣の水槽とも続いている）。
  *   範囲の格子を1回描くだけ（GPU）で、水槽の大きさに合わせた解像度（1m あたり 200px）のテクスチャに書く。
- *   大きな水槽（WINDOW を超える）も繰り返さず、元の水面のまま、見ている所のまわり WINDOW 四方だけを計算する
- *   （範囲の外は水紋なし。縁はぼかす）。
- * 水深：屈折で光がずれる量は水面から底までの深さに比例するので、深い水槽ほど網目がはっきりして、深すぎると崩れる。
- *   （60cm より深い所は網目の細かさをそのままに、）水が光を吸うので深いほど淡くなる（水槽ごとに水面と底の高さから決める）。
+ *   5m を超える大きな水槽は、5m 四方を計算して継ぎ目なく繰り返す。
+ * 水深：屈折で光がずれる量は水深に比例するので、浅い水槽は太く柔らかい網目、深い水槽は細く鋭い網目にする（60cm まで）。
+ *   さらに、映す面（底・物・生き物）ごとの水面からの深さで見え方を変える：水面のすぐ下では光がまだ集まらず淡く、
+ *   30cm ほどで網目がはっきりし、それより深いほどぼけて（光の広がり）淡くなり、4m でほぼ見えなくなる。
+ *   同じ水槽でも、表層を泳ぐ生き物と底の生き物で光の映り方が変わる。
  * 元の実装との違い（軽量化）：水面の数値シミュレーションと、光源から見た環境の深度マップは使わない。
  *   画面に見えている近くの水槽だけ、約24回/秒に間引いて描き直す。
  * 底・水槽内の物・生き物の材質には、ワールド座標で水槽のテクスチャを引いて「明るい網目（光）とそのあいだ（影）」を掛ける。
  */
-const PERIOD = 50; // m（水面が繰り返す1辺）
+const PERIOD = 5; // m（水面が繰り返す1辺。大きな水槽はこの範囲を繰り返す）
 const PX_PER_M = 200;
-/** 大きな水槽で一度に計算する範囲の1辺(m) */
-const WINDOW = 6;
 /** 波の振幅を決めたときの基準の水深(m)。水深 / これ で光のずれを伸び縮みさせる */
 const REF_DEPTH = 0.35;
-/** 水紋の濃さが 1/e になる水深(m)（水の吸収） */
-const FADE_DEPTH = 2.5;
+/** 映す面の水面からの深さで、水紋の濃さが 1/e になる深さ(m)。濃さ = exp(-(深さ/これ)²)：50cm で 9割強、2m で 4割弱、3m で 1割、4m でほぼ0 */
+const FADE_DEPTH = 2.0;
+/** 水面のすぐ下では光がまだ集まっていないので水紋は弱く、この深さ(m)までに網目がはっきりする */
+const FOCUS_RAMP = 0.3;
+/** 深さ 1m あたりのぼけの半径(m) */
+const BLUR_PER_M = 0.022;
 /** 光のずれが伸びる深さの上限(m)。これより深いと光が交差しすぎて砂嵐のようになるので、網目のまま淡くしていく */
 const MAX_FOCUS_DEPTH = 0.6;
 /** くり抜く範囲の外から入ってくる光も数えるための余白(m) */
@@ -33,7 +36,7 @@ const UPDATE_HZ = 24;
 /** これより遠い水槽は描き直さない(m) */
 const NEAR = 40;
 
-/** 波：50m あたりの整数の波数ベクトル・ずれの振幅(m)・角振動数・位相。乱数の種を固定して毎回同じ水面にする */
+/** 波：5m あたりの整数の波数ベクトル・ずれの振幅(m)・角振動数・位相。乱数の種を固定して毎回同じ水面にする */
 const WAVES = (() => {
   let seed = 20261124;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -69,6 +72,7 @@ export function causticUniforms(on = 1) {
     uCauTex: { value: NEUTRAL },
     uCauOrigin: { value: new THREE.Vector2() },
     uCauSize: { value: new THREE.Vector2(1, 1) },
+    uCauTop: { value: 0 }, // 水面の高さ（ワールド）
   };
 }
 
@@ -83,7 +87,6 @@ function createSim() {
       uOrigin: { value: new THREE.Vector2() }, // くり抜く範囲の左上（ワールド XZ）
       uSize: { value: new THREE.Vector2(1, 1) },
       uDepth: { value: 1 }, // 水深 / 基準の水深（光のずれの倍率）
-      uFade: { value: 1 }, // 水の吸収で残る濃さ
     },
     vertexShader: `uniform float uTime;
       uniform vec4 uWave[${WAVES.length}];
@@ -106,15 +109,13 @@ function createSim() {
         vNew = p + d * uDepth;
         gl_Position = vec4((vNew - uOrigin) / uSize * 2.0 - 1.0, 0.0, 1.0);
       }`,
-    fragmentShader: `uniform float uFade;
-      varying vec2 vOld;
+    fragmentShader: `varying vec2 vOld;
       varying vec2 vNew;
       void main() {
         // 明るさ＝元の面積 ÷ 屈折後の面積（光が集まって縮んだ所ほど明るい）
         float oldArea = length(dFdx(vOld)) * length(dFdy(vOld));
         float newArea = length(dFdx(vNew)) * length(dFdy(vNew));
         float I = min(oldArea / max(newArea, 1e-12), 12.0);
-        I = 1.0 + (I - 1.0) * uFade; // 深いほど淡く
         gl_FragColor = vec4(vec3(I * 0.25), 1.0);
       }`,
     side: THREE.DoubleSide,
@@ -149,9 +150,8 @@ function gridFor(w, h) {
 }
 
 const v3 = new THREE.Vector3();
-const dir = new THREE.Vector3();
-/** 水槽の水の範囲（ワールド XZ の外接矩形。大きさは 10cm 単位に切り上げ）。focus：大きな水槽で中心にしたい点 */
-function windowOf(tank, focus) {
+/** 水槽の水の範囲（ワールド XZ の外接矩形。大きさは 10cm 単位に切り上げ。5m を超えたら 5m で繰り返す） */
+function windowOf(tank) {
   const I = tank.userData.interior;
   const hx = I.radius ?? I.halfW;
   const hz = I.radius ?? I.halfD;
@@ -161,15 +161,9 @@ function windowOf(tank, focus) {
     x0 = Math.min(x0, v3.x); x1 = Math.max(x1, v3.x);
     z0 = Math.min(z0, v3.z); z1 = Math.max(z1, v3.z);
   }
-  // 大きな水槽は、見ている所（focus）を中心にした WINDOW 四方（水槽からはみ出さない。0.5m 刻みで動かす）
-  const fit = (a0, a1, c) => {
-    if (a1 - a0 <= WINDOW) return [a0, Math.ceil(Math.max(0.1, a1 - a0) * 10) / 10];
-    const start = Math.min(a1 - WINDOW, Math.max(a0, Math.round(((c ?? (a0 + a1) / 2) - WINDOW / 2) * 2) / 2));
-    return [start, WINDOW];
-  };
-  const [x, w] = fit(x0, x1, focus?.x);
-  const [z, h] = fit(z0, z1, focus?.z);
-  return { x, z, w, h };
+  const w = Math.min(PERIOD, Math.ceil(Math.max(0.1, x1 - x0) * 10) / 10);
+  const h = Math.min(PERIOD, Math.ceil(Math.max(0.1, z1 - z0) * 10) / 10);
+  return { x: x0, z: z0, w, h };
 }
 
 const clearColor = new THREE.Color();
@@ -198,26 +192,19 @@ export function updateCaustics(time, renderer, tanks = [], camera = null) {
     tank.updateWorldMatrix(true, false);
     tank.getWorldPosition(v3);
     if (camera && v3.distanceTo(camera.position) > NEAR) continue;
-    // 見ている所：カメラの視線が水槽の底の高さと交わる点
     const I = tank.userData.interior;
-    let focus = null;
-    if (camera) {
-      camera.getWorldDirection(dir);
-      const t = dir.y < -1e-3 ? (camera.position.y - (v3.y + I.floorY)) / -dir.y : 0;
-      focus = { x: camera.position.x + dir.x * t, z: camera.position.z + dir.z * t };
-    }
-    const win = windowOf(tank, focus);
-    // 水深（水面から底まで）で、光のずれと淡さを決める
+    const top = v3.y + I.waterTop; // 水面の高さ（ワールド）。映す面ごとのぼけと淡さに使う
+    const win = windowOf(tank);
+    // 水深（水面から底まで）で光のずれを決める
     const depth = Math.max(0.05, I.waterTop - I.floorY);
     sim.mat.uniforms.uDepth.value = Math.min(depth, MAX_FOCUS_DEPTH) / REF_DEPTH;
-    sim.mat.uniforms.uFade.value = Math.exp(-depth / FADE_DEPTH);
     let st = sim.tanks.get(tank);
     const rw = Math.max(16, Math.round(win.w * PX_PER_M));
     const rh = Math.max(16, Math.round(win.h * PX_PER_M));
     if (!st || st.rt.width !== rw || st.rt.height !== rh) {
       st?.rt.dispose();
       const rt = new THREE.WebGLRenderTarget(rw, rh, { depthBuffer: false, stencilBuffer: false });
-      rt.texture.wrapS = rt.texture.wrapT = THREE.ClampToEdgeWrapping; // 繰り返さない
+      rt.texture.wrapS = rt.texture.wrapT = THREE.RepeatWrapping; // 5m を超える水槽で繰り返す
       rt.texture.generateMipmaps = false;
       st = { rt };
       sim.tanks.set(tank, st);
@@ -233,6 +220,7 @@ export function updateCaustics(time, renderer, tanks = [], camera = null) {
     cau.uCauTex.value = st.rt.texture;
     cau.uCauOrigin.value.set(win.x, win.z);
     cau.uCauSize.value.set(win.w, win.h);
+    cau.uCauTop.value = top;
   }
   renderer.autoClear = prevAuto;
   renderer.setClearColor(clearColor, prevAlpha);
@@ -249,6 +237,7 @@ export function updateCaustics(time, renderer, tanks = [], camera = null) {
 const CAU_DECL = `uniform sampler2D uCauTex;
 uniform vec2 uCauOrigin;
 uniform vec2 uCauSize;
+uniform float uCauTop;
 uniform float uCauAmt;
 uniform float uCauOn;
 // ワールド座標 wp の水紋：明るい網目は明るく、そのあいだは少し暗く（上向きの面ほど強く）
@@ -257,9 +246,17 @@ float cauFactor(vec3 wp) {
   vec3 n = normalize(cross(dFdx(wp), dFdy(wp)));
   float up = clamp(abs(n.y) * 0.8 + 0.2, 0.0, 1.0);
   vec2 uv = (wp.xz - uCauOrigin) / uCauSize;
-  // 計算した範囲の外は水紋なし（大きな水槽で見ている所から離れた所）。縁 3% はぼかす
-  vec2 e = smoothstep(vec2(0.0), vec2(0.03), uv) * smoothstep(vec2(0.0), vec2(0.03), 1.0 - uv);
-  float I = mix(1.0, texture2D(uCauTex, uv).r * 4.0, e.x * e.y);
+  // 水面からの深さ：深いほど光が広がってぼけ（周りの7点の平均）、水に吸われて淡くなる
+  float d = max(0.0, uCauTop - wp.y);
+  vec2 r = vec2(d * ${BLUR_PER_M.toFixed(3)}) / uCauSize;
+  float I = texture2D(uCauTex, uv).r * 2.0;
+  for (int i = 0; i < 6; i++) {
+    float a = float(i) * 1.0472;
+    I += texture2D(uCauTex, uv + r * vec2(cos(a), sin(a))).r;
+  }
+  I = I / 8.0 * 4.0;
+  // 水面のすぐ下は光がまだ集まらず淡く、深いほど吸われて淡く
+  I = mix(1.0, I, smoothstep(0.0, ${FOCUS_RAMP.toFixed(2)}, d) * exp(-pow(d / ${FADE_DEPTH.toFixed(2)}, 2.0)));
   float k = I > 1.0 ? 0.85 : 0.6;
   return max(0.0, 1.0 + uCauAmt * up * k * (I - 1.0));
 }`;
@@ -271,7 +268,7 @@ float cauFactor(vec3 wp) {
  * mask：水紋を映す割合の GLSL の式（0〜1。水面より上を 0 にするなど）
  */
 export function addCaustics(shader, cau, worldVar = null, mask = '1.0') {
-  Object.assign(shader.uniforms, { uCauAmt: CAUSTIC_AMOUNT, uCauOn: cau.uCauOn, uCauTex: cau.uCauTex, uCauOrigin: cau.uCauOrigin, uCauSize: cau.uCauSize });
+  Object.assign(shader.uniforms, { uCauAmt: CAUSTIC_AMOUNT, uCauOn: cau.uCauOn, uCauTex: cau.uCauTex, uCauOrigin: cau.uCauOrigin, uCauSize: cau.uCauSize, uCauTop: cau.uCauTop });
   let v = worldVar;
   if (!v) {
     v = 'vCauWorld';
