@@ -14,6 +14,7 @@ import { HallInteraction } from './interaction/hallInteraction.js';
 import { InteriorInteraction } from './interaction/interiorInteraction.js';
 import { ViewInteraction } from './interaction/viewInteraction.js';
 import { LightInteraction } from './interaction/lightInteraction.js';
+import { updateCaustics } from './tanks/sandLook.js';
 import { InteriorCamera } from './interior/interiorCamera.js';
 import { Room } from './room/room.js';
 import { CELL } from './room/floorPlan.js';
@@ -326,7 +327,7 @@ async function boot() {
       if (action === 'param-embed-bottom') return hall.setEmbedParam(obj, 'bottom', value);
       if (action === 'embed') return hall.embed(obj);
       if (action === 'param-bubbles') return (obj.userData.bubbles = value);
-      if (action.startsWith('look-') || action === 'param-tanklight-intensity' || action === 'param-side-alpha') return changeTankLook(obj, action, value);
+      if (action.startsWith('look-') || action === 'param-tanklight-intensity' || action === 'param-side-alpha' || action === 'param-sand-depth') return changeTankLook(obj, action, value);
       if (action === 'unembed') return hall.unembed(obj);
       if (action === 'stairs-up' || action === 'stairs-down') {
         const to = stairsTo(obj.userData.floor, action === 'stairs-up' ? 'up' : 'down');
@@ -360,7 +361,14 @@ async function boot() {
     } else if (action === 'param-side-alpha') {
       manager.setTankLook(tank, { [side]: { ...look[side], alpha: value } });
       rerender = false;
-    } else if (action === 'look-frame-on') manager.setTankLook(tank, { frame: true });
+    } else if (action === 'look-sand-on' || action === 'look-sand-off') manager.setTankLook(tank, { sand: { ...look.sand, on: action === 'look-sand-on' } });
+    else if (action.startsWith('look-sandtype-')) manager.setTankLook(tank, { sand: { ...look.sand, type: action.slice(14) } });
+    else if (action === 'param-sand-depth') {
+      manager.setTankLook(tank, { sand: { ...look.sand, depth: value } });
+      rerender = false;
+    } else if (action.startsWith('look-floor-')) manager.setTankLook(tank, { floorColor: action.slice(11) });
+    else if (action === 'look-caustics') manager.setTankLook(tank, { caustics: !look.caustics });
+    else if (action === 'look-frame-on') manager.setTankLook(tank, { frame: true });
     else if (action === 'look-frame-off') manager.setTankLook(tank, { frame: false });
     else if (action.startsWith('look-framecolor-')) manager.setTankLook(tank, { frameColor: action.slice(16) });
     else if (action === 'look-light') manager.setTankLook(tank, { light: { on: !look.light.on } });
@@ -1320,6 +1328,7 @@ async function boot() {
     manager.updateClips();
     manager.updateAeration(clock.elapsedTime);
     manager.updateLife(clock.elapsedTime);
+    updateCaustics(clock.elapsedTime);
     penScene.update(clock.elapsedTime);
     pool.update(clock.elapsedTime);
     scenery.update(clock.elapsedTime);

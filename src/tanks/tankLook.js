@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MATERIALS } from './materials.js';
+import { applySand } from './sandLook.js';
 
 /**
  * 水槽ごとの見た目：背面・左右側面のバックスクリーン（色＋透明度）、フレーム（あり＋色／フレームレス）、水槽用ライト。
@@ -7,6 +8,8 @@ import { MATERIALS } from './materials.js';
  *   back|left|right: { color: '#rrggbb', alpha: 0..1 },   // alpha 0 = 透明（貼っていないのと同じ）
  *   frame: boolean, frameColor: '#rrggbb',
  *   light: { on, color, intensity },
+ *   sand: { on, type, depth }（depth: 砂の厚さ m。null なら水槽の大きさに合わせた標準）, floorColor: 砂なしの底面の色,
+ *   caustics: 水面のゆらぎが底に映す光の模様,
  * }
  */
 
@@ -35,6 +38,9 @@ export function defaultTankLook() {
     frame: true,
     frameColor: FRAME_COLORS[0],
     light: { on: false, color: '#e8f4ff', intensity: 1.5 },
+    sand: { on: true, type: 'fine', depth: null },
+    floorColor: '#2b2f33',
+    caustics: true,
   };
 }
 
@@ -54,6 +60,9 @@ export function normalizeLook(look = {}) {
     frame: look.frame ?? d.frame,
     frameColor: look.frameColor ?? d.frameColor,
     light: { ...d.light, ...(look.light ?? {}) },
+    sand: { ...d.sand, ...(look.sand ?? {}) },
+    floorColor: look.floorColor ?? d.floorColor,
+    caustics: look.caustics ?? d.caustics,
   };
 }
 
@@ -72,6 +81,7 @@ export function applyTankLook(tank, def, lookIn) {
   const look = normalizeLook(lookIn);
   tank.userData.look = look;
   const body = tank.getObjectByName('body');
+  applySand(tank, look);
 
   for (const o of [...body.children]) {
     if (!o.name.startsWith('look-')) continue;

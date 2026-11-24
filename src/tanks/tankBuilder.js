@@ -128,7 +128,10 @@ function buildBoxTank(g, def) {
   const iw = w - 2 * t - 0.002;
   const id = d - 2 * t - 0.002;
   const sandH = h * 0.07;
-  box(g, iw, sandH, id, MATERIALS.sand, 0, t + sandH / 2, 0);
+  const sand = box(g, iw, sandH, id, MATERIALS.sand, 0, t + sandH / 2, 0);
+  sand.name = 'sand';
+  sand.userData.sandBase = { y0: t, h: sandH, centered: true };
+  g.userData.bottom = { kind: 'box', w: iw, d: id };
   const waterH = h * 0.9 - t;
   box(g, iw, waterH, id, MATERIALS.water, 0, t + waterH / 2, 0);
   addSurface(g, new THREE.PlaneGeometry(iw, id), t + waterH + 0.001);
@@ -159,6 +162,9 @@ function buildCylinderTank(g, def) {
   const sandH = h * 0.06;
   const sand = mesh(new THREE.CylinderGeometry(r * 0.985, r * 0.985, sandH, seg), MATERIALS.sand);
   sand.position.y = baseH + sandH / 2;
+  sand.name = 'sand';
+  sand.userData.sandBase = { y0: baseH, h: sandH, centered: true };
+  g.userData.bottom = { kind: 'circle', r: r * 0.985 };
   g.add(sand);
 
   const waterH = glassH * 0.92;
