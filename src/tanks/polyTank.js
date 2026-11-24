@@ -61,7 +61,11 @@ export function buildPolyTank(g, def) {
   bottom.renderOrder = RENDER_ORDER.GLASS;
   g.add(bottom);
   const sandH = h * 0.07;
-  g.add(slab(inner, sandH, MATERIALS.sand, t));
+  const sand = slab(inner, sandH, MATERIALS.sand, t);
+  sand.name = 'sand';
+  sand.userData.sandBase = { y0: t, h: sandH, centered: false };
+  g.userData.bottom = { kind: 'shape', shape: inner };
+  g.add(sand);
   const waterH = h * 0.9 - t;
   g.add(slab(inner, waterH, MATERIALS.water, t));
   const surf = new THREE.ShapeGeometry(inner);

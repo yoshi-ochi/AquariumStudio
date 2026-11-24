@@ -232,7 +232,7 @@ export class Room {
     const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.17, 0.16, 20, 1, true).translate(0, 0.02, 0), this.fixtureMat);
     const glow = new THREE.Mesh(new THREE.CircleGeometry(0.15, 20).rotateX(Math.PI / 2).translate(0, -0.05, 0), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
     g.add(rose, stem, shade, glow);
-    g.userData = { rose, stem, glow };
+    g.userData = { rose, stem, glow, shade };
     g.traverse((o) => (o.raycast = () => {}));
     return g;
   }
@@ -272,13 +272,19 @@ export class Room {
     line.geometry.setFromPoints([bulb.position, aim.position]);
     line.computeLineDistances();
     line.material.color.set(l.color);
-    // 照明器具：笠はライトの高さ、吊り棒は天井まで
+    // 照明器具：天井近くなら天井に埋め込んだダウンライト（枠と光る面だけ）、低ければ吊り棒と笠のペンダント
     const H = this.ceilingHeight;
-    fixture.position.set(l.x, Math.min(l.height, H - 0.1), l.z);
-    const { rose, stem, glow } = fixture.userData;
+    const recessed = l.height >= H - 0.15;
+    fixture.position.set(l.x, recessed ? H - 0.012 : Math.min(l.height, H - 0.1), l.z);
+    const { rose, stem, glow, shade } = fixture.userData;
+    stem.visible = shade.visible = !recessed;
     stem.position.y = 0.1;
     stem.scale.y = Math.max(0.01, H - fixture.position.y - 0.1);
     rose.position.y = H - fixture.position.y - 0.015;
+    rose.scale.set(recessed ? 1.9 : 1, 1, recessed ? 1.9 : 1);
+    // 埋め込みのときは、枠（受け皿を広げたもの）の下面のすぐ下に、枠より少し小さい光る面
+    glow.position.y = recessed ? 0.018 : 0;
+    glow.scale.setScalar(recessed ? 0.75 : 1);
     glow.material.color.set(l.color);
   }
 

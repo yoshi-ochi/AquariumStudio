@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CATEGORY, CATEGORY_LABELS } from './tankData.js';
 import { EMBED_RATIO_MIN, EMBED_RATIO_MAX } from '../room/embed.js';
 import { normalizeLook, PALETTE, FRAME_COLORS } from './tankLook.js';
+import { SAND_TYPES, FLOOR_COLORS } from './sandLook.js';
 import { floorLabel } from '../building/blueprint.js';
 
 const yen = (n) => `¥${Math.round(n).toLocaleString('ja-JP')}`;
@@ -142,6 +143,21 @@ export class TankCustomizer {
       ${def.bubbles ? `<div class="section"><h4>泡の量</h4>${slider('bubbles', '泡', 0, 1, 0.05, obj.userData.bubbles ?? 0.5, '%')}</div>` : ''}`;
   }
 
+  /** 底砂（あり・なし・種類・厚さ）、砂なしの底面の色、底に映る光の模様 */
+  _sandSection(obj, look) {
+    const s = look.sand;
+    const base = obj.getObjectByName('sand')?.userData.sandBase;
+    const depth = s.depth ?? base?.h ?? 0.03;
+    const maxD = Math.max(0.1, (obj.userData.interior?.waterTop ?? 0.4) * 0.4);
+    const types = SAND_TYPES.map((t) => `<button data-action="look-sandtype-${t.id}" class="${s.type === t.id ? 'active' : ''}"><i class="chip" style="background:${t.color}"></i>${t.label}</button>`).join('');
+    const floors = FLOOR_COLORS.map((c) => `<button class="swatch big${c === look.floorColor ? ' on' : ''}" style="background:${c}" data-action="look-floor-${c}" aria-label="${c}"></button>`).join('');
+    return `<div class="section"><h4>底砂</h4>
+      <div class="seg"><button data-action="look-sand-on" class="${s.on ? 'active' : ''}">砂あり</button><button data-action="look-sand-off" class="${s.on ? '' : 'active'}">砂なし</button></div>
+      ${s.on ? `<div class="seg wrap">${types}</div>${slider('sand-depth', '厚さ', 0.005, maxD, 0.005, Math.min(depth, maxD), 'cm')}` : `<div class="look-row"><span>底面の色</span></div><div class="palette frames">${floors}</div>`}
+      <div class="seg"><button data-action="look-caustics" class="${look.caustics ? 'active' : ''}">🌊 底のゆらめく光 ${look.caustics ? 'ON' : 'OFF'}</button></div>
+      </div>`;
+  }
+
   _lookSection(obj, def) {
     const look = normalizeLook(obj.userData.look);
     const sides = def.shape === 'cylinder' || def.shape === 'tunnel' ? [['back', '背面']] : [['back', '背面'], ['left', '左側面'], ['right', '右側面']];
@@ -170,6 +186,7 @@ export class TankCustomizer {
       </div>
       ${look.frame ? `<div class="palette frames">${frameSw}</div>` : ''}
       </div>
+      ${def.shape === 'box' || def.shape === 'cylinder' || def.shape === 'poly' ? this._sandSection(obj, look) : ''}
       <div class="section"><h4>水槽ライト</h4>
       <div class="seg"><button data-action="look-light" class="${look.light.on ? 'active' : ''}">💡 ${look.light.on ? 'ON' : 'OFF'}</button></div>
       ${look.light.on ? `

@@ -16,9 +16,13 @@ export const WALL_TYPES = [
 ];
 
 
+/** 天井の高さ(m)と、照明の標準の高さ（天井に埋め込んだダウンライト） */
+export const CEILING_H = 3.6;
+export const RECESSED_H = CEILING_H - 0.05;
+
 /** 室内ライト。zone（置いた部屋）の中だけを照らす。(x, height, z) から床の照射点 (tx, tz) へ向ける。数の上限はない */
 export function defaultLight(x = 0, z = 0, zone = 'entrance') {
-  return { zone, x, z, height: 2.4, tx: x, tz: z, intensity: 1.2, color: '#fff1d6', angle: 70 };
+  return { zone, x, z, height: RECESSED_H, tx: x, tz: z, intensity: 1.2, color: '#fff1d6', angle: 70 };
 }
 
 /** 旧形式（yaw/tilt）の照明を照射点形式に変換 */

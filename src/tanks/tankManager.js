@@ -3,7 +3,8 @@ import { getDef, hasDef, CATEGORY } from './tankData.js';
 import { buildObject, disposeObject } from './tankBuilder.js';
 import { createClipUniforms, updateClipUniforms, applyClip, floorAt } from './tankClip.js';
 import { encodePositions, applyEncodedPositions, rememberBase } from '../interior/sculpt.js';
-import { applyTankLook } from './tankLook.js';
+import { applyTankLook, normalizeLook } from './tankLook.js';
+import { applySand } from './sandLook.js';
 import { updateBubbles } from './aeration.js';
 import { syncLife, updateLife, lifeAppeal } from '../expedition/tankLife.js';
 import { cleanAppealFactor, updateCareVisual } from './tankCleaning.js';
@@ -45,6 +46,7 @@ export class TankManager {
       obj.userData.clean = clean ? { ...clean } : { last: Date.now() };
       if (name) obj.userData.name = String(name).slice(0, 20);
       if (look) applyTankLook(obj, def, look);
+      else applySand(obj, normalizeLook()); // 底砂（標準）と底の光の模様
     }
     this.group.add(obj);
     this.objects.set(obj.userData.uid, obj);
