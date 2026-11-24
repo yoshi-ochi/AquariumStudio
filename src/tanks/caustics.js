@@ -12,7 +12,7 @@ import * as THREE from 'three';
  *   5m を超える大きな水槽は、5m 四方を計算して継ぎ目なく繰り返す。
  * 水深：屈折で光がずれる量は水深に比例するので、浅い水槽は太く柔らかい網目、深い水槽は細く鋭い網目にする（60cm まで）。
  *   さらに、映す面（底・物・生き物）ごとの水面からの深さで見え方を変える：水面のすぐ下では光がまだ集まらず淡く、
- *   30cm ほどで網目がはっきりし、それより深いほどぼけて（光の広がり）淡くなり、4m でほぼ見えなくなる。
+ *   30cm ほどで網目がはっきりし、それより深いほどぼけて（光の広がり）淡くなる。消える深さは水槽ライトの光量で変わる（なし・最小 1m 〜 最大 15m）。
  *   同じ水槽でも、表層を泳ぐ生き物と底の生き物で光の映り方が変わる。
  * 元の実装との違い（軽量化）：水面の数値シミュレーションと、光源から見た環境の深度マップは使わない。
  *   画面に見えている近くの水槽だけ、約24回/秒に間引いて描き直す。
@@ -22,12 +22,25 @@ const PERIOD = 5; // m（水面が繰り返す1辺。大きな水槽はこの範
 const PX_PER_M = 200;
 /** 波の振幅を決めたときの基準の水深(m)。水深 / これ で光のずれを伸び縮みさせる */
 const REF_DEPTH = 0.35;
-/** 映す面の水面からの深さで、水紋の濃さが 1/e になる深さ(m)。濃さ = exp(-(深さ/これ)²)：50cm で 9割強、2m で 4割弱、3m で 1割、4m でほぼ0 */
-const FADE_DEPTH = 2.0;
+/**
+ * 水紋がほぼ消える深さ(m)：水槽ライトの光量で変わる。ライトなし・光量最小で 1m、光量最大で 15m（その間は対数で）。
+ * 濃さ = exp(-(深さ / (消える深さ/2))²)（消える深さで約2%）。ぼけも消える深さに合わせて伸び縮みする
+ */
+const VANISH_MIN = 1;
+const VANISH_MAX = 15;
+const LIGHT_MIN = 0.2;
+const LIGHT_MAX = 4;
+/** 水槽の見た目（ライト）から、水紋がほぼ消える深さ */
+function vanishDepth(look) {
+  const L = look?.light;
+  if (!L?.on) return VANISH_MIN;
+  const t = Math.min(1, Math.max(0, ((L.intensity ?? 1.5) - LIGHT_MIN) / (LIGHT_MAX - LIGHT_MIN)));
+  return VANISH_MIN * (VANISH_MAX / VANISH_MIN) ** t;
+}
 /** 水面のすぐ下では光がまだ集まっていないので水紋は弱く、この深さ(m)までに網目がはっきりする */
 const FOCUS_RAMP = 0.3;
-/** 深さ 1m あたりのぼけの半径(m) */
-const BLUR_PER_M = 0.022;
+/** ぼけの半径(m) = 深さ × これ ÷ 消える深さ（消える深さ 4m のとき、深さ1m で約2cm） */
+const BLUR_K = 0.088;
 /** 光のずれが伸びる深さの上限(m)。これより深いと光が交差しすぎて砂嵐のようになるので、網目のまま淡くしていく */
 const MAX_FOCUS_DEPTH = 0.6;
 /** くり抜く範囲の外から入ってくる光も数えるための余白(m) */
@@ -73,6 +86,7 @@ export function causticUniforms(on = 1) {
     uCauOrigin: { value: new THREE.Vector2() },
     uCauSize: { value: new THREE.Vector2(1, 1) },
     uCauTop: { value: 0 }, // 水面の高さ（ワールド）
+    uCauVanish: { value: VANISH_MIN }, // 水紋がほぼ消える深さ(m)（水槽ライトの光量で決まる）
   };
 }
 
@@ -221,6 +235,7 @@ export function updateCaustics(time, renderer, tanks = [], camera = null) {
     cau.uCauOrigin.value.set(win.x, win.z);
     cau.uCauSize.value.set(win.w, win.h);
     cau.uCauTop.value = top;
+    cau.uCauVanish.value = vanishDepth(tank.userData.look);
   }
   renderer.autoClear = prevAuto;
   renderer.setClearColor(clearColor, prevAlpha);
@@ -238,6 +253,7 @@ const CAU_DECL = `uniform sampler2D uCauTex;
 uniform vec2 uCauOrigin;
 uniform vec2 uCauSize;
 uniform float uCauTop;
+uniform float uCauVanish;
 uniform float uCauAmt;
 uniform float uCauOn;
 // ワールド座標 wp の水紋：明るい網目は明るく、そのあいだは少し暗く（上向きの面ほど強く）
@@ -248,7 +264,7 @@ float cauFactor(vec3 wp) {
   vec2 uv = (wp.xz - uCauOrigin) / uCauSize;
   // 水面からの深さ：深いほど光が広がってぼけ（周りの7点の平均）、水に吸われて淡くなる
   float d = max(0.0, uCauTop - wp.y);
-  vec2 r = vec2(d * ${BLUR_PER_M.toFixed(3)}) / uCauSize;
+  vec2 r = vec2(d * ${BLUR_K.toFixed(3)} / uCauVanish) / uCauSize;
   float I = texture2D(uCauTex, uv).r * 2.0;
   for (int i = 0; i < 6; i++) {
     float a = float(i) * 1.0472;
@@ -256,7 +272,7 @@ float cauFactor(vec3 wp) {
   }
   I = I / 8.0 * 4.0;
   // 水面のすぐ下は光がまだ集まらず淡く、深いほど吸われて淡く
-  I = mix(1.0, I, smoothstep(0.0, ${FOCUS_RAMP.toFixed(2)}, d) * exp(-pow(d / ${FADE_DEPTH.toFixed(2)}, 2.0)));
+  I = mix(1.0, I, smoothstep(0.0, ${FOCUS_RAMP.toFixed(2)}, d) * exp(-pow(d / (uCauVanish * 0.5), 2.0)));
   float k = I > 1.0 ? 0.85 : 0.6;
   return max(0.0, 1.0 + uCauAmt * up * k * (I - 1.0));
 }`;
@@ -268,7 +284,7 @@ float cauFactor(vec3 wp) {
  * mask：水紋を映す割合の GLSL の式（0〜1。水面より上を 0 にするなど）
  */
 export function addCaustics(shader, cau, worldVar = null, mask = '1.0') {
-  Object.assign(shader.uniforms, { uCauAmt: CAUSTIC_AMOUNT, uCauOn: cau.uCauOn, uCauTex: cau.uCauTex, uCauOrigin: cau.uCauOrigin, uCauSize: cau.uCauSize, uCauTop: cau.uCauTop });
+  Object.assign(shader.uniforms, { uCauAmt: CAUSTIC_AMOUNT, uCauOn: cau.uCauOn, uCauTex: cau.uCauTex, uCauOrigin: cau.uCauOrigin, uCauSize: cau.uCauSize, uCauTop: cau.uCauTop, uCauVanish: cau.uCauVanish });
   let v = worldVar;
   if (!v) {
     v = 'vCauWorld';
