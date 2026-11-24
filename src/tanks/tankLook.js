@@ -38,7 +38,7 @@ export function defaultTankLook() {
     bottom: { ...side },
     frame: true,
     frameColor: FRAME_COLORS[0],
-    light: { on: false, color: '#e8f4ff', intensity: 1.5 },
+    light: { on: false, color: '#e8f4ff', intensity: 1.6 }, // 光量は 0.2 刻みの20段階（0.2〜4.0）
     sand: { on: true, type: 'fine', depth: null },
     caustics: true,
   };
@@ -61,7 +61,11 @@ export function normalizeLook(look = {}) {
     bottom: look.bottom ? normSide(look.bottom, d.bottom) : look.floorColor ? { color: look.floorColor, alpha: 1 } : { ...d.bottom },
     frame: look.frame ?? d.frame,
     frameColor: look.frameColor ?? d.frameColor,
-    light: { ...d.light, ...(look.light ?? {}) },
+    light: (() => {
+      const l = { ...d.light, ...(look.light ?? {}) };
+      l.intensity = Math.min(4, Math.max(0.2, Math.round(l.intensity / 0.2) * 0.2)); // 20段階にそろえる
+      return l;
+    })(),
     sand: { ...d.sand, ...(look.sand ?? {}) },
     caustics: look.caustics ?? d.caustics,
   };

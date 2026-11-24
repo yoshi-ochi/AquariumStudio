@@ -18,6 +18,7 @@ export function format(fmt, v) {
   if (fmt === 'cm') return `${Math.round(v * 100)} cm`;
   if (fmt === 'm') return `${v.toFixed(2)} m`;
   if (fmt === '%') return `${Math.round(v * 100)}%`;
+  if (fmt === 'lv') return `${Math.round(v / 0.2)} / 20`; // 水槽ライトの光量の段階
   return `${v}`;
 }
 
@@ -197,7 +198,7 @@ export class TankCustomizer {
       ${look.light.on ? `
       <div class="look-row"><span>ライト色</span><input type="color" data-look="lightColor" value="${look.light.color}">
         <button data-action="look-lightpreset-#e8f4ff">白</button><button data-action="look-lightpreset-#7fb4ff">青</button><button data-action="look-lightpreset-#ffe2b0">暖色</button></div>
-      ${slider('tanklight-intensity', '明るさ', 0.2, 4, 0.1, look.light.intensity, '')}` : ''}</div>`;
+      ${slider('tanklight-intensity', '光量', 0.2, 4, 0.2, look.light.intensity, 'lv')}<small class="note">光量が強いほど水紋が深くまで届く（1段階で約${(14 / 19).toFixed(1)}m）</small>` : ''}</div>`;
   }
 
   _embedSection(obj) {
