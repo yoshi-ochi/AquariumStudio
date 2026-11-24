@@ -30,11 +30,13 @@ export const ROLES = [
 ];
 
 export const STARTING_STAFF = { guide: 1, keeper: 1, cleaner: 1, research: 0, show: 0, shop: 0 };
+/** 案内係の上限。大水槽や生け簀で集客が大きくなっても、案内は館内の要所に50人いれば足りる */
+export const GUIDE_MAX = 50;
 
 /** 水族館の規模から必要な人数を求める */
 export function requiredStaff({ potential, tanks, creatures, level, showTanks, shops, labs = 0 }) {
   return {
-    guide: Math.max(1, Math.ceil(potential / 80)),
+    guide: Math.min(GUIDE_MAX, Math.max(1, Math.ceil(potential / 80))),
     keeper: Math.max(1, Math.ceil(tanks / 4) + Math.floor(creatures / 25)),
     cleaner: Math.max(1, Math.ceil(tanks / 6)),
     research: Math.max(level - 1, labs),
