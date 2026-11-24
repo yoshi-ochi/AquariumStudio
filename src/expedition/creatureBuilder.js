@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { addCaustics } from '../tanks/caustics.js';
+import { addCaustics, causticUniforms } from '../tanks/caustics.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FORMS } from './creatureForms.js';
 import { extraSoftParts } from './creatureSoft.js';
@@ -525,15 +525,15 @@ export function buildCreature(c) {
   const shape = shapeOf(c);
   const { geo, clearGeo, mode, opacity } = shape;
   const sw = swimOf(c);
-  // uCauOn：水槽に入れたら、その水槽の水紋の ON/OFF と同じ uniform に差し替える（tankLife.js）
-  const uni = { uTime: { value: 0 }, uMode: { value: mode }, uWave: { value: shape.wave }, uSwimA: { value: new THREE.Vector4(...sw.a) }, uSwimB: { value: new THREE.Vector4(...sw.b) }, uSwimC: { value: new THREE.Vector4(...sw.c) }, uCauOn: { value: 0 } };
+  // 水紋の uniform（uCauOn など）：水槽に入れたら、その水槽のものに差し替える（tankLife.js）
+  const uni = { uTime: { value: 0 }, uMode: { value: mode }, uWave: { value: shape.wave }, uSwimA: { value: new THREE.Vector4(...sw.a) }, uSwimB: { value: new THREE.Vector4(...sw.b) }, uSwimC: { value: new THREE.Vector4(...sw.c) }, ...causticUniforms(0) };
   // 色は焼き込み済みなので、館内の照明に左右されない
   const addMesh = (g, alpha, parent = root) => {
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide, transparent: alpha < 1, opacity: alpha, depthWrite: alpha >= 1 });
     mat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uni);
       shader.vertexShader = shader.vertexShader.replace('#include <common>', VERT_DECL).replace('#include <begin_vertex>', VERT_BODY);
-      addCaustics(shader, uni.uCauOn); // 水槽の中では体に水紋が映る
+      addCaustics(shader, uni); // 水槽の中では体に水紋が映る
     };
     mat.customProgramCacheKey = () => 'creature-swim-cau';
     const mesh = new THREE.Mesh(g, mat);

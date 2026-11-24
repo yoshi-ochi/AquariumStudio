@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { addCaustics } from './caustics.js';
+import { addCaustics, causticUniforms } from './caustics.js';
 
 /**
  * 水槽内オブジェの側面クリッピング。
@@ -15,7 +15,7 @@ export function createClipUniforms(interior) {
     uClipShape: { value: interior.shape === 'cylinder' ? 1 : 0 },
     uClipHalf: { value: new THREE.Vector3(interior.halfW, interior.halfD, interior.radius ?? 0) },
     uTunnel: { value: new THREE.Vector2(interior.tunnel?.r ?? 0, interior.tunnel?.straightH ?? 0) },
-    uCauOn: { value: 1 }, // 水紋を映すか（水槽の見た目の「底のゆらめく光」）
+    ...causticUniforms(1), // 水紋（uCauOn：水槽の見た目の「底のゆらめく光」の ON/OFF、uCauTex：この水槽の真上をくり抜いた水紋）
     uWaterTop: { value: interior.waterTop ?? 1e3 }, // 水面の高さ（水槽ローカル）。これより上には水紋を映さない
   };
 }
@@ -83,7 +83,7 @@ function clipMaterial(material, uniforms) {
       .replace('#include <clipping_planes_fragment>', FRAG_BODY)
       .replace('#include <normal_fragment_maps>', FRAG_CAP);
     // 水紋は水の中だけ（水面の1cm ほど下から上へ消していく）
-    addCaustics(shader, uniforms.uCauOn, 'vClipWorld', 'smoothstep(uWaterTop + 0.002, uWaterTop - 0.01, (uClipInv * vec4(vClipWorld, 1.0)).y)');
+    addCaustics(shader, uniforms, 'vClipWorld', 'smoothstep(uWaterTop + 0.002, uWaterTop - 0.01, (uClipInv * vec4(vClipWorld, 1.0)).y)');
   };
   m.customProgramCacheKey = () => 'tank-clip-cau';
   m.needsUpdate = true;

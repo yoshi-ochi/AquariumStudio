@@ -94,7 +94,7 @@ export function applySand(tank, look) {
   sand.visible = s.on;
   if (s.on) {
     if (!tank.userData.sandMat) {
-      tank.userData.sandMat = withCaustics(new THREE.MeshStandardMaterial({ roughness: 0.95 }), tank.userData.clip.uCauOn);
+      tank.userData.sandMat = withCaustics(new THREE.MeshStandardMaterial({ roughness: 0.95 }), tank.userData.clip);
       sand.material = tank.userData.sandMat;
     }
     const m = tank.userData.sandMat;
@@ -115,7 +115,7 @@ export function applySand(tank, look) {
   const bottom = look.bottom;
   if (bottom.alpha > 0.001) {
     if (!plate) {
-      plate = new THREE.Mesh(bottomGeometry(b), withCaustics(new THREE.MeshStandardMaterial({ roughness: 0.6, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), tank.userData.clip.uCauOn));
+      plate = new THREE.Mesh(bottomGeometry(b), withCaustics(new THREE.MeshStandardMaterial({ roughness: 0.6, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), tank.userData.clip));
       plate.name = 'bottom-plate';
       plate.position.y = base.y0 + 0.002;
       plate.renderOrder = 0.8;
