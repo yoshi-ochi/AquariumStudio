@@ -11,6 +11,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { speciesList, GROUPS } from './species.mjs';
+import { PLANNED } from '../../src/expedition/speciesRoster.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
@@ -41,9 +42,16 @@ async function allSpecies() {
   return map;
 }
 
+/** ゲームに実装済みの和名：creatureData.js の種と、モデルが出来た追加予定種（speciesRoster.js） */
 async function inGame() {
   const src = await fs.readFile(CREATURES, 'utf8').catch(() => '');
-  return new Set([...src.matchAll(/c\('[\w]+', '([^']+)'/g)].map((m) => m[1]));
+  const names = new Set([...src.matchAll(/c\('[\w]+', '([^']+)'/g)].map((m) => m[1]));
+  const dir = path.dirname(CREATURES);
+  const anatomy = (await fs.readdir(dir)).filter((f) => /^creatureAnatomy.*\.js$/.test(f));
+  const keys = new Set();
+  for (const f of anatomy) for (const m of (await fs.readFile(path.join(dir, f), 'utf8')).matchAll(/^ {2}(\w+): \{/gm)) keys.add(m[1]);
+  for (const p of PLANNED) if (p.model === true || keys.has(p.id)) names.add(p.name);
+  return names;
 }
 
 async function speciesState(name) {

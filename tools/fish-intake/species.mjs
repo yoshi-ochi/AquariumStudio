@@ -1,3 +1,5 @@
+import { PLANNED } from '../../src/expedition/speciesRoster.js';
+
 /**
  * 日本の水族館でよく展示されている生き物の候補リスト（開発用）。ゲーム未実装の「登録待ち」が200種になるよう選定。
  * 大型館（海遊館・美ら海・鴨川・名古屋港・サンシャイン・アクアマリンふくしま・沼津深海 等）の
@@ -27,10 +29,17 @@ const LIST = {
   other: 'ミズクラゲ,アカクラゲ,タコクラゲ,パシフィックシーネットル,ブルージェリー,マダコ,ミズダコ,スルメイカ,コウイカ,オウムガイ,イセエビ,オトヒメエビ,サクラエビ,アカウミガメ,アオウミガメ,ラッコ,ゴマフアザラシ,カリフォルニアアシカ,バンドウイルカ,シロイルカ,フンボルトペンギン,ウミウシ,イソギンチャク,ヒトデ,ナマコ,カブトガニ',
 };
 
-/** [{ name, group }]（同名は最初のゾーンだけに残す） */
+/** ゲームの追加予定種（src/expedition/speciesRoster.js）。採取地が決まっているので優先して画像を集める */
+const PLANNED_GROUP = '追加予定（採取地あり）';
+
+/** [{ name, group }]（同名は最初のゾーンだけに残す。追加予定種は先頭のゾーンにまとめる） */
 export function speciesList() {
   const seen = new Set();
   const out = [];
+  for (const p of PLANNED) {
+    seen.add(p.name);
+    out.push({ name: p.name, group: PLANNED_GROUP, planned: p.id });
+  }
   for (const [key, csv] of Object.entries(LIST)) {
     for (const name of csv.split(',')) {
       if (seen.has(name)) continue;
@@ -41,4 +50,4 @@ export function speciesList() {
   return out;
 }
 
-export const GROUPS = Object.values(G);
+export const GROUPS = [PLANNED_GROUP, ...Object.values(G)];

@@ -3,7 +3,8 @@ import { disposeObject } from '../tanks/tankBuilder.js';
 import { mulberry32 } from '../tanks/random.js';
 import { getCreature } from './creatureData.js';
 import { buildCreature } from './creatureBuilder.js';
-import { BENTHIC_FORMS, STATIONARY_FORMS } from './creatureSoft.js';
+import { createMotion, stepMotion, reanchor } from './lifeMotion.js';
+import { lifeAnchors, anchorSig } from './lifeAnchors.js';
 import { speciesPieces, sizeOf, appealOf } from './growth.js';
 
 /** 水槽内の展示生物：収容枠の計算、モデルの同期、遊泳アニメーション */
@@ -36,10 +37,10 @@ const MAX_MODELS = 120;
 function swimBox(I) {
   const k = I.shape === 'cylinder' ? 0.68 : 0.86;
   const y0 = I.tunnel ? I.tunnel.straightH + I.tunnel.r + 0.08 : I.floorY + 0.03;
-  return { cx: I.swim?.cx ?? 0, hx: (I.swim?.halfW ?? I.halfW) * k, hz: I.halfD * k, y0, y1: Math.max(y0 + 0.01, I.waterTop - 0.03) };
+  return { cx: I.swim?.cx ?? 0, hx: (I.swim?.halfW ?? I.halfW) * k, hz: I.halfD * k, y0, y1: Math.max(y0 + 0.01, I.waterTop - 0.03), round: I.shape === 'cylinder' };
 }
 
-/** tank.userData.creatures に合わせてモデルを作り直す */
+/** tank.userData.creatures に合わせてモデルを作り直す。動きは種ごとの行動（lifeMotion.js）で決める */
 export function syncLife(tank) {
   const old = tank.getObjectByName(LIFE);
   if (old) {
@@ -51,12 +52,16 @@ export function syncLife(tank) {
   tank.add(group);
   const box = swimBox(tank.userData.interior);
   const room = Math.min(box.hx, box.hz) * 1.4; // 大きな生物は水槽に収まる大きさに縮める
+  // 水の流れの向き（チンアナゴなどが一斉に向く）は水槽ごとに決まっている
+  const ctx = { box, anchors: lifeAnchors(tank), sig: anchorSig(tank), current: mulberry32(tank.userData.uid * 31 + 7)() * Math.PI * 2, checked: 0, last: null };
+  group.userData.ctx = ctx;
   let index = 0;
   const entries = Object.entries(tank.userData.creatures ?? {}).filter(([id]) => getCreature(id));
   const total = entries.reduce((s, [, n]) => s + n, 0);
   for (const [id, n] of entries) {
     const c = getCreature(id);
     const shown = total <= MAX_MODELS ? n : Math.max(1, Math.round((n / total) * MAX_MODELS));
+    const shared = { n: shown }; // 同じ種の群れ・コロニーで共有する状態
     for (let i = 0; i < shown; i++) {
       const fish = buildCreature(c);
       // 水槽の水紋（ON/OFF と、この水槽の真上をくり抜いた模様）を使う
@@ -64,54 +69,27 @@ export function syncLife(tank) {
       const rand = mulberry32(tank.userData.uid * 131 + index++ * 977);
       const scale = Math.min(1, room / c.len) * sizeOf(speciesPieces(id)); // 大きな生物は水槽に収め、成長（ピース）に応じて育つ
       fish.scale.setScalar(scale);
-      const margin = (c.len * scale) / 2;
-      const ax = Math.max(0.01, (box.hx - margin) * (0.45 + rand() * 0.55));
-      const az = Math.max(0.01, (box.hz - margin) * (0.45 + rand() * 0.55));
-      const drifting = c.form === 'jelly' || c.form === 'dumbo' || c.form === 'clione';
-      const benthic = BENTHIC_FORMS.has(c.form);
-      const fixed = STATIONARY_FORMS.has(c.form);
-      const velocity = (0.05 + rand() * 0.07) * (fixed ? 0 : benthic ? 0.15 : drifting ? 0.35 : 1); // m/秒
-      fish.userData.swim = {
-        ax,
-        az,
-        speed: velocity / Math.max(ax, az),
-        dir: rand() < 0.5 ? 1 : -1,
-        p1: rand() * 6.28,
-        p2: rand() * 6.28,
-        p3: rand() * 6.28,
-        cy: benthic ? box.y0 : box.y0 + (box.y1 - box.y0) * (0.3 + rand() * 0.4),
-        ay: benthic || fixed ? 0 : (box.y1 - box.y0) * 0.2,
-        cx: box.cx,
-        tempo: 0.8 + rand() * 0.5,
-      };
-      fish.userData.still = drifting || fixed; // 向きを変えず漂う
+      fish.userData.motion = createMotion(c, c.len * scale, ctx, rand, shared, i);
       group.add(fish);
     }
   }
 }
 
-function pathAt(s, t, out) {
-  const a = t * s.speed * s.dir;
-  out.x = s.cx + Math.cos(a + s.p1) * s.ax;
-  out.z = Math.sin(a + s.p1 + Math.sin(a * 0.5 + s.p2) * 0.4) * s.az;
-  out.y = s.cy + Math.sin(a * 1.7 + s.p3) * s.ay;
-  return out;
-}
-
-const cur = { x: 0, y: 0, z: 0 };
-const next = { x: 0, y: 0, z: 0 };
-
 export function updateLife(tank, time) {
   const group = tank.getObjectByName(LIFE);
   if (!group) return;
-  for (const fish of group.children) {
-    const s = fish.userData.swim;
-    const u = fish.userData;
-    pathAt(s, time, cur);
-    pathAt(s, time + 0.08, next);
-    fish.position.set(cur.x, cur.y, cur.z);
-    u.uni.uTime.value = time * s.tempo + s.p2;
-    if (fish.userData.still) continue;
-    fish.rotation.y = Math.atan2(-(next.z - cur.z), next.x - cur.x);
+  const ctx = group.userData.ctx;
+  const dt = ctx.last === null ? 0 : Math.min(0.1, Math.max(0, time - ctx.last));
+  ctx.last = time;
+  // 岩・海藻の配置が変わったら、巣や掴まる場所を選び直す（1秒ごとに確認）
+  if (time - ctx.checked > 1) {
+    ctx.checked = time;
+    const sig = anchorSig(tank);
+    if (sig !== ctx.sig) {
+      ctx.sig = sig;
+      ctx.anchors = lifeAnchors(tank);
+      for (const fish of group.children) reanchor(fish.userData.motion, ctx);
+    }
   }
+  for (const fish of group.children) stepMotion(fish, fish.userData.motion, ctx, dt, time);
 }

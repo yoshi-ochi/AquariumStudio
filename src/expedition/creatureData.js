@@ -1,3 +1,5 @@
+import { releaseModeled } from './speciesRelease.js';
+
 // 展示生物・採取地・合同調査の定義（データのみ）。
 // len は全長(m)、rarity はレア度（1〜4）、slots は水槽の収容枠の消費量、form は体形（creatureForms.js）、pat は模様。
 // レア度はカードの背景色で表す（緑→青→紫→金）。捕れやすさ・繁殖時間・料理の値段・ランキングの点数を決める。
@@ -193,7 +195,12 @@ export const DESTINATIONS = [
 
 /** 管理者が削除した採取地（航海中の隊が帰れるように残す） */
 export const RETIRED_PLACES = [];
-export const getDestination = (id) => DESTINATIONS.find((d) => d.id === id) ?? RETIRED_PLACES.find((d) => d.id === id);
+/** 捕れる魚種がそろうまで地図に出さない採取地（speciesRoster.js） */
+export const HIDDEN_PLACES = [];
+// モデルが出来た予定種と、新しい採取地を加える（speciesRelease.js）
+releaseModeled({ creatures: CREATURES, places: DESTINATIONS, hidden: HIDDEN_PLACES });
+recomputeDerived();
+export const getDestination = (id) => DESTINATIONS.find((d) => d.id === id) ?? RETIRED_PLACES.find((d) => d.id === id) ?? HIDDEN_PLACES.find((d) => d.id === id);
 
 /** 立地を指定していないときの基準地（東京） */
 export const DEFAULT_HOME = { lat: 35.7, lon: 139.8 };

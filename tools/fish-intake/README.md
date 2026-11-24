@@ -14,3 +14,9 @@ npm run fish-intake
 - `reference/fish/<和名>/memo.txt` … Claude への指示メモ
 - `reference/fish/_custom.json` … リスト外から追加した魚種
 - 以前の形式 `reference/fish/<和名>.png` もメイン画像として扱う
+
+## 追加予定種と本番への公開
+- `src/expedition/speciesRoster.js` の追加予定種は、このツールで「追加予定（採取地あり）」として先頭に並ぶ
+- モデルを作る（`ANATOMY[id]` を追加、または組み立ての体なら `model: true`）と、その種は自動で本番の魚種・採取地に加わる
+- `npm run species:release` で公開日を記録して main へマージ → GitHub Pages に公開 → ログイン時に「新しく追加された生き物」として案内される
+- 捕れる種が3種そろうまで、その採取地は地図に出ない（例：アマゾン川）

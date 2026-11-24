@@ -435,6 +435,25 @@ body:not([data-view=floor]) #side-actions, body:not([data-view=floor]) #goal-car
 /* ---------- 間取りの選択 ---------- */
 #layout-picker { position: fixed; inset: 0; z-index: 120; overflow-y: auto; padding: calc(16px + var(--safe-top)) 12px calc(16px + var(--safe-bottom)); color: #fff; background: #0a2438; user-select: none; }
 #layout-picker[hidden] { display: none; }
+/* ログイン時の「新しく追加された生き物」 */
+#new-species { position: fixed; inset: 0; z-index: 125; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom)); background: rgba(6, 22, 36, 0.72); }
+.ns-box { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 720px; margin: auto 0; padding: 16px; color: #fff; background: #0f3550; border: 2px solid #2f7aa3; border-radius: 14px; }
+.ns-box h2 { margin: 0; font-size: 20px; }
+.ns-box h3 { margin: 6px 0 0; color: var(--gold); font-size: 15px; }
+.ns-lead { margin: 0; color: #a9d3e6; font-size: 13px; }
+.ns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 8px; max-height: 52dvh; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.ns-card { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px; background: #123f60; border-radius: 10px; }
+.ns-card .cthumb img { width: 64px; height: 48px; object-fit: contain; }
+.ns-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ns-text b { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.ns-text small { color: #a9d3e6; font-size: 11px; }
+.ns-meta { display: flex; align-items: center; gap: 6px; }
+.ns-r { padding: 0 6px; color: #10283a; font-weight: 700; border-radius: 8px; }
+.ns-r.r1 { background: #7cc97f; } .ns-r.r2 { background: #5f9fe6; } .ns-r.r3 { background: #9a6ae0; color: #fff; } .ns-r.r4 { background: var(--gold); }
+.ns-places { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ns-places li { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; background: #123f60; border-radius: 10px; }
+.ns-places small { color: #d9eef7; font-size: 12px; }
+.ns-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .lp-box { display: flex; flex-direction: column; gap: 10px; max-width: 760px; margin: 0 auto; }
 .lp-box h2 { margin: 0; font-size: 22px; }
 .lp-box p { margin: 0; color: #a9d3e6; font-size: 13px; }
