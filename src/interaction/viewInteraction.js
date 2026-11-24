@@ -5,11 +5,12 @@ const TAP_TOLERANCE = 8; // px
 
 /** 閲覧モード（ホーム）：タップした水槽を onTankTap、階段を onStairsTap で知らせる。ドラッグはカメラ操作に任せる */
 export class ViewInteraction {
-  constructor({ sceneMgr, manager, onTankTap, onStairsTap = () => {}, extraTargets = () => [] }) {
+  constructor({ sceneMgr, manager, onTankTap, onStairsTap = () => {}, onFloorTap = () => {}, extraTargets = () => [] }) {
     this.sceneMgr = sceneMgr;
     this.manager = manager;
     this.onTankTap = onTankTap;
     this.onStairsTap = onStairsTap;
+    this.onFloorTap = onFloorTap;
     this.extraTargets = extraTargets; // 水槽以外の展示 [[Object3D, onTap], ...]
     this.enabled = false;
     this.dom = sceneMgr.renderer.domElement;
@@ -33,6 +34,7 @@ export class ViewInteraction {
       for (const [obj, onTap] of this.extraTargets()) {
         if (this.raycaster.intersectObject(obj, true).length) return onTap();
       }
+      this.onFloorTap(e);
     });
   }
 

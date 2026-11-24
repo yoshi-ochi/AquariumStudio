@@ -9,16 +9,15 @@ const TAP_MS = 450;
 
 /**
  * 室内ライトの操作（部屋 > 照明 を開いている間だけ有効）。
- * - 部屋の外から部屋をタップ → その部屋の中に入って照明を編集する（onEnterRoom）
- * - 部屋の中で床か天井をタップ → その場所に照明を追加（真下を照らす）
+ * - 編集中の部屋（真上から見た2Dの画面）の床をタップ → その場所に照明を追加（真下を照らす）。向きはあとで調整
  * - 床のリング、または電球をドラッグ → 照明を移動（照らす向きはそのまま）
  * - リングの中央の ● をドラッグ → 照らす場所（向き）を変える
  * ハンドルは画面上で少し離れた所を押しても掴める。掴んだ位置からずらすので、押した瞬間に飛ばない。
  * ハンドルを掴んだときは他の操作（オブジェ選択・カメラ）にイベントを渡さない。
  */
 export class LightInteraction {
-  constructor({ sceneMgr, cameraCtl, room, manager, getSettings, onSelect, onChanged, onAdd, onEnterRoom }) {
-    Object.assign(this, { sceneMgr, cameraCtl, room, manager, getSettings, onSelect, onChanged, onAdd, onEnterRoom });
+  constructor({ sceneMgr, cameraCtl, room, manager, getSettings, onSelect, onChanged, onAdd }) {
+    Object.assign(this, { sceneMgr, cameraCtl, room, manager, getSettings, onSelect, onChanged, onAdd });
     this.enabled = false;
     this.dom = sceneMgr.renderer.domElement;
     this.raycaster = new THREE.Raycaster();
@@ -136,23 +135,10 @@ export class LightInteraction {
     if (e.target !== this.dom) return;
     this._ray(e);
     const focus = this.room.focusZone;
-    if (!focus) {
-      // 部屋の外：タップした部屋の中に入る
-      const p = this._onPlane(0);
-      const zone = p && this._zoneAt(p.x, p.z);
-      if (zone) this.onEnterRoom?.(zone);
-      return;
-    }
+    if (!focus) return;
     // 水槽やオブジェをタップしたときは追加しない
     if (this.raycaster.intersectObjects(this.manager.getPickables(), true).length) return;
-    // 部屋の中：視線が先に当たる床か天井の位置に追加
-    const ray = this.raycaster.ray;
-    const hits = [0, this.room.ceilingHeight]
-      .map((y) => (Math.abs(ray.direction.y) > 1e-4 ? (y - ray.origin.y) / ray.direction.y : -1))
-      .filter((t) => t > 0)
-      .sort((a, b) => a - b);
-    if (!hits.length) return;
-    const p = ray.at(hits[0], new THREE.Vector3());
-    if (this._zoneAt(p.x, p.z) === focus) this.onAdd?.(p.x, p.z);
+    const p = this._onPlane(0);
+    if (p && this._zoneAt(p.x, p.z) === focus) this.onAdd?.(p.x, p.z);
   };
 }

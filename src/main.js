@@ -90,7 +90,8 @@ const OUTDOOR_APPEAL = { marine: 60, store: 20, diner: 30 };
 const THEME_BONUS = 1.25;
 const HINT = {
   home: '水槽をタップすると名前・展示生物・エサ・掃除を管理できます ・ ドラッグで回転 / 2本指でズーム',
-  hall: 'タップで選択・ドラッグで移動 ・ 何もない所のドラッグで視点を回転',
+  pick: '編集する部屋をタップしてください（真上から見た部屋で編集します）',
+  hall: 'タップで選択・ドラッグで移動 ・ 何もない所のドラッグで画面を移動 / 2本指でズーム',
   place: '床をタップして設置 ・ もう一度カードを押すとキャンセル',
   interior: 'ドラッグで移動（岩の上にも積める）・ はみ出した部分はガラス面でカット',
   sculpt: '岩肌をなぞって{mode} ・ 2本指で視点操作',
@@ -383,15 +384,12 @@ async function boot() {
       if (kind === 'look') room.applyLook(roomSettings);
       else if (kind === 'lights') room.setLights(roomSettings.lights);
       else if (kind === 'light-update') room.updateLight(value, roomSettings.lights[value]);
-      else if (kind === 'light-mode') {
-        lightCtl.enabled = value;
-        if (!value) exitRoomView();
-      } else if (kind === 'room-exit') exitRoomView();
+      else if (kind === 'light-mode') lightCtl.enabled = value;
       else if (kind === 'light-select') room.setSelectedLight(value);
       else if (kind === 'wall-mode') {
         wallCtl.setEnabled(value);
         room.setWallEditing(value);
-        hall.setEnabled(!value && mode === 'hall-edit');
+        hall.setEnabled(!value && mode === 'hall-edit' && !!editRoom);
         if (value) customizer.deselect();
       }
     },
@@ -413,6 +411,7 @@ async function boot() {
       const active = mode === 'interior-edit' ? interior : hall;
       if (active.placing?.def.id === id) return active.cancelPlacement();
       // 水槽は在庫から設置する。無ければ取引先を開く
+      if (mode === 'hall-edit' && !editRoom) return toast('先に編集する部屋をタップしてください');
       if (mode === 'hall-edit' && getDef(id).category === CATEGORY.TANK && inventory.count(id) <= 0) {
         toast('在庫がありません。取引先から購入できます');
         return gameSheet.openItems('supplier');
@@ -425,8 +424,8 @@ async function boot() {
       hall.cancelPlacement();
       roomPanel.setVisible(extra && id === 'room');
       expandPanel.setVisible(extra && id === 'expand');
-      inPlace.setActive(extra && id === 'build');
-      if (!extra) shell.setHint(HINT.hall);
+      inPlace.setActive(extra && id === 'build' && !!editRoom); // 水槽建造も部屋を選んでから
+      if (!extra) shell.setHint(editRoom ? HINT.hall : HINT.pick);
     },
   });
 
@@ -438,7 +437,6 @@ async function boot() {
     onSelect: (i) => roomPanel.selectLight(i),
     onChanged: () => roomPanel.render(), // 向き・傾きの表示を合わせる
     onAdd: (x, z) => roomPanel.addLightAt(x, z),
-    onEnterRoom: (zone) => enterRoomView(zone),
   });
   const wallCtl = new WallInteraction({
     sceneMgr, room, manager, toast,
@@ -452,6 +450,12 @@ async function boot() {
   const view = new ViewInteraction({
     sceneMgr, manager, onTankTap: (tank) => openTank(tank),
     onStairsTap: (stairs, e) => openStairsMenu(stairs, e),
+    // 部屋の床をタップ：部屋の中から見渡すプレビュー
+    onFloorTap: (e) => {
+      if (roomView) return;
+      const zone = floorZoneAt(e);
+      if (zone && zone.type !== 'outdoor') enterRoomView(zone.id);
+    },
     extraTargets: () => [
       ...(pool.group.visible ? [[pool.water, () => gameSheet.openPanel('pool')]] : []),
       ...(penScene.group.visible ? [[penScene.group, () => gameSheet.openPanel('seapen')]] : []),
@@ -503,6 +507,7 @@ async function boot() {
   let interiorFrom = null;
 
   function goHome() {
+    leaveRoomEdit();
     mode = 'home';
     hall.setEnabled(false);
     room.setEditVisible(false);
@@ -517,6 +522,7 @@ async function boot() {
 
   function openTank(tank) {
     if (interiorCam.busy) return;
+    exitRoomView();
     focusTank = tank;
     mode = 'tank';
     view.enabled = false;
@@ -535,15 +541,17 @@ async function boot() {
   }
 
   function enterHallEdit() {
+    exitRoomView();
     views.setMode('floor');
     mode = 'hall-edit';
     view.enabled = false;
     customizer.allowEmbed = true;
-    hall.setEnabled(true);
+    // 部屋を選んでから編集する（水槽内の編集から戻ったときは、その部屋の編集のまま）
+    hall.setEnabled(!!editRoom);
     room.setEditVisible(true);
     catalog.setDefs(HALL_DEFS, [{ id: 'build', label: '水槽建造' }, { id: 'room', label: '部屋' }, { id: 'expand', label: '増築' }]);
     shell.setMode('hall-edit', '館内レイアウト編集');
-    shell.setHint(HINT.hall);
+    shell.setHint(editRoom ? HINT.hall : HINT.pick);
   }
 
   function enterInteriorEdit(tank, from) {
@@ -586,6 +594,7 @@ async function boot() {
   function changeFloor(floor) {
     if (!economy.setFloor(floor)) return;
     exitRoomView();
+    leaveRoomEdit();
     hall.cancelPlacement();
     customizer.deselect();
     manager.setFloor(economy.floor);
@@ -633,14 +642,32 @@ async function boot() {
     roomSettings.lights = [defaultLight(c.x, c.z, 'entrance')];
   }
 
-  // ---- 部屋の中から照明を編集する画面：部屋の中央の目の高さから、壁や天井を自由に見渡す ----
+  // ---- カメラの操作設定の保存と復元 ----
+  function camSave() {
+    const c = cameraCtl.controls;
+    return { pos: sceneMgr.camera.position.clone(), target: c.target.clone(), min: c.minDistance, max: c.maxDistance, minPolar: c.minPolarAngle, maxPolar: c.maxPolarAngle, pan: c.enablePan, zoom: c.enableZoom, rotate: c.enableRotate, speed: c.rotateSpeed, ssp: c.screenSpacePanning, touches: { ...c.touches }, mouse: { ...c.mouseButtons } };
+  }
+  function camRestore(s) {
+    const c = cameraCtl.controls;
+    Object.assign(c, { minDistance: s.min, maxDistance: s.max, minPolarAngle: s.minPolar, maxPolarAngle: s.maxPolar, enablePan: s.pan, enableZoom: s.zoom, enableRotate: s.rotate, rotateSpeed: s.speed, screenSpacePanning: s.ssp, touches: s.touches, mouseButtons: s.mouse });
+    c.target.copy(s.target);
+    sceneMgr.camera.position.copy(s.pos);
+    c.update();
+  }
+
+  // ---- ホーム：部屋の床をタップすると、部屋の中央の目の高さから壁や天井を見渡すプレビュー ----
   let roomView = null; // { zone, saved }
+  const previewBtn = document.createElement('button');
+  previewBtn.id = 'preview-exit';
+  previewBtn.hidden = true;
+  document.body.append(previewBtn);
+  previewBtn.addEventListener('click', () => exitRoomView());
   function enterRoomView(zoneId) {
     const zone = getZone(zoneId);
     if (!zone) return;
     const c = cameraCtl.controls;
     const cam = sceneMgr.camera;
-    if (!roomView) roomView = { saved: { pos: cam.position.clone(), target: c.target.clone(), min: c.minDistance, max: c.maxDistance, minPolar: c.minPolarAngle, maxPolar: c.maxPolarAngle, pan: c.enablePan, zoom: c.enableZoom, speed: c.rotateSpeed } };
+    if (!roomView) roomView = { saved: camSave() };
     roomView.zone = zoneId;
     const center = zoneCenter(zone);
     // 注視点のすぐ後ろにカメラを置き、回転で見渡す（距離はほぼ0）
@@ -649,22 +676,95 @@ async function boot() {
     dir.normalize();
     c.target.set(center.x, 1.6, center.z);
     cam.position.copy(c.target).addScaledVector(dir, -0.05);
-    Object.assign(c, { minDistance: 0.05, maxDistance: 0.05, minPolarAngle: 0.15, maxPolarAngle: Math.PI - 0.15, enablePan: false, enableZoom: false, rotateSpeed: -0.45 });
+    Object.assign(c, { minDistance: 0.05, maxDistance: 0.05, minPolarAngle: 0.15, maxPolarAngle: Math.PI - 0.15, enablePan: false, enableZoom: false, enableRotate: true, rotateSpeed: -0.45 });
     c.update();
-    room.setFocusZone(zoneId);
-    roomPanel.setFocus(zoneId);
+    previewBtn.textContent = `${zone.name} のプレビューを終わる`;
+    previewBtn.hidden = false;
+    shell.setHint('ドラッグで部屋の中を見渡せます');
   }
   function exitRoomView() {
     if (!roomView) return;
     const { saved } = roomView;
     roomView = null;
+    camRestore(saved);
+    previewBtn.hidden = true;
+    if (mode === 'home') shell.setHint(HINT.home);
+  }
+
+  // ---- レイアウト編集：部屋をタップして、その部屋を真上から見た2Dの画面で編集する ----
+  let editRoom = null; // { zone, saved }
+  const roomBackBtn = document.createElement('button');
+  roomBackBtn.id = 'room-back';
+  roomBackBtn.hidden = true;
+  roomBackBtn.textContent = '部屋を選び直す';
+  document.body.append(roomBackBtn);
+  roomBackBtn.addEventListener('click', () => leaveRoomEdit());
+  function enterRoomEdit(zoneId) {
+    const zone = getZone(zoneId);
+    if (!zone || editRoom) return;
+    editRoom = { zone: zoneId, saved: camSave() };
+    // 部屋の外接矩形が画面に収まる高さの真上から見下ろす（回転なし・1本指で移動・2本指でズーム）
+    const xs = zone.rects.flatMap((r) => [r[0], r[2] + 1]).map((i) => (i - GRID_X / 2) * CELL_SIZE);
+    const zs = zone.rects.flatMap((r) => [r[1], r[3] + 1]).map((j) => (j - GRID_Z0) * CELL_SIZE);
+    const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+    const cam = sceneMgr.camera;
+    const t = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    const h = Math.max((z1 - z0) / 2 / t, (x1 - x0) / 2 / (t * cam.aspect)) * 1.25 + 4;
     const c = cameraCtl.controls;
-    Object.assign(c, { minDistance: saved.min, maxDistance: saved.max, minPolarAngle: saved.minPolar, maxPolarAngle: saved.maxPolar, enablePan: saved.pan, enableZoom: saved.zoom, rotateSpeed: saved.speed });
-    c.target.copy(saved.target);
-    sceneMgr.camera.position.copy(saved.pos);
+    Object.assign(c, { minDistance: 4, maxDistance: Math.max(h * 2, 30), minPolarAngle: 0, maxPolarAngle: 0.0001, enablePan: true, enableZoom: true, enableRotate: false, screenSpacePanning: true });
+    c.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+    c.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+    // 下のカタログに隠れないよう、注視点を少し手前（画面の下側）へずらす
+    c.target.set((x0 + x1) / 2, 0, (z0 + z1) / 2 + (z1 - z0) * 0.12);
+    cam.position.set(c.target.x, h, c.target.z + 0.001);
     c.update();
+    room.setFocusZone(zoneId);
+    roomPanel.setFocus(zoneId);
+    hall.setEnabled(true);
+    inPlace.setActive(catalog.activeTab === 'build');
+    roomBackBtn.textContent = `${zone.name} ・ 部屋を選び直す`;
+    roomBackBtn.hidden = false;
+    shell.setHint(HINT.hall);
+  }
+  /** 2Dの部屋の編集から、部屋を選ぶ画面に戻る */
+  function leaveRoomEdit() {
+    if (!editRoom) return;
+    const { saved } = editRoom;
+    editRoom = null;
+    hall.cancelPlacement();
+    customizer.deselect();
+    camRestore(saved);
     room.setFocusZone(null);
     roomPanel.setFocus(null);
+    roomBackBtn.hidden = true;
+    inPlace.setActive(false);
+    if (mode === 'hall-edit') {
+      hall.setEnabled(false);
+      shell.setHint(HINT.pick);
+    }
+  }
+  // 部屋を選ぶ画面：床のタップでその部屋の編集へ
+  {
+    const dom = sceneMgr.renderer.domElement;
+    let down = null;
+    dom.addEventListener('pointerdown', (e) => (down = e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now() } : null));
+    dom.addEventListener('pointerup', (e) => {
+      const d = down;
+      down = null;
+      if (!d || mode !== 'hall-edit' || editRoom || views.mode !== 'floor' || inPlace.active) return;
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8 || performance.now() - d.t > 500) return;
+      const zone = floorZoneAt(e);
+      if (zone) enterRoomEdit(zone.id);
+    });
+  }
+  /** 画面の点の下の床の、解放済みのエリア */
+  function floorZoneAt(e) {
+    const r = sceneMgr.renderer.domElement.getBoundingClientRect();
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), sceneMgr.camera);
+    const p = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+    const zone = p && zoneAt(economy.floor, p.x, p.z);
+    return zone && unlocked.has(zone.id) ? zone : null;
   }
 
   /** 新しいアカウント：選んだ間取りのエントランスに最初の水槽を置く */
