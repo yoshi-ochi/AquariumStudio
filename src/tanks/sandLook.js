@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TILE, causticMaterial } from './caustics.js';
+import { withCaustics } from './caustics.js';
 
 /**
  * 水槽の底：底砂（種類・厚さ／砂なし）と、底面の色（バックスクリーンと同じ色＋不透明度）、水面のゆらぎが底に映す光の模様（コースティクス）。
@@ -58,11 +58,11 @@ function sandTexture(id) {
   return tex;
 }
 
-// 水紋（コースティクス）はシミュレーションで作った模様を共有する（caustics.js）
+// 水紋（コースティクス）は全水槽で共有の1枚を GPU で描き、底・水槽内の物・生き物の材質に掛け合わせる（caustics.js）
 export { updateCaustics } from './caustics.js';
 
 /** 底の形の平面（XZ）。UV はメートル単位（模様の大きさを水槽によらずそろえる） */
-function bottomGeometry(b, tile = TILE) {
+function bottomGeometry(b, tile = 0.25) {
   let geo;
   if (b.kind === 'circle') geo = new THREE.CircleGeometry(b.r, 48);
   else if (b.kind === 'shape') geo = new THREE.ShapeGeometry(b.shape);
@@ -94,7 +94,7 @@ export function applySand(tank, look) {
   sand.visible = s.on;
   if (s.on) {
     if (!tank.userData.sandMat) {
-      tank.userData.sandMat = new THREE.MeshStandardMaterial({ roughness: 0.95 });
+      tank.userData.sandMat = withCaustics(new THREE.MeshStandardMaterial({ roughness: 0.95 }), tank.userData.clip.uCauOn);
       sand.material = tank.userData.sandMat;
     }
     const m = tank.userData.sandMat;
@@ -115,7 +115,7 @@ export function applySand(tank, look) {
   const bottom = look.bottom;
   if (bottom.alpha > 0.001) {
     if (!plate) {
-      plate = new THREE.Mesh(bottomGeometry(b), new THREE.MeshStandardMaterial({ roughness: 0.6, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+      plate = new THREE.Mesh(bottomGeometry(b), withCaustics(new THREE.MeshStandardMaterial({ roughness: 0.6, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), tank.userData.clip.uCauOn));
       plate.name = 'bottom-plate';
       plate.position.y = base.y0 + 0.002;
       plate.renderOrder = 0.8;
@@ -130,24 +130,14 @@ export function applySand(tank, look) {
     plate.geometry.dispose();
     plate.material.dispose();
   }
-  // コースティクス
+  // 水紋：底・水槽内の物・生き物の材質が、この水槽の uCauOn を見て水紋を映す
   const floorY = base.y0 + (s.on ? depth : 0.002);
-  let ca = body.getObjectByName('caustics');
-  if (look.caustics && !ca) {
-    ca = new THREE.Group();
-    ca.name = 'caustics';
-    // 底の色に光と影を掛け合わせる1枚（水（1）より先に描いて、水の色で包む）
-    const m = new THREE.Mesh(bottomGeometry(b), causticMaterial());
-    m.renderOrder = 0.9;
-    m.raycast = () => {};
-    ca.add(m);
-    body.add(ca);
-  } else if (!look.caustics && ca) {
-    body.remove(ca);
-    ca.children[0]?.geometry.dispose();
-    ca = null;
+  if (tank.userData.clip) tank.userData.clip.uCauOn.value = look.caustics ? 1 : 0;
+  const old = body.getObjectByName('caustics'); // 以前の版の、底に重ねた水紋の板
+  if (old) {
+    body.remove(old);
+    old.children[0]?.geometry.dispose();
   }
-  if (ca) ca.position.y = floorY + 0.003;
   // 水槽内の床の高さと、置いてある物の高さ
   const I = tank.userData.interior;
   if (I && Math.abs(I.floorY - floorY) > 1e-6) {
