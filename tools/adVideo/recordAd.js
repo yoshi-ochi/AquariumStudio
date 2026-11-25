@@ -192,7 +192,7 @@ export async function recordAd(app, { onProgress = () => {}, probe = false } = {
     g.shadowColor = 'rgba(0,0,0,.5)';
     g.shadowBlur = 18;
     g.font = `900 88px ${font}`;
-    g.fillText('アクアリウム・ビルダー', W / 2, H * 0.36 + 150);
+    g.fillText('Aquarium Studio', W / 2, H * 0.36 + 150);
     g.font = `700 54px ${font}`;
     g.fillStyle = '#ffd36b';
     g.fillText('いますぐ無料でプレイ', W / 2, H * 0.36 + 290);
