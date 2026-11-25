@@ -33,6 +33,44 @@ function stripeTexture() {
  * 部屋：マス目の床（館内・バックヤード）、外壁・仕切り壁（埋め込み穴あき）、室内ライト、屋外の地面。
  * 天井と照明器具は、カメラが天井より下にあるときだけ表示する（上から見下ろすときは隠す）。
  */
+/**
+ * 壁の穴（長方形）を、重なる・接するものどうしで1つの輪郭にまとめる。
+ * 並べて埋め込んだ水槽の穴が重なると、穴あきの面の三角形分割が壊れて壁が水槽の前に残るため。
+ * 輪郭は左右に単調（下の辺を左から右、上の辺を右から左）：x の区間ごとに、かかる穴の一番下と一番上を使う
+ */
+export function mergeHoles(rects, gap = 0.01) {
+  const sorted = [...rects].sort((a, b) => a.x0 - b.x0);
+  const groups = [];
+  for (const r of sorted) {
+    const g = groups.at(-1);
+    if (g && r.x0 <= g.x1 + gap) (g.rects.push(r), (g.x1 = Math.max(g.x1, r.x1)));
+    else groups.push({ x1: r.x1, rects: [r] });
+  }
+  return groups.map(({ rects: rs }) => {
+    if (rs.length === 1) {
+      const { x0, x1, y0, y1 } = rs[0];
+      return [[x0, y0], [x0, y1], [x1, y1], [x1, y0]];
+    }
+    // x の境目ごとの区間で、その区間にかかる穴の下端・上端（すき間 gap 以下は埋めてつなぐ）
+    const xs = [...new Set(rs.flatMap((r) => [r.x0, r.x1]))].sort((a, b) => a - b);
+    const cells = [];
+    for (let i = 0; i < xs.length - 1; i++) {
+      const m = (xs[i] + xs[i + 1]) / 2;
+      const on = rs.filter((r) => r.x0 - gap <= m && r.x1 + gap >= m);
+      if (on.length) cells.push({ a: xs[i], b: xs[i + 1], y0: Math.min(...on.map((r) => r.y0)), y1: Math.max(...on.map((r) => r.y1)) });
+    }
+    const bottom = cells.flatMap((c) => [[c.a, c.y0], [c.b, c.y0]]);
+    const top = cells.flatMap((c) => [[c.a, c.y1], [c.b, c.y1]]).reverse();
+    // 同じ点・一直線に並ぶ点を省く
+    const pts = [...bottom, ...top].filter((p, i, arr) => i === 0 || p[0] !== arr[i - 1][0] || p[1] !== arr[i - 1][1]);
+    return pts.filter((p, i) => {
+      const a = pts[(i - 1 + pts.length) % pts.length];
+      const b = pts[(i + 1) % pts.length];
+      return Math.abs((p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])) > 1e-9;
+    });
+  });
+}
+
 export class Room {
   constructor(scene, sceneMgr) {
     this.scene = scene;
@@ -455,6 +493,7 @@ export class Room {
     shape.lineTo(len / 2, H);
     shape.lineTo(-len / 2, H);
     shape.closePath();
+    const rects = [];
     for (const h of holes) {
       const cx = (h.along - mid) * sign;
       const x0 = Math.max(-len / 2 + 0.01, cx - h.width / 2);
@@ -462,11 +501,12 @@ export class Room {
       const y0 = Math.max(0.005, h.bottom);
       const y1 = Math.min(H - 0.01, h.top);
       if (x1 - x0 < 0.02 || y1 - y0 < 0.02) continue;
+      rects.push({ x0, x1, y0, y1 });
+    }
+    for (const outline of mergeHoles(rects)) {
       const p = new THREE.Path();
-      p.moveTo(x0, y0);
-      p.lineTo(x0, y1);
-      p.lineTo(x1, y1);
-      p.lineTo(x1, y0);
+      p.moveTo(outline[0][0], outline[0][1]);
+      for (let i = 1; i < outline.length; i++) p.lineTo(outline[i][0], outline[i][1]);
       p.closePath();
       shape.holes.push(p);
     }
