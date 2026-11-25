@@ -145,8 +145,9 @@ export class TankCustomizer {
       </div>
       ${def.stairs ? this._stairsSection(obj) : ''}
       ${isTank && this.allowEmbed && !def.atrium ? this._embedSection(obj) : ''}
+      ${obj.userData.interiorItem && obj.userData.locked ? '<p class="note">ロック中です。「ロック解除」で移動・回転・編集ができます（解除できるのは1つだけ。ほかの物は自動でロックされます）</p>' : `
       ${def.shape === 'liveRock' && this.getBrush ? this._sculptSection(def) : ''}
-      ${def.flora && this.getGrowMode ? this._floraSection(obj, def) : def.growth && this.getGrowMode ? this._growthSection(obj) : ''}
+      ${def.flora && this.getGrowMode ? this._floraSection(obj, def) : def.growth && this.getGrowMode ? this._growthSection(obj) : ''}`}
       ${def.bubbles ? `<div class="section"><h4>泡の量</h4>${slider('bubbles', '泡', 0, 1, 0.05, obj.userData.bubbles ?? 0.5, '%')}</div>` : ''}`;
   }
 

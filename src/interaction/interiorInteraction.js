@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { isFloraMode, floraItem, floraHit, floraStroke, brushRadius, resetFloraTargets } from './floraBrush.js';
 import { conformFlora } from '../flora/floraSurface.js';
+import { InteriorHistory } from './interiorHistory.js';
 import { specOf, fitToDepth } from '../flora/floraBuilder.js';
 import { floorAt } from '../tanks/tankClip.js';
 import { getDef } from '../tanks/tankData.js';
@@ -18,8 +19,10 @@ const EMBED = 0.12; // 岩などを他のオブジェの上に積むとき、少
  * - 高さ（Y）は制限しない
  */
 export class InteriorInteraction {
-  constructor({ sceneMgr, cameraCtl, manager, economy, customizer, toast, onPlacementChange, onChanged, onExitRequest, onBrushChange, onGrowChange }) {
+  constructor({ sceneMgr, cameraCtl, manager, economy, customizer, toast, onPlacementChange, onChanged, onExitRequest, onBrushChange, onGrowChange, onHistory }) {
     Object.assign(this, { sceneMgr, cameraCtl, manager, economy, customizer, toast, onPlacementChange, onChanged, onExitRequest, onBrushChange, onGrowChange });
+    // 巻き戻し（最大10手）
+    this.history = new InteriorHistory({ manager, economy, onChange: (h) => onHistory?.(h) });
     this.dom = sceneMgr.renderer.domElement;
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
@@ -52,8 +55,14 @@ export class InteriorInteraction {
     return !!this.tank;
   }
 
+  /**
+   * 水槽内編集を開く。置いた物はその場でロックされ、編集できるのはロックを解除した1つだけ
+   * （以前の保存で解除されたままの物も、開いたときにロックする）
+   */
   attach(tank) {
     this.tank = tank;
+    for (const item of this.manager.interiorItems(tank)) item.userData.locked = true;
+    this.history.reset(tank);
   }
 
   detach() {
@@ -61,7 +70,36 @@ export class InteriorInteraction {
     this.setGrowMode(null);
     this.cancelPlacement();
     this.customizer.deselect();
+    this.history.reset(null);
     this.tank = null;
+  }
+
+  // ---- ロック・巻き戻し -----------------------------------------------------
+
+  /** ロックする／解除する。解除すると、同じ水槽のほかの物はすべてロックされる（解除できるのは1つだけ） */
+  setLocked(item, locked) {
+    if (!item?.userData.interiorItem) return;
+    if (!locked) for (const o of this.manager.interiorItems(this.tank ?? item.parent?.parent)) if (o !== item) o.userData.locked = true;
+    item.userData.locked = locked;
+    if (locked) {
+      this.setBrush('mode', null);
+      this.setGrowMode(null);
+    }
+    this.customizer.syncLock();
+    this.customizer.renderPanel();
+  }
+
+  /** 1手戻す（ボタン・Ctrl+Z） */
+  undo() {
+    if (!this.enabled || this.drag || this.sculpting || this.growing) return;
+    this.cancelPlacement();
+    this.setBrush('mode', null);
+    this.setGrowMode(null);
+    this.customizer.deselect();
+    const label = this.history.undo();
+    if (!label) return this.toast('戻せる操作はありません');
+    this.toast(`「${label}」を戻しました`);
+    this.onChanged?.();
   }
 
   // ---- 幾何 -----------------------------------------------------------------
@@ -202,6 +240,7 @@ export class InteriorInteraction {
   /** 生き物オブジェの成長の度合い（群体の大きさ・海藻の高さ）を変えて作り直す */
   setFloraSize(item, s) {
     if (!item?.userData.interiorItem || item.userData.locked || !getDef(item.userData.defId).flora) return;
+    this.history.record(specOf(getDef(item.userData.defId)).kind === 'grow' ? '成長' : '高さ', `size:${item.uuid}`);
     this.manager.regrowInterior(item, { ...item.userData.growth, s });
     this.onChanged?.();
   }
@@ -355,10 +394,13 @@ export class InteriorInteraction {
       this.toast('資金が足りません', { error: true });
       return;
     }
+    this.history.record(`${p.def.name}の配置`);
     this.economy.spend(p.def.price);
-    // ゴーストをそのまま確定オブジェにする（形の seed も引き継がれる）
+    this.history.charge(p.def.price);
+    // ゴーストをそのまま確定オブジェにする（形の seed も引き継がれる）。置いた物はその場でロックする
     const item = p.ghost;
     item.userData.ghost = false;
+    item.userData.locked = true;
     this._conform(item);
     this.sceneMgr.scene.remove(p.helper);
     p.helper.dispose();
@@ -377,6 +419,7 @@ export class InteriorInteraction {
   // ---- 選択オブジェ操作 -----------------------------------------------------
 
   rotate(item, dir) {
+    this.history.record('回転', `rot:${item.uuid}`);
     item.rotation.y = (item.rotation.y + dir * ROTATE_STEP) % (Math.PI * 2);
     this._conform(item);
     this.customizer.renderPanel();
@@ -387,8 +430,10 @@ export class InteriorInteraction {
     this.setGrowMode(null);
     const def = getDef(item.userData.defId);
     this.customizer.deselect();
+    this.history.record(`${def.name}の撤去`);
     this.manager.removeInterior(item);
     this.economy.earn(Math.floor(def.price * REFUND_RATE));
+    this.history.charge(-Math.floor(def.price * REFUND_RATE));
     this.toast(`${def.name} を撤去しました`);
     this.onChanged?.();
   }
@@ -419,6 +464,7 @@ export class InteriorInteraction {
     if (flora) {
       // ブラシ：なぞった面に個体を足す／消す
       this.cameraCtl.setEnabled(false);
+      this.history.record(this.growMode === 'erase' ? '消す' : '広げる');
       resetFloraTargets(this);
       this.floraFull = null;
       this.growing = { item: flora, flora: true, dirty: false };
@@ -428,6 +474,7 @@ export class InteriorInteraction {
     const growHit = this._growTarget();
     if (growHit) {
       this.cameraCtl.setEnabled(false);
+      this.history.record('流木の編集');
       this.growing = { item: growHit.item, wood: this._startWoodEdit(growHit.item, growHit.hit, e), dirty: true };
       return;
     }
@@ -435,6 +482,7 @@ export class InteriorInteraction {
     const rockHit = this._rockHit();
     if (rockHit) {
       this.cameraCtl.setEnabled(false);
+      this.history.record('岩肌の編集');
       this.sculpting = { item: this.customizer.selected, event: e };
       return;
     }
@@ -442,6 +490,7 @@ export class InteriorInteraction {
     const item = this._pick();
     if (!item) return;
     this.customizer.select(item);
+    this.down.item = item; // 離したときに選択を外さない
     if (item.userData.locked) return; // ロック中は選択のみ
     this.cameraCtl.setEnabled(false);
     this.drag = { obj: item, moved: false };
@@ -488,6 +537,7 @@ export class InteriorInteraction {
       this._setPointer(e);
       const local = this._surfaceHit(this.drag.obj);
       if (local) {
+        if (!this.drag.moved) this.history.record('移動');
         this._placeAt(this.drag.obj, local);
         this.drag.moved = true;
       }
@@ -543,7 +593,8 @@ export class InteriorInteraction {
       this.customizer.renderPanel();
       return;
     }
-    if (clicked) {
+    // 何も無い所をタップしたら選択を外す
+    if (clicked && !down.item) {
       this.setBrush('mode', null);
       this.setGrowMode(null);
       this.customizer.deselect();
@@ -553,7 +604,10 @@ export class InteriorInteraction {
   _onKey = (e) => {
     if (!this.enabled || e.target instanceof HTMLInputElement) return;
     const sel = this.customizer.selected;
-    if (e.key === 'Escape') {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      this.undo();
+    } else if (e.key === 'Escape') {
       if (this.brush.mode) this.setBrush('mode', null);
       else if (this.growMode) this.setGrowMode(null);
       else if (this.placing) this.cancelPlacement();
