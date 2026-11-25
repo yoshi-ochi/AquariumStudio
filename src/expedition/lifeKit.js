@@ -70,7 +70,7 @@ export const bottomY = (ctx, m) => ctx.box.y0 + m.ground - (m.beh.bury ?? 0) * m
 
 export function keepInside(m, ctx) {
   clampXZ(ctx.box, m, m.margin);
-  m.y = clamp(m.y, ctx.box.y0 - m.L, ctx.box.y1);
+  m.y = clamp(m.y, ctx.box.y0 - m.L, m.air ? Infinity : ctx.box.y1); // 跳躍・滑空中は水面より上へ出られる
 }
 
 // ---- 速さの緩急 ----------------------------------------------------------

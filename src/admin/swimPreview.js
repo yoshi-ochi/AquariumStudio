@@ -49,13 +49,14 @@ export class SwimPreview {
   }
 
   /** 生き物 c（c.swim・c.beh に編集中の値）を表示する。行動が変わらなければ、ひれの動きだけ差し替える */
-  show(c) {
-    const key = `${c.id}|${c.len}|${JSON.stringify(behaviorOf(c))}`;
-    if (key !== this.key) this._rebuild(c);
+  show(c, other = null) {
+    const key = `${c.id}|${c.len}|${JSON.stringify(behaviorOf(c))}|${other?.id ?? ''}`;
+    if (key !== this.key) this._rebuild(c, other);
     this.key = key;
     const sw = swimOf(c);
     const params = swimParams(c);
     for (const f of this.life.children) {
+      if (f.userData.creature !== c.id) continue;
       const u = f.userData.uni;
       Object.assign(f.userData.motion, { sw: params, gw: -1 });
       u.uSwimA.value.set(...sw.a);
@@ -64,7 +65,7 @@ export class SwimPreview {
     }
   }
 
-  _rebuild(c) {
+  _rebuild(c, other) {
     this._clear(this.tank);
     this._clear(this.life);
     // 水槽の幅は体長の15倍（奥行・高さは幅の0.45・0.5倍）。体長との比が一定なので、どの種も同じ見え方で速さを比べられる
@@ -94,17 +95,23 @@ export class SwimPreview {
     coralMesh.position.set(coral.x, 0, coral.z);
     this.tank.add(floor, edges, rockMesh, weedMesh, coralMesh);
 
-    const beh = behaviorOf(c);
-    // 群れ・巣穴のコロニーは5匹、宿主に住む魚はつがいと若魚の3匹
-    const n = beh.school || beh.mode === 'burrow' ? 5 : beh.mode === 'host' ? 3 : 1;
-    const scale = Math.min(1, (Math.min(box.hx, box.hz) * 1.4) / c.len);
-    const shared = { n };
-    for (let i = 0; i < n; i++) {
-      const fish = buildCreature(c);
-      fish.scale.setScalar(scale);
-      fish.userData.motion = createMotion(c, c.len * scale, this.ctx, mulberry32(97 + i * 131), shared, i);
-      this.life.add(fish);
-    }
+    // 群れは8匹・巣穴のコロニーは5匹、宿主に住む魚はつがいと若魚の3匹、つがいは2匹
+    const count = (b) => (b.school ? 8 : b.mode === 'burrow' ? 5 : b.mode === 'host' ? 3 : b.pair ? 2 : 1);
+    let seed = 97;
+    const spawn = (s) => {
+      const n = count(behaviorOf(s));
+      const scale = Math.min(1, (Math.min(box.hx, box.hz) * 1.4) / s.len);
+      const shared = { n };
+      for (let i = 0; i < n; i++) {
+        const fish = buildCreature(s);
+        fish.scale.setScalar(scale);
+        fish.userData.motion = createMotion(s, s.len * scale, this.ctx, mulberry32((seed += 131)), shared, i);
+        this.life.add(fish);
+      }
+      return scale;
+    };
+    const scale = spawn(c);
+    if (other) spawn(other);
     this.L = c.len * scale;
     this.H = H;
     this.W = W;

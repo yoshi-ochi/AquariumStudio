@@ -149,3 +149,4 @@ i { font-style: normal; font-size: 11px; padding: 0 4px; border-radius: 4px; bac
 .ad-toast.info { background: #4d6575; }
 .ad-toast.error { background: var(--danger); }
 .ad-toast.out { opacity: 0; }
+.ad-swim-with { display: block; margin: 4px 0 8px; }

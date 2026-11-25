@@ -453,14 +453,16 @@ if (uMode < 0.5) {
     else transformed.z += sin(ph) * uSwimB.y * aFinT;
   } else if (aFin > 3.5) {
     // 胸びれ・腹びれ：前後に漕ぐ／上下に羽ばたく（ベラ型）／左右交互に漕ぐ（シーラカンス）
+    // 腹びれ（aFin 5）は姿勢を保つ小さな動きだけ（胸びれの uSwimC.w 倍。シーラカンスは胸びれと同じく大きく漕ぐ）
     float side = position.z < 0.0 ? -1.0 : 1.0;
-    float pp = ph * uSwimC.z + (uSwimC.y > 1.5 && side > 0.0 ? 3.1416 : 0.0);
+    float amp = aFin > 4.5 ? uSwimC.x * uSwimC.w : uSwimC.x;
+    float pp = ph * uSwimC.z + (uSwimC.y > 1.5 && side > 0.0 ? 3.1416 : 0.0) + (aFin > 4.5 ? 1.6 : 0.0);
     if (uSwimC.y > 0.5 && uSwimC.y < 1.5) {
-      transformed.y += sin(pp) * uSwimC.x * aFinT;
-      transformed.z += cos(pp) * uSwimC.x * 0.35 * aFinT * side;
+      transformed.y += sin(pp) * amp * aFinT;
+      transformed.z += cos(pp) * amp * 0.35 * aFinT * side;
     } else {
-      transformed.x += sin(pp) * uSwimC.x * aFinT;
-      transformed.z += cos(pp) * uSwimC.x * 0.5 * aFinT * side;
+      transformed.x += sin(pp) * amp * aFinT;
+      transformed.z += cos(pp) * amp * 0.5 * aFinT * side;
     }
   }
 } else if (uMode < 1.5) {

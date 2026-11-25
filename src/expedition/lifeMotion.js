@@ -5,6 +5,7 @@ import { homeOf, pickWander, initWander, wander, restSpot, initRest, rest, initW
 import { den, initCrevice, crevice, initBurrow, burrow, holdPoint, initCling, cling } from './lifeHide.js';
 import { initPulse, pulse, initVertical, vertical } from './lifeDrift.js';
 import { initHost, host, rehost } from './lifeHost.js';
+import { initSocial, followPartner, social } from './lifeSocial.js';
 import { swimParams } from './swimStyles.js';
 /**
  * 水槽内の生き物の動きの入口。行動の種類（behaviorData.js の mode）ごとに状態を持って毎フレーム進める。
@@ -12,6 +13,7 @@ import { swimParams } from './swimStyles.js';
  *   lifeCruise.js 周回（外洋性・群れ・呼吸や宙返り）  lifeRoam.js 泳いでは止まる・底で休む・海底を歩く
  *   lifeHide.js 岩穴・砂の巣穴・海藻に掴まる          lifeDrift.js 拍動で漂う・縦の姿勢
  *   lifeHost.js 宿主（イソギンチャク代わりのサンゴ）の周りで暮らす（クマノミ）
+ *   lifeSocial.js 生き物どうし：つがいの並走・捕食者の狩り・獲物の逃避と再集合
  */
 
 const MODES = {
@@ -63,14 +65,18 @@ export function createMotion(c, L, ctx, r, sh, index) {
     gw: -1,
   };
   MODES[m.mode][0](m, ctx, sh, index);
+  m.sh = sh;
+  initSocial(m, ctx, sh, index ?? 0);
   return m;
 }
 
 /** 1フレーム進め、モデルに反映する */
 export function stepMotion(fish, m, ctx, dt, time) {
-  MODES[m.mode][1](m, ctx, dt, time);
-  fish.position.set(m.x, m.y, m.z);
-  fish.rotation.set(m.roll, m.yaw, m.pitch, 'YZX');
+  if (m.partner) followPartner(m, ctx, time);
+  else MODES[m.mode][1](m, ctx, dt, time);
+  social(m, ctx, dt, time);
+  fish.position.set(m.rx, m.ry, m.rz);
+  fish.rotation.set(m.roll, m.ryaw, m.rpitch, 'YZX');
   fish.visible = m.visible;
   // 胸びれで泳ぐ魚は止まっていても胸びれを漕ぎ続ける（idle）。速く泳ぐと尾びれ泳ぎに切り替わる（gait）
   m.clock += dt * m.tempo * Math.max(m.tail, m.sw.idle ?? 0);
@@ -85,7 +91,7 @@ export function stepMotion(fish, m, ctx, dt, time) {
  */
 function gaitShift(m, u) {
   const s = m.sw;
-  const bl = m.v / Math.max(1e-4, m.L);
+  const bl = (m.v + Math.hypot(m.ovx, m.ovz)) / Math.max(1e-4, m.L);
   const p = clamp((bl - s.gait * 0.7) / (s.gait * 0.6), 0, 1);
   const w = Math.round(p * p * (3 - 2 * p) * 20) / 20;
   if (w === m.gw) return;

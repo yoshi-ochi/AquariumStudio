@@ -18,6 +18,8 @@
  *   clio クリオネ … 左右の翼足を同時に背側・腹側へ羽ばたかせる（ゆっくり泳ぐとき約1〜2回/秒）
  *
  * gait：胸びれ泳ぎから体と尾びれの泳ぎに切り替わる速さ（体長/秒）。ブルーギルは約1.1（Gibb ら 1994）
+ * pelv：腹びれの動き（胸びれの振れに対する割合）。腹びれは姿勢の安定・制動に使い、巡航ではほとんど動かさない（0.15）。
+ *   シーラカンスは胸びれ・腹びれを四肢のように左右交互に大きく動かす（1）
  * idle：止まっているときもひれを動かし続ける割合（胸びれで定位する魚は0.4〜0.6）
  * 周期：体と尾で進む魚の尾びれの振動は、ストローハル数 0.25〜0.35 から「巡航で毎秒 体長×1〜2 進む」とき
  * 小さな魚ほど速い（およそ体長の-0.4乗）。マンタの胸びれは約0.3〜1回/秒、イルカの尾びれは0.5〜2.9回/秒。
@@ -35,7 +37,7 @@ const STYLES = {
   ost: { f: 4.0, ref: 0.15, start: -0.45, body: 0, waves: 0.5, caudal: 0.02, median: 0.05, mMode: 1, mWaves: 1, pect: 0.08, pMode: 0, pMul: 1.5, idle: 0.5 },
   amii: { f: 1.5, ref: 1, start: -0.5, body: 0.005, waves: 0.5, caudal: 0.01, median: 0.08, mMode: 0, mWaves: 4, pect: 0.03, pMode: 0, pMul: 1 },
   mola: { f: 0.45, ref: 1.8, start: -0.5, body: 0, waves: 0.5, caudal: 0.02, median: 0.18, mMode: 1, mWaves: 1, pect: 0.04, pMode: 0, pMul: 1 },
-  coel: { f: 0.5, ref: 1.8, start: -0.2, body: 0.01, waves: 0.6, caudal: 0.02, median: 0.07, mMode: 1, mWaves: 1, pect: 0.08, pMode: 2, pMul: 1 },
+  coel: { f: 0.5, ref: 1.8, start: -0.2, body: 0.01, waves: 0.6, caudal: 0.02, median: 0.07, mMode: 1, mWaves: 1, pect: 0.08, pMode: 2, pMul: 1, pelv: 1 },
   clio: { f: 1.6, ref: 0.03, start: -0.5, body: 0, waves: 0.5, caudal: 0, median: 0.16, mMode: 1, mWaves: 1, pect: 0, pMode: 0, pMul: 1 },
 };
 
@@ -46,7 +48,7 @@ export const STYLE_NAMES = {
   mola: 'マンボウ', coel: 'シーラカンス', clown: 'クマノミ型（丸い胸びれで漕ぐ）', clio: 'クリオネ（翼足で羽ばたく）',
 };
 /** 管理者が魚種ごとに上書きできる値（c.swim）。hz は実際の振動数（回/秒）で、空なら体長から求める */
-export const SWIM_KEYS = ['hz', 'start', 'body', 'waves', 'caudal', 'median', 'mMode', 'mWaves', 'pect', 'pMode', 'pMul', 'gait', 'idle'];
+export const SWIM_KEYS = ['hz', 'start', 'body', 'waves', 'caudal', 'median', 'mMode', 'mWaves', 'pect', 'pMode', 'pMul', 'pelv', 'gait', 'idle'];
 
 const FORM_STYLE = {
   perch: 'sub', grouper: 'sub', cod: 'sub', lump: 'sub', clown: 'lab', tang: 'lab', disc: 'lab', moorish: 'lab', bat: 'lab',
@@ -86,9 +88,10 @@ const autoHz = (s, len) => Math.min(6, Math.max(0.25, s.f * (s.ref / Math.max(0.
 /** 泳ぎの値（組み込みの泳法に管理者の上書き c.swim を重ねる）。{ hz, start, body, ... } */
 export function swimParams(c, { base = false } = {}) {
   const s = STYLES[base ? baseStyleOf(c) : styleOf(c)];
-  const out = { ...s, hz: autoHz(s, c.len) };
+  const out = { pelv: 0.15, ...s, hz: autoHz(s, c.len) };
   if (!base) for (const k of SWIM_KEYS) if (fin(c.swim?.[k])) out[k] = c.swim[k];
   out.hz = Math.min(12, Math.max(0.05, out.hz));
+  out.pelv = Math.min(2, Math.max(0, out.pelv));
   if (out.idle != null) out.idle = Math.min(1, Math.max(0, out.idle));
   if (out.gait != null) out.gait = Math.min(20, Math.max(0, out.gait));
   return out;
@@ -100,6 +103,6 @@ export function swimOf(c) {
   return {
     a: [s.hz, s.start, s.body, s.waves],
     b: [s.caudal, s.median, s.mMode, s.mWaves],
-    c: [s.pect, s.pMode, s.pMul, 0],
+    c: [s.pect, s.pMode, s.pMul, s.pelv],
   };
 }
