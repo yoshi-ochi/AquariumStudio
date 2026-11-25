@@ -34,7 +34,8 @@ export function updateClipUniforms(tank) {
 }
 
 const VERT_DECL = '#include <common>\nvarying vec3 vClipWorld;';
-const VERT_BODY = '#include <project_vertex>\nvClipWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;';
+// 繰り返し描画（InstancedMesh）は個体ごとの行列も掛ける
+const VERT_BODY = '#include <project_vertex>\n#ifdef USE_INSTANCING\nvClipWorld = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;\n#else\nvClipWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\n#endif';
 const FRAG_DECL = `#include <common>
 varying vec3 vClipWorld;
 uniform mat4 uClipInv;
@@ -69,11 +70,26 @@ const FRAG_BODY = `#include <clipping_planes_fragment>
   }
 }`;
 
+// 水槽ごとに1つだけ複製して使い回す材質（生き物オブジェ：floraMaterial.js）。水槽の uniform → (元の材質 → 複製)
+const TANK_MATS = new WeakMap();
+
 function clipMaterial(material, uniforms) {
+  if (material.userData.clipped) return material; // すでにこの仕組みで作った複製
+  const reuse = material.userData.tankShared;
+  let mats = null;
+  if (reuse) {
+    mats = TANK_MATS.get(uniforms) ?? TANK_MATS.set(uniforms, new Map()).get(uniforms);
+    if (mats.has(material)) return mats.get(material);
+  }
+  const extend = material.userData.extend; // 元の材質が持つシェーダーの追加（揺れ）。複製すると消えるので先に取る
+  const key = material.userData.programKey ?? '';
   const m = material.userData.shared ? material.clone() : material;
-  m.userData.shared = false;
+  m.userData.shared = !!reuse; // 使い回す複製は、オブジェを消しても捨てない
+  m.userData.clipped = !!reuse;
+  if (mats) mats.set(material, m);
   m.side = THREE.DoubleSide; // 切り口から内側が抜けて見えないように
   m.onBeforeCompile = (shader) => {
+    extend?.(shader);
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', VERT_DECL)
@@ -85,7 +101,7 @@ function clipMaterial(material, uniforms) {
     // 水紋は水の中だけ（水面の1cm ほど下から上へ消していく）
     addCaustics(shader, uniforms, 'vClipWorld', 'smoothstep(uWaterTop + 0.002, uWaterTop - 0.01, (uClipInv * vec4(vClipWorld, 1.0)).y)');
   };
-  m.customProgramCacheKey = () => 'tank-clip-cau';
+  m.customProgramCacheKey = () => `tank-clip-cau${key}`;
   m.needsUpdate = true;
   return m;
 }

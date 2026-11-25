@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { getDef, hasDef, CATEGORY } from './tankData.js';
 import { buildObject, disposeObject } from './tankBuilder.js';
-import { createClipUniforms, updateClipUniforms, applyClip, floorAt } from './tankClip.js';
+import { createClipUniforms, updateClipUniforms, applyClip } from './tankClip.js';
+import { conformFlora } from '../flora/floraSurface.js';
 import { encodePositions, applyEncodedPositions, rememberBase } from '../interior/sculpt.js';
 import { applyTankLook, normalizeLook } from './tankLook.js';
 import { applySand } from './sandLook.js';
@@ -54,6 +55,13 @@ export class TankManager {
     for (const item of contents) {
       if (hasDef(item.defId)) this.createInterior(obj, item.defId, item);
     }
+    // 以前の形式の生き物オブジェは、岩などがそろってから地形に沿わせ直す
+    for (const item of contents.length ? this.interiorItems(obj) : []) {
+      if (!item.userData.conform) continue;
+      delete item.userData.conform;
+      conformFlora(this, obj, item);
+      this.regrowInterior(item, item.userData.growth);
+    }
     if (creatures && obj.userData.clip) {
       obj.userData.creatures = { ...creatures };
       if (care) obj.userData.care = { ...care };
@@ -76,8 +84,7 @@ export class TankManager {
   /** 水槽内オブジェを生成してクリップを適用する（座標は水槽ローカル） */
   createInterior(tank, defId, { x = 0, y = 0, z = 0, rotY = 0, seed, sculpt, growth, bubbles, locked } = {}) {
     const def = getDef(defId);
-    const surface = def.growth === 'colony' ? this.surfaceSampler(tank, null, { x, y, z, rotY }) : undefined;
-    const item = buildObject(def, { seed: seed ?? Math.floor(Math.random() * 2 ** 31), growth, surface });
+    const item = buildObject(def, { seed: seed ?? Math.floor(Math.random() * 2 ** 31), growth });
     if (bubbles !== undefined) item.userData.bubbles = bubbles;
     if (locked) item.userData.locked = true;
     const rock = item.getObjectByName('rock');
@@ -94,11 +101,7 @@ export class TankManager {
   regrowInterior(item, growth) {
     const tank = item.parent?.parent;
     const def = getDef(item.userData.defId);
-    const surface =
-      def.growth === 'colony' && tank
-        ? this.surfaceSampler(tank, item, { x: item.position.x, y: item.position.y, z: item.position.z, rotY: item.rotation.y })
-        : undefined;
-    const fresh = buildObject(def, { seed: item.userData.seed, growth, surface });
+    const fresh = buildObject(def, { seed: item.userData.seed, growth });
     const oldBody = item.getObjectByName('body');
     const newBody = fresh.getObjectByName('body');
     item.remove(oldBody);
@@ -106,38 +109,6 @@ export class TankManager {
     item.add(newBody);
     item.userData.growth = fresh.userData.growth;
     if (tank?.userData.clip) applyClip(newBody, tank.userData.clip);
-  }
-
-  /**
-   * 群体を下の地形（岩・他のオブジェ・底砂）に沿わせるための高さ関数。
-   * 引数はオブジェのローカル (x, z)、戻り値はオブジェの原点からの高さ。
-   * 真上から下へレイを飛ばして当たった面の高さを使う（1cm 単位でキャッシュ）。
-   */
-  surfaceSampler(tank, self, { x, y, z, rotY }) {
-    const targets = this.interiorItems(tank).filter((o) => o !== self && !o.userData.ghost);
-    const I = tank.userData.interior;
-    const ray = new THREE.Raycaster();
-    const down = new THREE.Vector3(0, -1, 0);
-    const cache = new Map();
-    const c = Math.cos(rotY);
-    const s = Math.sin(rotY);
-    tank.updateWorldMatrix(true, true);
-    return (lx, lz) => {
-      const key = `${Math.round(lx * 100)},${Math.round(lz * 100)}`;
-      if (cache.has(key)) return cache.get(key);
-      // オブジェのローカル → 水槽のローカル（Y 軸回転＋平行移動）→ ワールド
-      const tx = x + lx * c + lz * s;
-      const tz = z - lx * s + lz * c;
-      const origin = tank.localToWorld(new THREE.Vector3(tx, y + 1.5, tz));
-      ray.set(origin, down);
-      const floorY = floorAt(I, tx);
-      let top = floorY;
-      const hit = targets.length ? ray.intersectObjects(targets, true)[0] : null;
-      if (hit) top = Math.max(floorY, tank.worldToLocal(hit.point.clone()).y);
-      const h = Math.max(0, top - y);
-      cache.set(key, h);
-      return h;
-    };
   }
 
   removeInterior(item) {
@@ -399,6 +370,6 @@ export class TankManager {
 const round = (v) => Math.round(v * 1000) / 1000;
 const roundGrowth = (g) => ({
   ...g,
-  ...(g.nodes && { nodes: g.nodes.map((n) => ({ a: n.a.map(round), b: n.b.map(round), r: Math.round(n.r * 1e4) / 1e4, p: n.p })) }),
+  ...(g.p && { p: [...g.p], s: round(g.s) }), // 生き物オブジェ：個体の点（mm の整数）と成長の度合い
   ...(g.parts && { parts: g.parts.map((p) => ({ pts: p.pts.map((q) => q.map(round)), r: round(p.r) })) }),
 });

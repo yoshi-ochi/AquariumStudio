@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mulberry32 } from './random.js';
-import { capsule, lattice, capsuleShape, drape } from './growth.js';
-import { Parts, colony, place, tone } from './colonyKit.js';
 
 export { mulberry32 };
 
@@ -134,41 +132,4 @@ export function buildDriftwood(g, def, { seed = 1, growth } = {}) {
       g.add(cap);
     }
   });
-}
-
-/** 玉石：川原の丸く平たい石。群れとして広がり、密度で石の数が変わる（河川・アマゾンの展示の底） */
-export function buildCobble(g, def, opt) {
-  const P = new Parts();
-  const stone = new THREE.IcosahedronGeometry(1, 1);
-  const cols = [0x8a8580, 0x6a6560, 0xa09888, 0x7a6a58, 0x9a9a96];
-  for (const c of colony(opt, 0.08, 520, 0.01)) {
-    const r = 0.012 + c.rand() * 0.02;
-    const s = new THREE.Vector3(r * (1 + c.rand() * 0.5), r * (0.45 + c.rand() * 0.25), r);
-    P.add(stone, tone(cols[Math.floor(c.rand() * cols.length)], c.rand, 0.06), place([c.x, c.y + s.y * 0.6, c.z], [(c.rand() - 0.5) * 0.3, c.rand() * 6, (c.rand() - 0.5) * 0.3], s));
-  }
-  stone.dispose();
-  P.into(g, { flat: false, roughness: 0.6 });
-}
-
-/** 海藻・水草。growth.ext の方向へ群生の範囲が伸び、本数は面積に比例（1本の細かさは同じ） */
-export function buildPlants(g, def, { seed = 1, growth, surface = () => 0 } = {}) {
-  const { w, h } = def.size;
-  const region = capsule(w * 0.4, growth?.ext ?? { x: 0, z: 0 });
-  const greens = [0x3f9b3a, 0x5fbf4a, 0x2f7a3a, 0x8fcf4f, 0x7a5a2a].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.8 }));
-
-  const soilGeo = capsuleShape(region, region.R, seed % 5);
-  drape(soilGeo, surface, 0.004);
-  g.add(finish(new THREE.Mesh(soilGeo, new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1, side: THREE.DoubleSide }))));
-
-  const blade = new THREE.ConeGeometry(0.5, 1, 5);
-  blade.translate(0, 0.5, 0);
-  const thick = 0.012;
-  for (const { p, rand } of lattice(seed, 900, region, 0.01, growth)) {
-    const m = new THREE.Mesh(blade, greens[Math.floor(rand() * greens.length)]);
-    const bh = h * (0.35 + rand() * 0.65);
-    m.scale.set(thick * (0.6 + rand() * 0.6), bh, thick * (0.6 + rand() * 0.6));
-    m.position.set(p.x, surface(p.x, p.y) + 0.004, p.y);
-    m.rotation.set((rand() - 0.5) * 0.5, rand() * Math.PI, (rand() - 0.5) * 0.5);
-    g.add(finish(m));
-  }
 }

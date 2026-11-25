@@ -1,15 +1,10 @@
 import * as THREE from 'three';
 import { MATERIALS, RENDER_ORDER } from './materials.js';
 import { CATEGORY } from './tankData.js';
-import { buildLiveRock, buildDriftwood, buildPlants, buildCobble } from './interiorBuilder.js';
-import { CORAL_BUILDERS } from './coralBuilder.js';
-import { MODULAR_BUILDERS } from './coralModular.js';
+import { buildLiveRock, buildDriftwood } from './interiorBuilder.js';
+import { buildFlora, normalizeFlora } from '../flora/floraBuilder.js';
 import { buildSouvenirShop, buildCafe, buildResearchLab, buildBreedingTank, buildWaterPlant, buildCleanCenter, buildFreezer, buildLiveFeed, buildFoodPrep } from './facilityBuilder.js';
 import { buildAirstone } from './aeration.js';
-import { SEAWEED_BUILDERS } from './seaweedBuilder.js';
-import { MORE_FLORA_BUILDERS } from './seaweedMore.js';
-import { REEF_BUILDERS } from './coralReef.js';
-import { SOFT_BUILDERS } from './coralSoft.js';
 import { buildPolyTank } from './polyTank.js';
 import { normalizeGrowth } from './growth.js';
 import { waterSurfaceMesh } from '../water/waterSurface.js';
@@ -27,8 +22,9 @@ function addSurface(parent, geometry, y, x = 0) {
  * 戻り値の root は底面が y=0、中心が x=z=0 のローカル座標系。
  * root.children: 'body'（見た目）と 'contents'（水槽内オブジェ用の子グループ）。
  */
-export function buildObject(def, { seed = 1, growth, surface } = {}) {
-  const g = def.growth ? normalizeGrowth(growth) : undefined;
+export function buildObject(def, { seed = 1, growth } = {}) {
+  const flora = def.flora ? normalizeFlora(def, growth) : null;
+  const g = flora ? flora.growth : def.growth ? normalizeGrowth(growth) : undefined;
   const root = new THREE.Group();
   root.name = def.id;
   root.userData.defId = def.id;
@@ -37,6 +33,7 @@ export function buildObject(def, { seed = 1, growth, surface } = {}) {
     root.userData.interiorItem = true;
     root.userData.seed = seed;
     if (g) root.userData.growth = g;
+    if (flora?.legacy) root.userData.conform = true; // 以前の形式から読み替えた：置いたあと地形に沿わせ直す
   } else {
     root.userData.placeable = true;
   }
@@ -47,7 +44,7 @@ export function buildObject(def, { seed = 1, growth, surface } = {}) {
 
   const builder = BUILDERS[def.shape];
   if (!builder) throw new Error(`No builder for shape: ${def.shape}`);
-  builder(body, def, { seed, growth: g, surface: surface ?? (() => 0) });
+  builder(body, def, { seed, growth: g });
 
   if (def.category === CATEGORY.TANK) {
     // 水槽内レイアウト用の情報（ローカル座標）と子要素グループ
@@ -63,6 +60,7 @@ export function buildObject(def, { seed = 1, growth, surface } = {}) {
 export function disposeObject(obj) {
   obj.traverse((child) => {
     if (child.geometry && !child.geometry.userData.shared) child.geometry.dispose(); // 生き物の形は種類ごとに共有
+    if (child.isInstancedMesh) child.dispose(); // 個体ごとの行列・色のバッファ
     const mats = Array.isArray(child.material) ? child.material : child.material ? [child.material] : [];
     for (const m of mats) {
       if (m.userData.shared) continue;
@@ -422,13 +420,6 @@ const BUILDERS = {
   stairs: buildStairs,
   liveRock: buildLiveRock,
   driftwood: buildDriftwood,
-  plants: buildPlants,
-  ...CORAL_BUILDERS,
-  ...MODULAR_BUILDERS,
-  ...SEAWEED_BUILDERS,
-  ...MORE_FLORA_BUILDERS,
-  ...REEF_BUILDERS,
-  ...SOFT_BUILDERS,
-  cobble: buildCobble,
+  flora: buildFlora,
   airstone: buildAirstone,
 };

@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { startCoralEdit, moveCoralEdit } from './coralEdit.js';
+import { isFloraMode, floraItem, floraHit, floraStroke, brushRadius, resetFloraTargets } from './floraBrush.js';
+import { conformFlora } from '../flora/floraSurface.js';
+import { specOf, fitToDepth } from '../flora/floraBuilder.js';
 import { floorAt } from '../tanks/tankClip.js';
 import { getDef } from '../tanks/tankData.js';
 import { REFUND_RATE } from '../management/stageData.js';
 import { BRUSH_DEFAULTS, sculptAt, createBrushCursor } from '../interior/sculpt.js';
-import { MAX_EXT } from '../tanks/growth.js';
 
 const CLICK_TOLERANCE = 5; // px
 const ROTATE_STEP = Math.PI / 4;
@@ -35,9 +36,10 @@ export class InteriorInteraction {
     sceneMgr.scene.add(this.cursor);
     this._n = new THREE.Vector3();
 
-    // 成長（サンゴ・流木・海藻）：モードをオンにして本体を上下ドラッグ
-    this.growMode = null; // null | 'extend'（ドラッグ方向へ伸ばす）| 'trunk'（流木の幹を太く）
-    this.growing = null; // { item, plane, startLocal, startExt, startY, startTrunk, value, dirty }
+    // 編集モード：生き物オブジェは 'paint'（ブラシで広げる）/ 'erase'（消す）、流木は 'branch' / 'extend' / 'trunk'
+    this.growMode = null;
+    this.growing = null; // { item, flora | wood, dirty }
+    this.floraRadius = 0.06; // ブラシの半径（m）
 
     this.dom.addEventListener('pointerdown', this._onDown, { capture: true });
     window.addEventListener('pointermove', this._onMove);
@@ -109,7 +111,7 @@ export class InteriorInteraction {
       x = THREE.MathUtils.clamp(x, -I.halfW, I.halfW);
       z = THREE.MathUtils.clamp(z, -I.halfD, I.halfD);
     }
-    const y = Math.max(local.y, floorAt(I, x)) - def.size.h * EMBED;
+    const y = Math.max(local.y, floorAt(I, x)) - (def.flora ? 0 : def.size.h * EMBED); // 生き物は面の上に付く
     obj.position.set(x, y, z);
   }
 
@@ -187,25 +189,49 @@ export class InteriorInteraction {
   setGrowMode(mode) {
     if (this.growMode === mode) return;
     this.growMode = mode;
+    this.cursor.visible = false;
     if (mode) this.setBrush('mode', null);
     this.onGrowChange?.(mode);
     this.customizer.renderPanel();
   }
 
-  /** 群体の密度（枝・ポリプ・株・石の数の倍率）を変えて作り直す */
-  setDensity(item, density) {
-    if (!item?.userData.interiorItem || item.userData.locked || getDef(item.userData.defId).growth !== 'colony') return;
-    this.manager.regrowInterior(item, { ...item.userData.growth, density });
+  /** 生き物オブジェの成長の度合い（群体の大きさ・海藻の高さ）を変えて作り直す */
+  setFloraSize(item, s) {
+    if (!item?.userData.interiorItem || item.userData.locked || !getDef(item.userData.defId).flora) return;
+    this.manager.regrowInterior(item, { ...item.userData.growth, s });
     this.onChanged?.();
   }
 
-  /** 成長モード中に、選択中のオブジェ本体に触れたか（流木は触ったパーツも返す） */
+  /** ブラシで広げられる生き物オブジェを選んでいて、ブラシのモード中か */
+  _floraTarget() {
+    const sel = this.customizer.selected;
+    return isFloraMode(this.growMode) && !sel?.userData.locked ? floraItem(sel) : null;
+  }
+
+  /** ブラシの輪を面に沿わせて表示する */
+  _floraCursor(item, hit) {
+    if (!hit) return (this.cursor.visible = false);
+    const wp = this.tank.localToWorld(hit.p.clone());
+    const wn = this.tank.localToWorld(hit.p.clone().add(hit.n)).sub(wp).normalize();
+    this.cursor.position.copy(wp).addScaledVector(wn, 0.003);
+    this.cursor.lookAt(wp.clone().add(wn));
+    this.cursor.scale.setScalar(brushRadius(this, item));
+    this.cursor.material.color.set(this.growMode === 'erase' ? 0xff8a8a : 0x8affc1);
+    this.cursor.visible = true;
+  }
+
+  /** ブラシ1回ぶん（押している間、ポインタが動くたび） */
+  _floraBrush(item) {
+    const hit = floraHit(this, item);
+    this._floraCursor(item, hit);
+    if (hit && floraStroke(this, item, hit)) this.growing.dirty = true;
+  }
+
+  /** 流木の編集モード中に、選択中の流木に触れたか（触ったパーツも返す） */
   _growTarget() {
     const sel = this.customizer.selected;
-    if (!this.growMode || !sel?.userData.interiorItem || sel.userData.locked || !getDef(sel.userData.defId).growth) return null;
-    // 種類に合わないモード（別のオブジェで選んだまま）は無視
-    const modular = getDef(sel.userData.defId).growth === 'modular';
-    if (modular !== ['add', 'remove'].includes(this.growMode) && !(modular && this.growMode === 'extend')) return null;
+    if (!this.growMode || !sel?.userData.interiorItem || sel.userData.locked || getDef(sel.userData.defId).growth !== 'driftwood') return null;
+    if (!['branch', 'extend', 'trunk'].includes(this.growMode)) return null;
     const hit = this.raycaster.intersectObject(sel, true)[0];
     return hit ? { item: sel, hit } : null;
   }
@@ -215,14 +241,15 @@ export class InteriorInteraction {
     const g = this.growing;
     if (!g?.dirty) return;
     g.dirty = false;
-    if (g.mod) this.manager.regrowInterior(g.item, { ...g.item.userData.growth, nodes: g.mod.nodes });
-    else if (g.wood) this.manager.regrowInterior(g.item, { ...g.item.userData.growth, parts: g.wood.parts });
-    else this.manager.regrowInterior(g.item, { ...g.item.userData.growth, ...g.value });
+    if (g.wood) this.manager.regrowInterior(g.item, { ...g.item.userData.growth, parts: g.wood.parts });
+    else this.manager.regrowInterior(g.item, g.item.userData.growth);
   }
 
-  /** 群体（サンゴ・海藻）を置いた場所の地形に沿わせ直す */
+  /** 生き物オブジェを置いた・動かした・回したあと、個体を近くの面（岩・砂・壁）に沿わせ直す */
   _conform(item) {
-    if (getDef(item.userData.defId).growth === 'colony') this.manager.regrowInterior(item, item.userData.growth);
+    if (!getDef(item.userData.defId).flora) return;
+    conformFlora(this.manager, this.tank, item);
+    this.manager.regrowInterior(item, item.userData.growth);
   }
 
   /** 流木の編集を開始：枝を増やす / 触ったパーツを伸ばす / 触ったパーツを太くする */
@@ -280,7 +307,10 @@ export class InteriorInteraction {
     this.cancelPlacement();
     this.customizer.deselect();
     const def = getDef(defId);
-    const ghost = this.manager.createInterior(this.tank, defId);
+    // 海藻などは、この水槽の水深に収まる高さで置く（あとから「高さ」で伸ばせる）
+    const I = this.tank.userData.interior;
+    const growth = def.flora ? { s: fitToDepth(specOf(def), (I.waterTop ?? 1) - I.floorY) } : undefined;
+    const ghost = this.manager.createInterior(this.tank, defId, { growth });
     ghost.userData.ghost = true;
     ghost.visible = false;
     const helper = new THREE.Box3Helper(new THREE.Box3(), 0x4cd18a);
@@ -344,6 +374,7 @@ export class InteriorInteraction {
 
   rotate(item, dir) {
     item.rotation.y = (item.rotation.y + dir * ROTATE_STEP) % (Math.PI * 2);
+    this._conform(item);
     this.customizer.renderPanel();
   }
 
@@ -380,34 +411,20 @@ export class InteriorInteraction {
     this.down = { x: e.clientX, y: e.clientY };
     if (this.placing) return;
 
+    const flora = this._floraTarget();
+    if (flora) {
+      // ブラシ：なぞった面に個体を足す／消す
+      this.cameraCtl.setEnabled(false);
+      resetFloraTargets(this);
+      this.floraFull = null;
+      this.growing = { item: flora, flora: true, dirty: false };
+      this._floraBrush(flora);
+      return;
+    }
     const growHit = this._growTarget();
     if (growHit) {
-      const growItem = growHit.item;
       this.cameraCtl.setEnabled(false);
-      const gr = growItem.userData.growth;
-      if (getDef(growItem.userData.defId).growth === 'modular') {
-        const mod = startCoralEdit(this, growItem, growHit.hit);
-        if (!mod) return this.cameraCtl.setEnabled(true);
-        this.growing = { item: growItem, mod, dirty: true };
-        return;
-      }
-      if (getDef(growItem.userData.defId).growth === 'driftwood') {
-        this.growing = { item: growItem, wood: this._startWoodEdit(growItem, growHit.hit, e), dirty: true };
-        return;
-      }
-      // 本体の高さの水平面上でドラッグ量を測る（オブジェのローカル座標に変換）
-      const wp = growItem.getWorldPosition(new THREE.Vector3());
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -wp.y);
-      const hit = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
-      this.growing = {
-        item: growItem,
-        plane,
-        startLocal: hit ? growItem.worldToLocal(hit.clone()) : null,
-        startExt: { ...gr.ext },
-        startY: e.clientY,
-        value: null,
-        dirty: false,
-      };
+      this.growing = { item: growHit.item, wood: this._startWoodEdit(growHit.item, growHit.hit, e), dirty: true };
       return;
     }
 
@@ -431,33 +448,11 @@ export class InteriorInteraction {
     if (!this.enabled || !e.isPrimary) return;
     if (this.growing) {
       const g = this.growing;
-      let value;
       if (g.wood) {
         if (this._moveWoodEdit(g.wood, e)) g.dirty = true;
-        return;
-      }
-      if (g.mod) {
-        if (moveCoralEdit(this, g.mod, e)) g.dirty = true;
-        return;
-      }
-      {
-        // 伸ばす：ドラッグした方向へ ext を動かす（逆へ戻すと縮む）
+      } else {
         this._setPointer(e);
-        const hit = g.startLocal && this.raycaster.ray.intersectPlane(g.plane, new THREE.Vector3());
-        if (!hit) return;
-        const cur = g.item.worldToLocal(hit);
-        let x = g.startExt.x + (cur.x - g.startLocal.x);
-        let z = g.startExt.z + (cur.z - g.startLocal.z);
-        const L = Math.hypot(x, z);
-        if (L > MAX_EXT) {
-          x *= MAX_EXT / L;
-          z *= MAX_EXT / L;
-        }
-        value = { ext: { x: Math.round(x * 200) / 200, z: Math.round(z * 200) / 200 } };
-      }
-      if (JSON.stringify(value) !== JSON.stringify(g.value)) {
-        g.value = value;
-        g.dirty = true;
+        this._floraBrush(g.item);
       }
       return;
     }
@@ -469,6 +464,14 @@ export class InteriorInteraction {
     }
     if (this.sculpting) {
       this.sculpting.event = e; // 実際の変形は update() で毎フレーム
+      return;
+    }
+    if (e.buttons === 0 && e.target === this.dom && this._floraTarget()) {
+      // ブラシの輪をポインタの下の面に出す
+      this._setPointer(e);
+      resetFloraTargets(this);
+      this._floraCursor(this._floraTarget(), floraHit(this, this._floraTarget()));
+      this.dom.style.cursor = this.cursor.visible ? 'crosshair' : '';
       return;
     }
     if (this.brush.mode && e.buttons === 0 && e.target === this.dom) {
@@ -499,7 +502,11 @@ export class InteriorInteraction {
     if (!this.enabled || !e.isPrimary) return;
     if (this.growing) {
       this._updateGrowth();
-      if (this.growing.mod) this.onChanged?.();
+      if (this.growing.flora) {
+        resetFloraTargets(this);
+        if (this.floraFull) this.toast(this.floraFull);
+        this.onChanged?.();
+      }
       this.growing = null;
       this.cameraCtl.setEnabled(true);
       this.customizer.renderPanel();

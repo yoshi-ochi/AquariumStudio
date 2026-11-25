@@ -4,7 +4,7 @@ import { EMBED_RATIO_MIN, EMBED_RATIO_MAX } from '../room/embed.js';
 import { normalizeLook, PALETTE, FRAME_COLORS } from './tankLook.js';
 import { SAND_TYPES } from './sandLook.js';
 import { floorLabel } from '../building/blueprint.js';
-import { DENSITY, densityOf } from './growth.js';
+import { specOf, pointCount, LEVELS } from '../flora/floraBuilder.js';
 
 const yen = (n) => `¥${Math.round(n).toLocaleString('ja-JP')}`;
 const cm = (v) => Math.round(v * 100);
@@ -14,12 +14,17 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 function slider(name, label, min, max, step, value, fmt) {
   return `<label class="slider">${label}<input type="range" data-param="${name}" data-fmt="${fmt}" min="${min}" max="${max}" step="${step}" value="${value}"><output>${format(fmt, value)}</output></label>`;
 }
+const fmtLen = (m) => (m >= 1 ? `${Math.round(m * 10) / 10} m` : `${Math.round(m * 100)} cm`);
 export function format(fmt, v) {
   v = Number(v);
   if (fmt === 'cm') return `${Math.round(v * 100)} cm`;
   if (fmt === 'm') return `${v.toFixed(2)} m`;
   if (fmt === '%') return `${Math.round(v * 100)}%`;
-  if (fmt === 'x') return `×${v.toFixed(2)}`; // 密度の倍率
+  if (fmt.startsWith('sz:')) {
+    // 生き物オブジェの大きさ（sz:最小:最大。段階に丸める）
+    const [, a, b] = fmt.split(':').map(Number);
+    return fmtLen(a + (b - a) * (Math.round(v * (LEVELS - 1)) / (LEVELS - 1)));
+  }
   if (fmt === 'lv') return `${Math.round(v / 0.2)} / 20`; // 水槽ライトの光量の段階
   return `${v}`;
 }
@@ -30,8 +35,8 @@ export function format(fmt, v) {
  * パネルの追加セクション：岩肌ブラシ（ライブロック）、成長（サンゴ・流木・海藻）、壁埋め込み（水槽・館内編集時）
  */
 export class TankCustomizer {
-  constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode, stairsTo }) {
-    Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode, stairsTo });
+  constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode, getFloraRadius, stairsTo }) {
+    Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode, getFloraRadius, stairsTo });
     this.selected = null;
     this.helper = null;
     this.allowEmbed = false;
@@ -141,7 +146,7 @@ export class TankCustomizer {
       ${def.stairs ? this._stairsSection(obj) : ''}
       ${isTank && this.allowEmbed && !def.atrium ? this._embedSection(obj) : ''}
       ${def.shape === 'liveRock' && this.getBrush ? this._sculptSection(def) : ''}
-      ${def.growth && this.getGrowMode ? this._growthSection(obj, def) : ''}
+      ${def.flora && this.getGrowMode ? this._floraSection(obj, def) : def.growth && this.getGrowMode ? this._growthSection(obj) : ''}
       ${def.bubbles ? `<div class="section"><h4>泡の量</h4>${slider('bubbles', '泡', 0, 1, 0.05, obj.userData.bubbles ?? 0.5, '%')}</div>` : ''}`;
   }
 
@@ -226,40 +231,38 @@ export class TankCustomizer {
       ${slider('brush-strength', '強さ', 0.1, 1, 0.05, b.strength, '%')}</div>`;
   }
 
-  _growthSection(obj, def) {
+  /** 流木の編集（枝を増やす・伸ばす・太くする） */
+  _growthSection(obj) {
     const mode = this.getGrowMode();
-    if (def.growth === 'modular') return this._partsSection(obj, mode);
-    const g = obj.userData.growth ?? { ext: { x: 0, z: 0 } };
-    const len = Math.round(Math.hypot(g.ext.x, g.ext.z) * 100);
+    const g = obj.userData.growth ?? {};
     const btn = (m, label) => `<button data-action="grow-${m ?? 'off'}" class="${mode === m ? 'active' : ''}">${label}</button>`;
-    const wood = def.growth === 'driftwood';
-    const modes = wood
-      ? `${btn(null, 'オフ')}${btn('branch', '🌿 枝を増やす')}${btn('extend', '➚ 伸ばす')}${btn('trunk', '🪵 太くする')}`
-      : `${btn(null, 'オフ')}${btn('extend', '➚ 伸ばす')}`;
-    const info = wood ? `パーツ ${g.parts?.length ?? 4} 本（幹＋枝）` : `群体の伸び ${len} cm`;
-    const how = !mode
-      ? 'モードを選んで本体をドラッグ'
-      : mode === 'branch'
-        ? '枝を生やしたい点から伸ばす方向へドラッグ'
-        : mode === 'trunk'
-          ? '太くしたい枝・幹を上下にドラッグ'
-          : wood
-            ? '伸ばしたい枝・幹を触って方向へドラッグ'
-            : '本体から伸ばしたい方向へドラッグ';
-    // 密度：枝・ポリプ・株・石の数（ノウサンゴは1つの塊なので無し）
-    const dens = !wood && def.shape !== 'brain' ? slider('density', '密度', DENSITY.min, DENSITY.max, 0.05, densityOf(g), 'x') : '';
+    const how = { branch: '枝を生やしたい点から伸ばす方向へドラッグ', trunk: '太くしたい枝・幹を上下にドラッグ', extend: '伸ばしたい枝・幹を触って方向へドラッグ' }[mode] ?? 'モードを選んで本体をドラッグ';
     return `<div class="section"><h4>成長：${how}</h4>
-      <div class="seg">${modes}</div>
-      <div class="cat">${info}</div>${dens}</div>`;
+      <div class="seg">${btn(null, 'オフ')}${btn('branch', '🌿 枝を増やす')}${btn('extend', '➚ 伸ばす')}${btn('trunk', '🪵 太くする')}</div>
+      <div class="cat">パーツ ${g.parts?.length ?? 4} 本（幹＋枝）</div></div>`;
   }
 
-  /** パーツ編集サンゴ：触った箇所にパーツを追加 / 伸縮 / 削減 */
-  _partsSection(obj, mode) {
+  /**
+   * 生き物オブジェ（サンゴ・ソフトコーラル・イソギンチャク・海藻・水草）。
+   * 面に広がる種：ブラシで岩・砂・壁をなぞって広げる／消す。固着点から育つ種：「成長」で群体を大きくする。海藻は高さを伸ばせる
+   */
+  _floraSection(obj, def) {
+    const spec = specOf(def);
+    const g = obj.userData.growth;
+    const mode = this.getGrowMode();
     const btn = (m, label) => `<button data-action="grow-${m ?? 'off'}" class="${mode === m ? 'active' : ''}">${label}</button>`;
-    const how = { add: '増やしたい箇所から伸ばす方向へドラッグ（タップで既定サイズ）', extend: '伸縮したいパーツを触ってドラッグ', remove: '削りたいパーツをタップ' }[mode] ?? 'モードを選んで本体を操作';
-    return `<div class="section"><h4>パーツ編集：${how}</h4>
-      <div class="seg">${btn(null, 'オフ')}${btn('add', '＋ 拡張')}${btn('extend', '➚ 伸縮')}${btn('remove', '－ 削減')}</div>
-      <div class="cat">パーツ ${obj.userData.growth?.nodes?.length ?? 0} 個</div></div>`;
+    const size = spec.size ? slider('flora-size', spec.kind === 'grow' ? '成長' : '高さ', 0, 1, 1 / (LEVELS - 1), g.s, `sz:${spec.size[0]}:${spec.size[1]}`) : '';
+    if (spec.kind === 'grow') {
+      return `<div class="section"><h4>成長：固着点から育つ</h4>${size}
+        <div class="cat">${spec.dim}で ${fmtLen(spec.size[0])}〜${fmtLen(spec.size[1])}</div></div>`;
+    }
+    const how = mode === 'paint' ? '岩・砂・壁をなぞると、その面に広がります' : mode === 'erase' ? 'なぞった所の個体を消します' : 'ブラシを選んで、広げたい面をなぞる';
+    const limit = spec.maxR ? `・群体の径は最大 ${Math.round(spec.maxR * 200)}cm` : '';
+    return `<div class="section"><h4>広げる：${how}</h4>
+      <div class="seg">${btn(null, 'オフ')}${btn('paint', '🖌 広げる')}${btn('erase', '🧽 消す')}</div>
+      ${slider('flora-radius', 'ブラシの太さ', spec.gap, spec.gap * 10, spec.gap / 2, Math.min(spec.gap * 10, Math.max(spec.gap, this.getFloraRadius?.() ?? spec.gap * 2)), 'cm')}
+      ${size}
+      <div class="cat">個体 ${pointCount(g)} / 最大 ${spec.max}${limit}</div></div>`;
   }
 
   /** 毎フレーム：ハイライト更新とギズモの画面位置追従 */
