@@ -577,6 +577,8 @@ body:not([data-view=floor]) #side-actions, body:not([data-view=floor]) #goal-car
 .cg-cell .cthumb, .cg-cell .cthumb > img { width: 100%; }
 .cg-cell .cthumb > img { aspect-ratio: 4 / 3; height: auto; object-fit: cover; border-radius: 6px; background: #e6f2f9; }
 .cg-cell small { width: 100%; overflow: hidden; font-size: 10px; line-height: 1.25; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.cg-shown { position: absolute; right: 6px; top: 6px; padding: 0 4px; border-radius: 6px; color: #fff; background: #1f8a6a; font-size: 10px; font-style: normal; font-weight: 700; line-height: 1.5; }
+.cg-cell.none { opacity: .6; }
 .cg-n { position: absolute; left: 6px; top: 6px; padding: 0 4px; border-radius: 6px; color: #fff; background: rgba(10, 30, 45, .72); font-size: 10px; font-style: normal; font-weight: 700; line-height: 1.5; }
 /* 選んだアイコンの行のすぐ下に差し込む操作カード。吹き出しの先（--tip）が選んだアイコンを指す */
 .cg-pop { position: relative; grid-column: 1 / -1; margin: 6px 0 4px; padding: 10px 12px 12px; background: #fff; border: 2px solid #2f8fd0; border-radius: 12px; }
