@@ -39,6 +39,40 @@ export class FloorPlan {
     this.doors = this._findDoors();
     if (floor !== BASEMENT && !isWing(floor)) this._carveService(unlocked);
     this._carveWingYard(unlocked);
+    this._wrapYard(floor);
+  }
+
+  /**
+   * 展示室の外壁の裏をバックヤードにする：展示室（FLOOR）が建物の外（どのエリアでもないマス）に面する所に、
+   * 幅 SERVICE_WIDTH マスの管理通路を外側へ足す。エントランスの正面（+Z）の壁だけは建物の顔なので外壁のまま残す。
+   * 外側へ足すので、展示室の広さ・置いた物は変わらない。屋外エリア・プールなど、別のエリアの敷地には足さない
+   */
+  _wrapYard(floor) {
+    const SERVICE = 100;
+    const claimed = new Uint8Array(this.GX * this.GZ);
+    for (const zone of ZONES) {
+      if (zone.floor !== floor) continue;
+      for (const [x0, z0, x1, z1] of zone.rects) for (let j = Math.max(0, z0); j <= Math.min(this.GZ - 1, z1); j++) for (let i = Math.max(0, x0); i <= Math.min(this.GX - 1, x1); i++) claimed[this.idx(i, j)] = 1;
+    }
+    const entrance = ZONES.findIndex((z) => z.id === 'entrance' && z.floor === floor);
+    const add = [];
+    for (let j = 0; j < this.GZ; j++) for (let i = 0; i < this.GX; i++) {
+      if (this.at(i, j) !== CELL.FLOOR) continue;
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + a;
+        const nj = j + b;
+        if (this.at(ni, nj) !== CELL.NONE || ni < 0 || nj < 0 || ni >= this.GX || nj >= this.GZ || claimed[this.idx(ni, nj)]) continue;
+        if (b === 1 && this._zoneAt(i, j) === entrance) continue; // エントランスの正面の壁
+        for (let d = 0; d < SERVICE_WIDTH; d++) add.push([i + a * (d + 1), j + b * (d + 1)]);
+      }
+    }
+    for (const [i, j] of add) {
+      if (i < 0 || j < 0 || i >= this.GX || j >= this.GZ) continue;
+      const k = this.idx(i, j);
+      if (this.active[k] !== CELL.NONE || claimed[k]) continue;
+      this.active[k] = CELL.YARD;
+      this.zoneIds[k] = SERVICE;
+    }
   }
 
   /** 別館の展示室の周りを、幅 WING_YARD マスのバックヤードで囲む（連絡通路への出入口は空ける） */
@@ -305,6 +339,15 @@ export class FloorPlan {
     };
     scan('x', this.GZ, this.GX, (s, l) => [s, l - 1], (s, l) => [s, l]); // z = 一定 の線
     scan('z', this.GX, this.GZ, (s, l) => [l - 1, s], (s, l) => [l, s]); // x = 一定 の線
+    // 展示室側の外壁（裏にバックヤードが無い壁）に水槽を埋め込めるのは、エントランスの正面だけ
+    // （それ以外の外壁はバックヤードで囲む：_wrapYard。残るのはイルカスタジアムの通路の壁で、裏は観客席）
+    const entrance = ZONES.findIndex((z) => z.id === 'entrance' && z.floor === this.floor);
+    for (const r of runs) {
+      if (r.kind !== 'exterior' || r.side !== CELL.FLOOR) continue;
+      const mid = (r.from + r.to) / 2;
+      const [x, z] = r.axis === 'x' ? [mid, r.line + r.normal[1] * c * 0.5] : [r.line + r.normal[0] * c * 0.5, mid];
+      r.noEmbed = this._zoneAt(Math.floor(x / c + this.GX / 2), Math.floor(z / c + this.Z0)) !== entrance;
+    }
     return runs;
   }
 
