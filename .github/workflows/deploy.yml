@@ -32,7 +32,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
-      # 生物設定の管理者ツールを /AquariumApp/admin/ に置く（書き込みは管理者アカウントだけ：supabase/admin_config.sql）
+      # 生物設定の管理者ツールを /AquariumStudio/admin/ に置く（書き込みは管理者アカウントだけ：supabase/admin_config.sql）
       - run: npm run admin:build
         env:
           ADMIN_OUT_DIR: dist/admin
