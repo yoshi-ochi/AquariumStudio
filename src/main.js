@@ -347,6 +347,7 @@ async function boot() {
         customizer.renderPanel();
         return;
       }
+      if (action === 'copy') return hall.enabled ? hall.copy(obj) : toast('館内レイアウト編集でコピーできます');
       if (obj.userData.locked && (action.startsWith('rotate') || action === 'delete')) return;
       const target = obj.userData.interiorItem ? interior : hall;
       if (action === 'rotate-left') target.rotate(obj, 1);
@@ -492,6 +493,8 @@ async function boot() {
     onTankRemoved: (tank) => {
       for (const [id, n] of Object.entries(tank.userData.creatures ?? {})) expeditions.give(id, n);
     },
+    // コピーした水槽があれば、館内レイアウト編集の間だけ「貼り付け」を出す
+    onClipboard: (show) => ($('btn-paste').hidden = !show),
   });
   afterApplyRoom = () => hall.refreshCenters();
   const inPlace = new BuildInPlace({
@@ -516,12 +519,15 @@ async function boot() {
     onGrowChange: (m) => shell.setHint(m ? HINT.grow : HINT.interior),
     // 元に戻すボタン：水槽内編集の間だけ出し、戻せる操作が無ければ押せない
     onHistory: (h) => {
+      $('btn-clear').hidden = !h.tank;
       $('btn-undo').hidden = !h.tank;
       $('btn-undo').disabled = !h.size;
       $('btn-undo').textContent = h.size ? `↶ 戻す ${h.size}` : '↶ 戻す';
     },
   });
   $('btn-undo').addEventListener('click', () => interior.undo());
+  $('btn-clear').addEventListener('click', () => interior.clearLayout());
+  $('btn-paste').addEventListener('click', () => hall.paste());
 
   // ---- モード ---------------------------------------------------------------
   //   home（館内の閲覧）→ 水槽タップ → tank（水槽の閲覧）→ ✎ → interior-edit
@@ -550,6 +556,7 @@ async function boot() {
     focusTank = tank;
     mode = 'tank';
     view.enabled = false;
+    $('btn-paste').hidden = true; // 貼り付けは館内レイアウト編集の間だけ
     interiorCam.enter(tank);
     shell.setMode('tank', tankLabel(manager, tank));
     shell.setHint('');
