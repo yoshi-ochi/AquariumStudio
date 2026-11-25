@@ -9,7 +9,7 @@ import { BRUSH_DEFAULTS, sculptAt, createBrushCursor } from '../interior/sculpt.
 
 const CLICK_TOLERANCE = 5; // px
 const ROTATE_STEP = Math.PI / 4;
-const EMBED = 0.12; // 岩などを接地面に少し沈める割合（高さ比）
+const EMBED = 0.12; // 岩などを他のオブジェの上に積むとき、少し沈めてかみ合わせる割合（高さ比）
 
 /**
  * 水槽内モードの操作。座標はすべて水槽ローカルで扱う。
@@ -111,7 +111,11 @@ export class InteriorInteraction {
       x = THREE.MathUtils.clamp(x, -I.halfW, I.halfW);
       z = THREE.MathUtils.clamp(z, -I.halfD, I.halfD);
     }
-    const y = Math.max(local.y, floorAt(I, x)) - (def.flora ? 0 : def.size.h * EMBED); // 生き物は面の上に付く
+    // 床（底砂を敷いていれば砂の上面）に置くときは、その面から立ち上げる（砂の中・ガラスの下へ沈めない）。
+    // 他の岩などの上に積むときだけ少し沈めてかみ合わせる。生き物は面の上に付く
+    const floor = floorAt(I, x);
+    const stacked = local.y > floor + 0.002;
+    const y = stacked && !def.flora ? Math.max(floor, local.y - def.size.h * EMBED) : Math.max(local.y, floor);
     obj.position.set(x, y, z);
   }
 

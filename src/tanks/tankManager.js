@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { getDef, hasDef, CATEGORY } from './tankData.js';
 import { buildObject, disposeObject } from './tankBuilder.js';
-import { createClipUniforms, updateClipUniforms, applyClip } from './tankClip.js';
+import { createClipUniforms, updateClipUniforms, applyClip, floorAt } from './tankClip.js';
 import { conformFlora } from '../flora/floraSurface.js';
 import { encodePositions, applyEncodedPositions, rememberBase } from '../interior/sculpt.js';
 import { applyTankLook, normalizeLook } from './tankLook.js';
@@ -55,6 +55,11 @@ export class TankManager {
     for (const item of contents) {
       if (hasDef(item.defId)) this.createInterior(obj, item.defId, item);
     }
+    // 以前は床に置くとき高さの12%ほど沈めていた。床（砂の上面）より下にある物は床まで上げる
+    for (const item of contents.length ? this.interiorItems(obj) : []) {
+      const floor = floorAt(obj.userData.interior, item.position.x);
+      if (item.position.y < floor - 1e-4) item.position.y = floor;
+    }
     // 以前の形式の生き物オブジェは、岩などがそろってから地形に沿わせ直す
     for (const item of contents.length ? this.interiorItems(obj) : []) {
       if (!item.userData.conform) continue;
@@ -82,7 +87,8 @@ export class TankManager {
   }
 
   /** 水槽内オブジェを生成してクリップを適用する（座標は水槽ローカル） */
-  createInterior(tank, defId, { x = 0, y = 0, z = 0, rotY = 0, seed, sculpt, growth, bubbles, locked } = {}) {
+  createInterior(tank, defId, { x = 0, y, z = 0, rotY = 0, seed, sculpt, growth, bubbles, locked } = {}) {
+    y ??= floorAt(tank.userData.interior, x); // 高さの指定が無ければ床（底砂を敷いていれば砂の上面）
     const def = getDef(defId);
     const item = buildObject(def, { seed: seed ?? Math.floor(Math.random() * 2 ** 31), growth });
     if (bubbles !== undefined) item.userData.bubbles = bubbles;
