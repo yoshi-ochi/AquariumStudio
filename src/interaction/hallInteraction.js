@@ -17,7 +17,9 @@ const ROTATE_STEP = Math.PI / 2;
  * 配置できる範囲は床のマス（FloorPlan）。埋め込み水槽は壁に沿ってのみ動く。
  */
 export class HallInteraction {
-  constructor({ sceneMgr, cameraCtl, manager, economy, inventory, customizer, room, toast, onPlacementChange, onChanged, onWallsChanged, onTankRemoved, getUnlocked }) {
+  constructor({ sceneMgr, cameraCtl, manager, economy, inventory, customizer, room, toast, onPlacementChange, onChanged, onWallsChanged, onTankRemoved, getUnlocked, onClipboard }) {
+    this.onClipboard = onClipboard;
+    this.clipboard = null; // 水槽のコピー（サイズ・見た目・水槽内レイアウト。展示生物は含めない）
     Object.assign(this, { sceneMgr, cameraCtl, manager, economy, inventory, customizer, room, toast, onPlacementChange, onChanged, onWallsChanged, onTankRemoved, getUnlocked });
     this.guides = new AlignGuides(sceneMgr.scene, manager);
     this.dom = sceneMgr.renderer.domElement;
@@ -45,6 +47,37 @@ export class HallInteraction {
     this.enabled = v;
     this.guides.hide();
     this.refreshCenters();
+    this.onClipboard?.(v && !!this.clipboard);
+  }
+
+  // ---- 水槽のコピー・貼り付け ------------------------------------------------
+
+  /** 水槽をコピーする（水槽の種類・向き・見た目・水槽内レイアウト。展示生物と名前は含めない）。続けて貼り付けを始める */
+  copy(tank) {
+    if (!tank?.userData.clip) return;
+    this.clipboard = {
+      defId: tank.userData.defId,
+      rotY: tank.rotation.y,
+      look: tank.userData.look ? structuredClone(tank.userData.look) : null,
+      contents: this.manager.dumpInterior(tank),
+    };
+    this.onClipboard?.(this.enabled);
+    this.toast(`${getDef(tank.userData.defId).name} をコピーしました。貼り付ける場所をタップ（Shift で続けて）`);
+    this.paste();
+  }
+
+  /** コピーした水槽を置き始める */
+  paste() {
+    const c = this.clipboard;
+    if (!c || !this.enabled) return;
+    this.startPlacement(c.defId);
+    this.placing.copy = c;
+    this.placing.rotY = c.rotY;
+  }
+
+  /** 水槽内レイアウトの代金 */
+  _copyValue(copy) {
+    return copy.contents.reduce((s, it) => s + (getDef(it.defId)?.price ?? 0), 0);
   }
 
   /** エリア中央の十字線を今の階・解放状況で描き直す */
@@ -118,7 +151,12 @@ export class HallInteraction {
   // ---- 新規配置 -------------------------------------------------------------
 
   /** 水槽は在庫から、それ以外は資金で設置する。不足時は理由を返す */
-  _lack(def) {
+  _lack(def, copy) {
+    // 貼り付け：水槽本体は在庫から、水槽内レイアウトは資金で買い直す
+    if (copy) {
+      if (this.inventory.count(def.id) < 1) return `${def.name} の在庫がありません（水槽建造で作ってください）`;
+      return this.economy.canAfford(this._copyValue(copy)) ? '' : `水槽内レイアウトの代金 ¥${this._copyValue(copy).toLocaleString('ja-JP')} が足りません`;
+    }
     if (this.inventory.count(def.id) > 0) return '';
     if (def.category === CATEGORY.TANK) return '在庫がありません';
     return this.economy.canAfford(def.price) ? '' : '資金が足りません';
@@ -161,7 +199,7 @@ export class HallInteraction {
     p.ghost.position.set(x, this.manager.elevationAt(p.def, x, z, this.manager.currentFloor), z);
     p.ghost.rotation.y = p.rotY;
     p.ghost.visible = true;
-    const lack = this._lack(p.def);
+    const lack = this._lack(p.def, p.copy);
     p.valid = fits && !lack;
     p.reason = !fits ? (p.def.basement ? '地下に設置してください' : p.def.yardOnly ? 'バックヤードに設置してください' : '解放済みの床の上に置いてください') : lack;
     p.helper.box.setFromObject(p.ghost);
@@ -189,14 +227,23 @@ export class HallInteraction {
     if (!p.ghost.visible) return;
     if (!p.valid) return this.toast(p.reason, { error: true });
     if (!this.inventory.take(p.def.id)) this.economy.spend(p.def.price);
+    if (p.copy) this.economy.spend(this._copyValue(p.copy));
     const obj = this.manager.add(p.def.id, {
       x: p.ghost.position.x,
       z: p.ghost.position.z,
       rotY: p.ghost.rotation.y,
       embed: p.def.wallMount ? { ...p.embed } : null,
+      // 貼り付け：見た目と水槽内レイアウトを写す（展示生物は空のまま）
+      ...(p.copy && { look: p.copy.look ? structuredClone(p.copy.look) : null, contents: structuredClone(p.copy.contents) }),
     });
     if (p.def.wallMount) this.onWallsChanged?.();
-    this.toast(`${p.def.name} を設置しました`);
+    this.toast(p.copy ? `${p.def.name} を複製しました（展示生物は空です）` : `${p.def.name} を設置しました`);
+    if (p.copy && e.shiftKey && !this._lack(p.def, p.copy)) return this.onChanged?.();
+    if (p.copy && e.shiftKey) {
+      this.cancelPlacement();
+      this.customizer.select(obj);
+      return this.onChanged?.();
+    }
     if (!e.shiftKey) {
       this.cancelPlacement();
       this.customizer.select(obj);

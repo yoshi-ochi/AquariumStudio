@@ -89,6 +89,24 @@ export class InteriorInteraction {
     this.customizer.renderPanel();
   }
 
+  /** 水槽内レイアウトをクリアする（全部撤去。払い戻しあり、元に戻せる） */
+  clearLayout() {
+    const items = this.manager.interiorItems(this.tank);
+    if (!items.length) return this.toast('水槽内に物がありません');
+    const refund = items.reduce((s, it) => s + Math.floor(getDef(it.userData.defId).price * REFUND_RATE), 0);
+    if (!confirm(`水槽内のオブジェ ${items.length} 個をすべて撤去します（払い戻し ¥${refund.toLocaleString('ja-JP')}）。\n「↶ 戻す」で元に戻せます。よろしいですか？`)) return;
+    this.cancelPlacement();
+    this.setBrush('mode', null);
+    this.setGrowMode(null);
+    this.customizer.deselect();
+    this.history.record('レイアウトのクリア');
+    for (const it of items) this.manager.removeInterior(it);
+    this.economy.earn(refund);
+    this.history.charge(-refund);
+    this.toast(`水槽内レイアウトをクリアしました（¥${refund.toLocaleString('ja-JP')} 払い戻し）`);
+    this.onChanged?.();
+  }
+
   /** 1手戻す（ボタン・Ctrl+Z） */
   undo() {
     if (!this.enabled || this.drag || this.sculpting || this.growing) return;

@@ -141,6 +141,7 @@ export class TankCustomizer {
         <button data-action="rotate-left">⟲ 回転</button>
         <button data-action="rotate-right">⟳ 回転</button>
         ${isTank ? '<button data-action="tank-edit" class="primary">🐟 水槽を編集</button><button data-action="interior">✎ 水槽内</button>' : ''}
+        ${isTank && !def.atrium && this.allowEmbed ? '<button data-action="copy" title="サイズ・見た目・水槽内レイアウトを複製（展示生物は除く）">📋 コピー</button>' : ''}
         ${def.stairs ? '' : '<button data-action="delete" class="danger">🗑 撤去</button>'}
       </div>
       ${def.stairs ? this._stairsSection(obj) : ''}
