@@ -21,6 +21,8 @@
  *   pulse   傘の拍動で浮き沈みしながら漂う（クラゲ・クリオネ・メンダコ）
  *   vertical 頭を上（または下）に向けて静止する（リュウグウノツカイ・タチウオ・ヘラヤガラ）
  *   walk    海底を歩いては止まる（カニは横歩き）
+ *   host    宿主（イソギンチャク代わりの柔らかいサンゴ）の上で定位し、飛び出しては戻る（クマノミ）。range は宿主から離れる
+ *           最大距離（体長の倍数）、nestle は触手に潜り込む割合
  * layer は泳ぐ高さの範囲（水底0〜水面1）。events は周回中に起こす特別な行動
  *   breathe 水面へ呼吸に上がる（イルカ・ウミガメ・ピラルク・デンキウナギ）
  *   bask    水面で横倒しになって日光浴（マンボウ）
@@ -132,8 +134,9 @@ const ID_BEH = {
   denkiunagi: B('wander', 0.3, { layer: [0.05, 0.5], events: ['breathe'] }), // 空気呼吸のため定期的に水面へ
   // 海藻・サンゴのまわり
   tatsu: B('cling', 0.15),
-  kakure: B('wander', 1.0, { home: 0.2, layer: [0.1, 0.45], pause: 0.5, coral: true }), // 住みかのイソギンチャクから離れない
-  kumanomi: B('wander', 1.0, { home: 0.2, layer: [0.1, 0.45], pause: 0.5, coral: true }),
+  // 宿主の上で胸びれを漕いで定位し、ときどき上へ飛び出して戻る。触手に潜り込んで体をこすり付ける（lifeHost.js）
+  kakure: B('host', 0.6, { burst: 3, range: 4, nestle: 0.35, layer: [0.1, 0.45] }),
+  kumanomi: B('host', 0.6, { burst: 3, range: 5, nestle: 0.3, layer: [0.1, 0.45] }),
   deba: B('wander', 0.9, { home: 0.2, layer: [0.1, 0.4], school: true, coral: true }), // 驚くと枝サンゴに逃げ込む
   misuji: B('wander', 0.9, { home: 0.2, layer: [0.1, 0.4], coral: true }),
   rurisuzume: B('wander', 1.0, { home: 0.3, layer: [0.1, 0.5], coral: true }),
@@ -179,11 +182,11 @@ const ID_BEH = {
 /** 管理者ツールの表示名 */
 export const MODE_NAMES = {
   cruise: '周回（外洋性）', wander: '泳いでは止まる', rest: '底で待ち伏せ・休む', crevice: '岩穴から顔を出す', burrow: '砂の巣穴から出入り',
-  cling: '海藻に尾を巻き付ける', pulse: '拍動で漂う', vertical: '縦の姿勢で静止', walk: '海底を歩く',
+  cling: '海藻に尾を巻き付ける', pulse: '拍動で漂う', vertical: '縦の姿勢で静止', walk: '海底を歩く', host: '住みかの周りで暮らす（クマノミ）',
 };
 /** 管理者が魚種ごとに上書きできる値（c.beh）。layer は [下, 上]（水底0〜水面1） */
-export const BEH_KEYS = ['mode', 'cruise', 'burst', 'every', 'kick', 'pause', 'layer'];
-const LIMIT = { cruise: [0, 12], burst: [1, 10], every: [0, 3600], kick: [0, 1], pause: [0, 1] };
+export const BEH_KEYS = ['mode', 'cruise', 'burst', 'every', 'kick', 'pause', 'range', 'nestle', 'layer'];
+const LIMIT = { cruise: [0, 12], burst: [1, 10], every: [0, 3600], kick: [0, 1], pause: [0, 1], range: [1, 30], nestle: [0, 1] };
 
 /** 組み込みの行動（id → 体形 → 標準） */
 export const baseBehaviorOf = (c) => ID_BEH[c.id] ?? FORM_BEH[c.form] ?? FORM_BEH.perch;

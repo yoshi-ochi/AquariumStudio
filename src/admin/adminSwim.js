@@ -17,6 +17,8 @@ const SWIM_FIELDS = [
   ['mWaves', '背・尻びれの波の数', 0.5, '波を流すときの波の数'],
   ['pect', '胸びれ・腹びれの振れ', 0.005, ''],
   ['pMul', '胸びれの周期倍', 0.1, '尾の何倍の速さで動かすか'],
+  ['gait', '尾びれ泳ぎに切り替わる速さ（体長/秒）', 0.1, '胸びれで泳ぐ魚。0 で切り替えない'],
+  ['idle', '止まっている時のひれの動き', 0.05, '0 止める 〜 1 泳ぐ時と同じ。胸びれで定位する魚は0.4〜0.6'],
 ];
 const M_MODES = [[0, '波を流す（モンガラ・リュウグウノツカイ）'], [1, '同じ側へ羽ばたく（マンボウ・クリオネ）']];
 const P_MODES = [[0, '前後に漕ぐ'], [1, '上下に羽ばたく（ベラ型）'], [2, '左右交互に漕ぐ（シーラカンス）']];
@@ -26,6 +28,8 @@ const BEH_FIELDS = [
   ['every', '突進の間隔（秒）', 5, '0 で突進しない'],
   ['kick', 'ひと蹴りと滑走の強さ', 0.05, '0 一定の速さ 〜 1 強く蹴って惰性で滑る'],
   ['pause', '止まる割合', 0.05, '泳いでは止まる魚が止まっている割合'],
+  ['range', '住みかから離れる距離（体長の倍数）', 0.5, '住みかの周りで暮らす魚（クマノミ）'],
+  ['nestle', '住みかに潜り込む割合', 0.05, '住みかの周りで暮らす魚（クマノミ）'],
 ];
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const differs = (a, b) => Math.abs(r3(a) - r3(b)) > 1e-9;
@@ -80,7 +84,7 @@ export function readSwim(root, c) {
   if (style !== baseStyleOf(c)) swim.style = style;
   for (const k of SWIM_KEYS) {
     const v = val(`[data-sw=${k}]`);
-    if (v !== '' && Number.isFinite(+v) && differs(+v, ref[k])) swim[k] = +v;
+    if (v !== '' && Number.isFinite(+v) && (ref[k] == null || differs(+v, ref[k]))) swim[k] = +v;
   }
   const base = baseBehaviorOf(c);
   const beh = {};
