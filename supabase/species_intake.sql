@@ -16,6 +16,7 @@ alter table public.species_intake enable row level security;
 drop policy if exists "intake admin" on public.species_intake;
 create policy "intake admin" on public.species_intake for all to authenticated using (public.is_admin()) with check (public.is_admin());
 grant select, insert, update, delete on public.species_intake to authenticated;
+grant select, insert, update, delete on public.species_intake to service_role; -- PC への取り込み（npm run species:pull）
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('species-ref', 'species-ref', false, 10485760, array['image/jpeg', 'image/png', 'image/webp'])
