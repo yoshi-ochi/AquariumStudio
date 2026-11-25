@@ -5,7 +5,7 @@
 
 ## 本番（スマホからも使える）
 
-https://yoshi-ochi.github.io/AquariumApp/admin/
+https://yoshi-ochi.github.io/AquariumStudio/admin/
 
 main へのマージで、ゲームと一緒に GitHub Actions が GitHub Pages へ公開する。
 誰でもページは開けるが、読み書きは管理者アカウント（`public.admins` に登録したもの）でログインしたときだけ

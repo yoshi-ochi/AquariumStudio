@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
  * 生物設定の管理者ツール（ゲームとは別サイト）。ゲームの src/ のデータ定義を共有し、Supabase の game_config に保存する。
  *   開発・利用: npm run admin（Tailscale の URL ならスマホ・外出先からも開ける）
  *   静的ファイル: npm run admin:build → dist-admin/（任意の静的ホスティングに置ける）
- *   本番: GitHub Actions がゲームと一緒に Pages の /AquariumApp/admin/ へ公開する（ADMIN_OUT_DIR=dist/admin）
+ *   本番: GitHub Actions がゲームと一緒に Pages の /AquariumStudio/admin/ へ公開する（ADMIN_OUT_DIR=dist/admin）
  */
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = process.env.ADMIN_OUT_DIR ? fileURLToPath(new URL(`../${process.env.ADMIN_OUT_DIR}/`, import.meta.url)) : `${ROOT}/dist-admin`;
