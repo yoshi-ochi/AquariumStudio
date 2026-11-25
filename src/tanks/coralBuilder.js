@@ -71,7 +71,7 @@ function acropora(g, def, { seed, growth, surface }) {
   const tipGeo = new THREE.IcosahedronGeometry(0.0055, 0);
   const pad = new THREE.SphereGeometry(0.016, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2);
   pad.scale(1, 0.5, 1);
-  for (const { p: pt, rand } of lattice(seed, 2400, region)) {
+  for (const { p: pt, rand } of lattice(seed, 2400, region, 0, growth)) {
     const { dir: od, t } = outward(region, pt);
     const dir = new THREE.Vector3(od.x * t, 1.4 - t, od.y * t).normalize();
     const len = 0.035 + rand() * 0.035;
@@ -101,7 +101,7 @@ function tosaka(g, def, { seed, growth, surface }) {
   const stalk = C(0xf2b8c2);
   const polypCols = [C(0xe8463c), C(0xf07a2a), C(0xd8344a)];
   const polyp = new THREE.IcosahedronGeometry(0.006, 0);
-  for (const { p: pt, rand } of lattice(seed, 700, region)) {
+  for (const { p: pt, rand } of lattice(seed, 700, region, 0, growth)) {
     const h = 0.05 + rand() * 0.05;
     const s = cyl(0.009, 0.006, h, 6);
     const base = new THREE.Vector3(pt.x, surface(pt.x, pt.y), pt.y);
@@ -182,7 +182,7 @@ function euphyllia(g, def, { seed, growth, surface }) {
   const tent = C(0x5fb07a);
   const tipC = C(0xf2e6a0);
   const tipGeo = new THREE.IcosahedronGeometry(0.0045, 0);
-  for (const { p: pt, rand } of lattice(seed, 500, region)) {
+  for (const { p: pt, rand } of lattice(seed, 500, region, 0, growth)) {
     const base = new THREE.Vector3(pt.x, surface(pt.x, pt.y), pt.y);
     const sh = 0.025 + rand() * 0.015;
     const s = cyl(0.008, 0.01, sh, 6);
@@ -216,7 +216,7 @@ function gsp(g, def, { seed, growth, surface }) {
   const polyp = new THREE.ConeGeometry(0.003, 0.01, 5);
   polyp.translate(0, 0.005, 0);
   const star = new THREE.IcosahedronGeometry(0.003, 0);
-  for (const { p: pt, rand } of lattice(seed, 9000, region, 0.006)) {
+  for (const { p: pt, rand } of lattice(seed, 9000, region, 0.006, growth)) {
     const base = new THREE.Vector3(pt.x, surface(pt.x, pt.y) + 0.003, pt.y);
     p.add(polyp, matC, base);
     p.add(star, polypC[Math.floor(rand() * 2)], base.clone().add(new THREE.Vector3(0, 0.01, 0)));
@@ -232,7 +232,7 @@ function xenia(g, def, { seed, growth, surface }) {
   const petal = C(0xf4c4d6);
   const petalGeo = new THREE.ConeGeometry(0.003, 0.016, 4);
   petalGeo.translate(0, 0.008, 0);
-  for (const { p: pt, rand } of lattice(seed, 1500, region)) {
+  for (const { p: pt, rand } of lattice(seed, 1500, region, 0, growth)) {
     const h = 0.03 + rand() * 0.025;
     const s = cyl(0.005, 0.004, h, 6);
     const base = new THREE.Vector3(pt.x, surface(pt.x, pt.y), pt.y);
