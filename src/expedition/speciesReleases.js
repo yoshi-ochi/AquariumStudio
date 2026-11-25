@@ -24,4 +24,10 @@ export const RELEASES = {
   itachizame: '2026-11-20', rabuka: '2026-11-20', kouika: '2026-11-20', akakurage: '2026-11-20', takokurage: '2026-11-20', seanettle: '2026-11-20',
   bluejelly: '2026-11-20', kabutogani: '2026-11-20', kijihata: '2026-11-20', takanoha: '2026-11-20', akaumigame: '2026-11-20', aoumigame: '2026-11-20',
   bandou: '2026-11-20', shiroiruka: '2026-11-20', togecho: '2026-11-20', fuuraicho: '2026-11-20',
+  // 2026-11-26
+  shiroebi: '2026-11-26',
+  hatahata: '2026-11-26',
+  nodoguro: '2026-11-26',
+  rouninaji: '2026-11-26',
+  fueyakko: '2026-11-26',
 };
