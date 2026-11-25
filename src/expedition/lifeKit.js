@@ -73,6 +73,29 @@ export function keepInside(m, ctx) {
   m.y = clamp(m.y, ctx.box.y0 - m.L, m.air ? Infinity : ctx.box.y1); // 跳躍・滑空中は水面より上へ出られる
 }
 
+/**
+ * 当たり判定：位置 (x, z) の真上で、硬い物（lifeAnchors.js の solids）の上面の高さ。何も無ければ -Infinity。
+ * pad は生き物の体の幅のぶん、物を太らせる量（m）
+ */
+export function solidTop(solids, x, z, pad = 0) {
+  let top = -Infinity;
+  for (const s of solids) {
+    if (s.t === 'dome') {
+      const u = (x - s.x) / (s.rx + pad);
+      const v = (z - s.z) / (s.rz + pad);
+      const d = u * u + v * v;
+      if (d >= 1) continue;
+      // 角の丸い箱に近い山：縁の近くまで高さを保ち、縁で落ちる
+      top = Math.max(top, s.y0 + (s.h + pad) * Math.sqrt(1 - d * d));
+    } else {
+      const R = s.r + pad;
+      const d2 = (x - s.x) ** 2 + (z - s.z) ** 2;
+      if (d2 < R * R) top = Math.max(top, s.y + Math.sqrt(R * R - d2));
+    }
+  }
+  return top;
+}
+
 // ---- 速さの緩急 ----------------------------------------------------------
 
 /** 突進（バースト）。o は個体または群れの共有状態。突進が始まったフレームで o.darted = true */

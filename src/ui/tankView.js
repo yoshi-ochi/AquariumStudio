@@ -96,19 +96,24 @@ export class TankView {
 
   _picker(t) {
     const free = tankCapacity(this.manager.defOf(t)) - usedCapacity(t);
-    const owned = CREATURES.filter((c) => this.expeditions.count(c.id) > 0);
-    if (this.sel && !this.expeditions.count(this.sel)) this.sel = null;
+    // この水槽で展示中の種は、在庫が無くても並べて「展示 n」を出す（展示中の種を先に）
+    const shown = t.userData.creatures ?? {};
+    const owned = CREATURES.filter((c) => this.expeditions.count(c.id) > 0 || shown[c.id] > 0).sort((a, b) => (shown[b.id] > 0) - (shown[a.id] > 0));
+    if (this.sel && !owned.some((c) => c.id === this.sel)) this.sel = null;
     let panel = '';
-    if (this.sel) {
+    if (this.sel && !this.expeditions.count(this.sel)) {
+      const c = getCreature(this.sel);
+      panel = qtyPanel({ title: c.name, info: creatureInfo(c.id, `この水槽で ${shown[c.id]}匹 展示中 ・ 在庫なし`), max: 0, qty: 0, buttons: [] });
+    } else if (this.sel) {
       const c = getCreature(this.sel);
       const have = this.expeditions.count(c.id);
       const fit = Math.max(0, Math.floor(free / c.slots));
       panel = qtyPanel({
-        title: c.name, info: creatureInfo(c.id, `所持 ${have} ・ ${fit > 0 ? `空き枠に収まるのは ${fit}匹まで` : '空き枠なし（過密になります）'}`), max: have, qty: this.qty,
+        title: c.name, info: creatureInfo(c.id, `${shown[c.id] ? `展示中 ${shown[c.id]} ・ ` : ''}所持 ${have} ・ ${fit > 0 ? `空き枠に収まるのは ${fit}匹まで` : '空き枠なし（過密になります）'}`), max: have, qty: this.qty,
         buttons: [{ act: 'tank-show', id: `${c.id}:{n}`, label: '{n}匹 展示する', primary: true }],
       });
     }
-    const grid = owned.length ? creatureGrid(this.previews, owned.map((c) => ({ id: c.id, n: this.expeditions.count(c.id) })), { sel: this.sel, panel }) : '<p class="gs-empty">生物を持っていません。採取遠征で捕まえましょう。</p>';
+    const grid = owned.length ? creatureGrid(this.previews, owned.map((c) => ({ id: c.id, n: this.expeditions.count(c.id), shown: shown[c.id] ?? 0 })), { sel: this.sel, panel }) : '<p class="gs-empty">生物を持っていません。採取遠征で捕まえましょう。</p>';
     return `<button data-act="tank-add-back">← 戻る</button><p class="gs-empty">空き枠 ${free}（目安）。アイコンをタップして、展示する数を選んでください。</p>${grid}`;
   }
 

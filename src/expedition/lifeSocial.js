@@ -1,4 +1,4 @@
-import { clamp, span, turnTo, wrap, clampXZ } from './lifeKit.js';
+import { clamp, span, turnTo, wrap, clampXZ, ease, solidTop } from './lifeKit.js';
 import { forceEvent } from './lifeCruise.js';
 import { hideInHost } from './lifeHost.js';
 
@@ -170,6 +170,25 @@ function evade(m, ctx, dt, time) {
   push(m, (dx / dl) * v, (ry / rl) * v * 0.3, (dz / dl) * v, far ? 3 : 8, dt);
 }
 
+/** 当たり判定を付けない動き方：岩穴にすむ・砂に潜る・海藻に掴まる（岩・海藻に入り込むのが本来の姿） */
+const PASS = new Set(['crevice', 'burrow', 'cling']);
+
+/**
+ * 当たり判定：岩・硬いサンゴ・流木の中へ入らないよう、上面より上へ持ち上げる量。
+ * 急に跳ね上がらないよう、上がるときは速く・下がるときはゆっくりならす。底で休む・歩く生き物は岩の上に乗る
+ */
+function bodyLift(m, ctx, x, z, y, dt) {
+  const solids = ctx.anchors?.solids;
+  let need = 0;
+  if (solids?.length && m.visible && !m.air && !PASS.has(m.mode)) {
+    const top = solidTop(solids, x, z, m.L * 0.2);
+    if (top > -Infinity) need = Math.max(0, Math.min(ctx.box.y1, top + Math.max(m.ground, m.L * 0.1)) - y);
+  }
+  m.lift = ease(m.lift ?? 0, need, need > (m.lift ?? 0) ? 12 : 2.5, dt);
+  // 追いつく前でも、体が半分以上めり込まないようにする
+  return Math.max(m.lift, need - m.L * 0.25);
+}
+
 /** 行動の位置にずれを重ね、描画の位置・向きを決める */
 export function social(m, ctx, dt, time) {
   if (dt <= 0) return;
@@ -186,8 +205,9 @@ export function social(m, ctx, dt, time) {
   if (q.x !== m.x + m.ox) (m.ox = q.x - m.x), (m.ovx *= 0.3);
   if (q.z !== m.z + m.oz) (m.oz = q.z - m.z), (m.ovz *= 0.3);
   // ずれで水面より上へは出ない（跳躍・滑空は行動の位置 m.y が水面より上になる）
-  const y = clamp(m.y + m.oy, Math.min(m.y, box.y0 + m.L * 0.2), Math.max(m.y, box.y1));
+  let y = clamp(m.y + m.oy, Math.min(m.y, box.y0 + m.L * 0.2), Math.max(m.y, box.y1));
   if (y !== m.y + m.oy) (m.oy = y - m.y), (m.ovy *= 0.3);
+  y += bodyLift(m, ctx, m.x + m.ox, m.z + m.oz, y, dt);
   m.px = m.rx;
   m.py = m.ry;
   m.pz = m.rz;

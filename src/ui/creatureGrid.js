@@ -8,14 +8,16 @@ const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 /**
  * 生き物を4列のアイコンで並べる（種類が多くても一覧しやすい）。
  * タップで選ぶと、その行のすぐ下に操作カード（panel）を差し込む。カードの吹き出しの先が選んだアイコンを指す。
- *   items: [{ id, n, pieces? }]（n は所持数など、アイコンの左上に ×n で出す。pieces は成長のピース数）
+ *   items: [{ id, n, pieces?, shown? }]（n は所持数など、アイコンの左上に ×n で出す。pieces は成長のピース数、
+ *   shown はこの水槽で展示中の数（右上に「展示 n」）。n が 0 のアイコンは薄く出す）
  */
 export function creatureGrid(previews, items, { sel = null, panel = '' } = {}) {
   const at = items.findIndex((it) => it.id === sel);
   const out = [];
-  items.forEach(({ id, n, pieces }, i) => {
+  items.forEach(({ id, n, pieces, shown }, i) => {
     const c = getCreature(id);
-    out.push(`<button class="cg-cell ${sel === id ? 'sel' : ''}" data-act="cg-pick" data-id="${id}" aria-label="${c?.name ?? id} ${n}匹" aria-expanded="${sel === id}">${creatureThumb(previews, id, pieces != null ? `<i class="oct-badge">${octagrams(pieces, { mini: true })}</i>` : '')}<i class="cg-n">×${n}</i><small>${c?.name ?? id}</small></button>`);
+    const showing = shown ? `<i class="cg-shown" title="この水槽で展示中">展示 ${shown}</i>` : '';
+    out.push(`<button class="cg-cell ${sel === id ? 'sel' : ''} ${n ? '' : 'none'}" data-act="cg-pick" data-id="${id}" aria-label="${c?.name ?? id} 所持${n}匹${shown ? ` 展示中${shown}匹` : ''}" aria-expanded="${sel === id}">${creatureThumb(previews, id, pieces != null ? `<i class="oct-badge">${octagrams(pieces, { mini: true })}</i>` : '')}<i class="cg-n">×${n}</i>${showing}<small>${c?.name ?? id}</small></button>`);
     // 選んだアイコンの行の最後（または一覧の最後）にカードを入れる
     const rowEnd = Math.min(items.length - 1, Math.floor(at / COLS) * COLS + COLS - 1);
     if (at >= 0 && panel && i === rowEnd) {
