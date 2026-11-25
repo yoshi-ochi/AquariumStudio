@@ -150,3 +150,24 @@ i { font-style: normal; font-size: 11px; padding: 0 4px; border-radius: 4px; bac
 .ad-toast.error { background: var(--danger); }
 .ad-toast.out { opacity: 0; }
 .ad-swim-with { display: block; margin: 4px 0 8px; }
+
+/* モデル待ち */
+.ad-mlist { list-style: none; margin: 0; padding: 0; max-height: 70vh; overflow: auto; }
+.ad-mlist li { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.ad-mlist li:hover, .ad-mlist li.sel { background: var(--sel); }
+.ad-mthumb { width: 56px; height: 40px; border-radius: 6px; background: var(--bg); display: grid; place-items: center; overflow: hidden; }
+.ad-mthumb img { width: 100%; height: 100%; object-fit: cover; }
+.ad-mst { white-space: nowrap; }
+.ad-mst.wait { background: var(--bg); color: var(--muted); }
+.ad-mst.ready { background: #fff1c9; color: #7a5a00; }
+.ad-mst.req { background: #ffe0d0; color: #9a3a12; }
+.ad-mst.work { background: #e6dcff; color: #4a2f9a; }
+.ad-mst.done { background: #d6f2dc; color: #1f6a33; }
+.ad-mslot { border-top: 1px solid var(--line); margin-top: 8px; }
+.ad-mpics { display: flex; flex-wrap: wrap; gap: 8px; }
+.ad-mpics figure { position: relative; margin: 0; width: 120px; height: 84px; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); }
+.ad-mpics img { width: 100%; height: 100%; object-fit: contain; }
+.ad-mpics figure button { position: absolute; top: 2px; right: 2px; padding: 0 6px; font-size: 12px; }
+.ad-mup { display: grid; place-items: center; width: 120px; height: 84px; border: 1px dashed var(--accent); border-radius: 8px; color: var(--accent); cursor: pointer; font-size: 13px; }
+.ad-mup.off { opacity: 0.45; pointer-events: none; }
+textarea { resize: vertical; }

@@ -5,6 +5,7 @@ import { pruneConfig, auditConfig } from './adminState.js';
 import { SpeciesTab } from './adminSpecies.js';
 import { PlacesTab } from './adminPlaces.js';
 import { GrowthTab } from './adminGrowth.js';
+import { ModelingTab } from './adminModeling.js';
 import { esc, toast } from './adminUi.js';
 
 /**
@@ -35,6 +36,7 @@ const tabs = {
   species: ['魚種', new SpeciesTab(state, changed)],
   places: ['採取地', new PlacesTab(state, changed)],
   growth: ['レア度・成長', new GrowthTab(state, changed)],
+  modeling: ['モデル待ち', new ModelingTab(sb, () => render())],
   audit: ['点検', { html: () => auditHtml(), bind() {} }],
 };
 

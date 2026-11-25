@@ -10,7 +10,8 @@
     "fish-intake": "node tools/fish-intake/server.mjs",
     "admin": "vite --config admin/vite.config.js",
     "admin:build": "vite build --config admin/vite.config.js",
-    "species:release": "node tools/species-release.mjs"
+    "species:release": "node tools/species-release.mjs",
+    "species:pull": "node tools/species-pull.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
