@@ -13,8 +13,12 @@
  *   amii アミア型（リュウグウノツカイ・タチウオ）… 長い背びれに細かい波を流し、体はまっすぐ
  *   mola マンボウ … 背びれと尻びれを同じ側へそろえて羽ばたく（約0.4〜0.5回/秒）
  *   coel シーラカンス … 胸びれ・腹びれを左右交互に、第2背びれと尻びれを同時に振る
+ *   clown クマノミ型 … 丸く縦横比の小さい胸びれを前後に漕いで（抗力型）ゆっくり進む。尾は飛び出すときだけ使う
+ *     （胸びれの縦横比が小さい魚ほど漕ぎ型で遅い：Fulton ら 2005・Wainwright ら 2002）
  *   clio クリオネ … 左右の翼足を同時に背側・腹側へ羽ばたかせる（ゆっくり泳ぐとき約1〜2回/秒）
  *
+ * gait：胸びれ泳ぎから体と尾びれの泳ぎに切り替わる速さ（体長/秒）。ブルーギルは約1.1（Gibb ら 1994）
+ * idle：止まっているときもひれを動かし続ける割合（胸びれで定位する魚は0.4〜0.6）
  * 周期：体と尾で進む魚の尾びれの振動は、ストローハル数 0.25〜0.35 から「巡航で毎秒 体長×1〜2 進む」とき
  * 小さな魚ほど速い（およそ体長の-0.4乗）。マンタの胸びれは約0.3〜1回/秒、イルカの尾びれは0.5〜2.9回/秒。
  */
@@ -25,9 +29,10 @@ const STYLES = {
   thu: { f: 2.2, ref: 0.5, start: -0.3, body: 0.05, waves: 0.7, caudal: 0.08, median: 0, mMode: 0, mWaves: 1, pect: 0, pMode: 0, pMul: 1 },
   ang: { f: 1.2, ref: 0.5, start: 0.6, body: 0.06, waves: 1.6, caudal: 0.02, median: 0.02, mMode: 0, mWaves: 2, pect: 0.03, pMode: 0, pMul: 1 },
   shark: { f: 1.0, ref: 1, start: 0.1, body: 0.07, waves: 0.8, caudal: 0.06, median: 0, mMode: 0, mWaves: 1, pect: 0, pMode: 0, pMul: 1 },
-  lab: { f: 2.5, ref: 0.15, start: -0.2, body: 0.015, waves: 0.8, caudal: 0.02, median: 0.02, mMode: 0, mWaves: 1.5, pect: 0.12, pMode: 1, pMul: 1 },
-  bal: { f: 2.0, ref: 0.3, start: -0.4, body: 0.005, waves: 0.5, caudal: 0.01, median: 0.09, mMode: 0, mWaves: 1.5, pect: 0.03, pMode: 0, pMul: 1 },
-  ost: { f: 4.0, ref: 0.15, start: -0.45, body: 0, waves: 0.5, caudal: 0.02, median: 0.05, mMode: 1, mWaves: 1, pect: 0.08, pMode: 0, pMul: 1.5 },
+  lab: { f: 2.5, ref: 0.15, start: -0.2, body: 0.015, waves: 0.8, caudal: 0.02, median: 0.02, mMode: 0, mWaves: 1.5, pect: 0.12, pMode: 1, pMul: 1, gait: 1.1, idle: 0.4 },
+  clown: { f: 2.8, ref: 0.1, start: -0.2, body: 0.012, waves: 0.8, caudal: 0.025, median: 0.02, mMode: 0, mWaves: 1.5, pect: 0.14, pMode: 0, pMul: 1, gait: 1.2, idle: 0.6 },
+  bal: { f: 2.0, ref: 0.3, start: -0.4, body: 0.005, waves: 0.5, caudal: 0.01, median: 0.09, mMode: 0, mWaves: 1.5, pect: 0.03, pMode: 0, pMul: 1, idle: 0.4 },
+  ost: { f: 4.0, ref: 0.15, start: -0.45, body: 0, waves: 0.5, caudal: 0.02, median: 0.05, mMode: 1, mWaves: 1, pect: 0.08, pMode: 0, pMul: 1.5, idle: 0.5 },
   amii: { f: 1.5, ref: 1, start: -0.5, body: 0.005, waves: 0.5, caudal: 0.01, median: 0.08, mMode: 0, mWaves: 4, pect: 0.03, pMode: 0, pMul: 1 },
   mola: { f: 0.45, ref: 1.8, start: -0.5, body: 0, waves: 0.5, caudal: 0.02, median: 0.18, mMode: 1, mWaves: 1, pect: 0.04, pMode: 0, pMul: 1 },
   coel: { f: 0.5, ref: 1.8, start: -0.2, body: 0.01, waves: 0.6, caudal: 0.02, median: 0.07, mMode: 1, mWaves: 1, pect: 0.08, pMode: 2, pMul: 1 },
@@ -38,10 +43,10 @@ const STYLES = {
 export const STYLE_NAMES = {
   sub: '亜鯵型（タイ・ハタ）', car: '鯵型（アジ・イワシ）', thu: 'マグロ型（カツオ・カジキ）', ang: 'ウナギ型', shark: 'サメ',
   lab: 'ベラ型（胸びれで漕ぐ）', bal: 'モンガラ型（背・尻びれの波）', ost: 'ハコフグ型', amii: 'アミア型（長い背びれの波）',
-  mola: 'マンボウ', coel: 'シーラカンス', clio: 'クリオネ（翼足で羽ばたく）',
+  mola: 'マンボウ', coel: 'シーラカンス', clown: 'クマノミ型（丸い胸びれで漕ぐ）', clio: 'クリオネ（翼足で羽ばたく）',
 };
 /** 管理者が魚種ごとに上書きできる値（c.swim）。hz は実際の振動数（回/秒）で、空なら体長から求める */
-export const SWIM_KEYS = ['hz', 'start', 'body', 'waves', 'caudal', 'median', 'mMode', 'mWaves', 'pect', 'pMode', 'pMul'];
+export const SWIM_KEYS = ['hz', 'start', 'body', 'waves', 'caudal', 'median', 'mMode', 'mWaves', 'pect', 'pMode', 'pMul', 'gait', 'idle'];
 
 const FORM_STYLE = {
   perch: 'sub', grouper: 'sub', cod: 'sub', lump: 'sub', clown: 'lab', tang: 'lab', disc: 'lab', moorish: 'lab', bat: 'lab',
@@ -65,6 +70,8 @@ const ID_STYLE = {
   // ウナギ型
   ookamiuo: 'ang', utsubo: 'ang', hanahige: 'ang',
   clione: 'clio',
+  // クマノミ類（スズメダイ科でも、デバスズメダイなど縦横比の大きい胸びれで羽ばたく種は lab のまま）
+  kakure: 'clown', kumanomi: 'clown',
 };
 
 const fin = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -82,6 +89,8 @@ export function swimParams(c, { base = false } = {}) {
   const out = { ...s, hz: autoHz(s, c.len) };
   if (!base) for (const k of SWIM_KEYS) if (fin(c.swim?.[k])) out[k] = c.swim[k];
   out.hz = Math.min(12, Math.max(0.05, out.hz));
+  if (out.idle != null) out.idle = Math.min(1, Math.max(0, out.idle));
+  if (out.gait != null) out.gait = Math.min(20, Math.max(0, out.gait));
   return out;
 }
 

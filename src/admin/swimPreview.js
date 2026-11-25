@@ -4,7 +4,7 @@ import { mulberry32 } from '../tanks/random.js';
 import { buildCreature } from '../expedition/creatureBuilder.js';
 import { createMotion, stepMotion } from '../expedition/lifeMotion.js';
 import { behaviorOf } from '../expedition/behaviorData.js';
-import { swimOf } from '../expedition/swimStyles.js';
+import { swimOf, swimParams } from '../expedition/swimStyles.js';
 
 /**
  * 管理者ツールの泳ぎの試し見。ゲームと同じ形・泳ぎのシェーダー・行動（lifeMotion.js）で、岩と海藻を1つずつ置いた小さな水槽に泳がせる。
@@ -54,8 +54,10 @@ export class SwimPreview {
     if (key !== this.key) this._rebuild(c);
     this.key = key;
     const sw = swimOf(c);
+    const params = swimParams(c);
     for (const f of this.life.children) {
       const u = f.userData.uni;
+      Object.assign(f.userData.motion, { sw: params, gw: -1 });
       u.uSwimA.value.set(...sw.a);
       u.uSwimB.value.set(...sw.b);
       u.uSwimC.value.set(...sw.c);
@@ -72,8 +74,10 @@ export class SwimPreview {
     const box = { cx: 0, hx: (W / 2) * 0.86, hz: (D / 2) * 0.86, y0: 0.03 * W, y1: H - 0.03 * W, round: false };
     const rock = { x: -box.hx * 0.55, z: box.hz * 0.15, w: W * 0.18, d: D * 0.35, y0: 0, h: H * 0.22 };
     const weed = { x: box.hx * 0.5, z: -box.hz * 0.2, w: W * 0.06, d: W * 0.06, y0: 0, h: H * 0.7 };
-    for (const a of [rock, weed]) Object.assign(a, { r: Math.min(a.w, a.d) / 2, bx: a.x, bz: a.z });
-    this.ctx = { box, anchors: { rocks: [rock], holds: [weed], coral: [] }, sig: '', current: 0.8, checked: 0, last: null };
+    // 柔らかいサンゴ（ナガレハナサンゴ）：クマノミの住みかになる
+    const coral = { id: 'euphyllia', x: 0, z: box.hz * 0.2, w: W * 0.14, d: W * 0.14, y0: 0, h: H * 0.12 };
+    for (const a of [rock, weed, coral]) Object.assign(a, { r: Math.min(a.w, a.d) / 2, bx: a.x, bz: a.z });
+    this.ctx = { box, anchors: { rocks: [rock], holds: [weed], coral: [coral] }, sig: '', current: 0.8, checked: 0, last: null };
 
     const mat = (hex) => new THREE.MeshBasicMaterial({ color: hex });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), mat(FLOOR));
@@ -85,10 +89,14 @@ export class SwimPreview {
     rockMesh.position.set(rock.x, 0, rock.z);
     const weedMesh = new THREE.Mesh(new THREE.CylinderGeometry(weed.w * 0.15, weed.w * 0.3, weed.h, 5), mat(WEED));
     weedMesh.position.set(weed.x, weed.h / 2, weed.z);
-    this.tank.add(floor, edges, rockMesh, weedMesh);
+    const coralMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), mat(0xc77fa0));
+    coralMesh.scale.set(coral.w / 2, coral.h, coral.d / 2);
+    coralMesh.position.set(coral.x, 0, coral.z);
+    this.tank.add(floor, edges, rockMesh, weedMesh, coralMesh);
 
     const beh = behaviorOf(c);
-    const n = beh.school || beh.mode === 'burrow' ? 5 : 1;
+    // 群れ・巣穴のコロニーは5匹、宿主に住む魚はつがいと若魚の3匹
+    const n = beh.school || beh.mode === 'burrow' ? 5 : beh.mode === 'host' ? 3 : 1;
     const scale = Math.min(1, (Math.min(box.hx, box.hz) * 1.4) / c.len);
     const shared = { n };
     for (let i = 0; i < n; i++) {

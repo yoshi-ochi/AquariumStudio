@@ -26,7 +26,7 @@ export function lifeAnchors(tank) {
     box.setFromObject(item).applyMatrix4(inv);
     if (box.isEmpty()) continue;
     // bx, bz は根元（配置した位置）。海藻は葉が垂れて外接箱の中心が根元からずれるので、掴まる場所は根元から選ぶ
-    const a = { x: (box.min.x + box.max.x) / 2, z: (box.min.z + box.max.z) / 2, w: box.max.x - box.min.x, d: box.max.z - box.min.z, y0: box.min.y, h: box.max.y - box.min.y, bx: item.position.x, bz: item.position.z };
+    const a = { x: (box.min.x + box.max.x) / 2, z: (box.min.z + box.max.z) / 2, w: box.max.x - box.min.x, d: box.max.z - box.min.z, y0: box.min.y, h: box.max.y - box.min.y, bx: item.position.x, bz: item.position.z, id: def.id };
     a.r = Math.min(a.w, a.d) / 2;
     if (kind === 'rock') out.rocks.push(a);
     else if (kind === 'coral') out.coral.push(a), out.holds.push(a);
