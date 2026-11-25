@@ -4,6 +4,7 @@ import { EMBED_RATIO_MIN, EMBED_RATIO_MAX } from '../room/embed.js';
 import { normalizeLook, PALETTE, FRAME_COLORS } from './tankLook.js';
 import { SAND_TYPES } from './sandLook.js';
 import { floorLabel } from '../building/blueprint.js';
+import { DENSITY, densityOf } from './growth.js';
 
 const yen = (n) => `¥${Math.round(n).toLocaleString('ja-JP')}`;
 const cm = (v) => Math.round(v * 100);
@@ -18,6 +19,7 @@ export function format(fmt, v) {
   if (fmt === 'cm') return `${Math.round(v * 100)} cm`;
   if (fmt === 'm') return `${v.toFixed(2)} m`;
   if (fmt === '%') return `${Math.round(v * 100)}%`;
+  if (fmt === 'x') return `×${v.toFixed(2)}`; // 密度の倍率
   if (fmt === 'lv') return `${Math.round(v / 0.2)} / 20`; // 水槽ライトの光量の段階
   return `${v}`;
 }
@@ -244,9 +246,11 @@ export class TankCustomizer {
           : wood
             ? '伸ばしたい枝・幹を触って方向へドラッグ'
             : '本体から伸ばしたい方向へドラッグ';
+    // 密度：枝・ポリプ・株・石の数（ノウサンゴは1つの塊なので無し）
+    const dens = !wood && def.shape !== 'brain' ? slider('density', '密度', DENSITY.min, DENSITY.max, 0.05, densityOf(g), 'x') : '';
     return `<div class="section"><h4>成長：${how}</h4>
       <div class="seg">${modes}</div>
-      <div class="cat">${info}</div></div>`;
+      <div class="cat">${info}</div>${dens}</div>`;
   }
 
   /** パーツ編集サンゴ：触った箇所にパーツを追加 / 伸縮 / 削減 */

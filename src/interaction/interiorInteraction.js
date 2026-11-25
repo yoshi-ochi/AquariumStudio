@@ -192,6 +192,13 @@ export class InteriorInteraction {
     this.customizer.renderPanel();
   }
 
+  /** 群体の密度（枝・ポリプ・株・石の数の倍率）を変えて作り直す */
+  setDensity(item, density) {
+    if (!item?.userData.interiorItem || item.userData.locked || getDef(item.userData.defId).growth !== 'colony') return;
+    this.manager.regrowInterior(item, { ...item.userData.growth, density });
+    this.onChanged?.();
+  }
+
   /** 成長モード中に、選択中のオブジェ本体に触れたか（流木は触ったパーツも返す） */
   _growTarget() {
     const sel = this.customizer.selected;

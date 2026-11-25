@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mulberry32 } from './random.js';
 import { capsule, lattice, capsuleShape, drape } from './growth.js';
+import { Parts, colony, place, tone } from './colonyKit.js';
 
 export { mulberry32 };
 
@@ -20,6 +21,12 @@ const ROCK_PALETTES = {
   dark: { base: [0.2, 0.19, 0.19], patch: [[0.12, 0.12, 0.13], [0.3, 0.27, 0.25]], cover: 0.35 },
   brown: { base: [0.46, 0.33, 0.22], patch: [[0.36, 0.25, 0.16], [0.58, 0.45, 0.32]], cover: 0.35 },
   gray: { base: [0.56, 0.56, 0.55], patch: [[0.44, 0.44, 0.45], [0.68, 0.68, 0.66]], cover: 0.35 },
+  // 溶岩石：多孔質で赤黒い。細かな穴でごつごつする（日本の水族館・水草水槽の石組み）
+  lava: { base: [0.26, 0.17, 0.15], patch: [[0.14, 0.1, 0.1], [0.42, 0.22, 0.17]], cover: 0.45, rough: 0.13 },
+  // 青龍石：角ばった灰色の石灰岩に白い筋（水草レイアウト・河川展示の石組み）
+  seiryu: { base: [0.43, 0.44, 0.45], patch: [[0.32, 0.33, 0.35], [0.36, 0.37, 0.38]], cover: 0.3, facet: true, vein: [0.86, 0.87, 0.85] },
+  // ベースロック：生物の付いていない乾燥した白い岩（近年のサンゴ水槽の土台）。穴が多い
+  base: { base: [0.86, 0.83, 0.76], patch: [[0.76, 0.72, 0.64], [0.93, 0.91, 0.86]], cover: 0.3, rough: 0.07 },
 };
 
 /**
@@ -30,7 +37,8 @@ export function buildLiveRock(g, def, { seed = 1 } = {}) {
   const rand = mulberry32(seed);
   const pal = ROCK_PALETTES[def.palette] ?? ROCK_PALETTES.coralline;
   const { w, h, d } = def.size;
-  let geo = new THREE.IcosahedronGeometry(0.5, w <= 0.1 ? 6 : 14);
+  // 角ばった石は粗い多面体のまま、それ以外は細かく分割して丸みを出す
+  let geo = new THREE.IcosahedronGeometry(0.5, pal.facet ? (w <= 0.1 ? 2 : 3) : w <= 0.1 ? 6 : 14);
   geo.deleteAttribute('normal');
   geo.deleteAttribute('uv');
   geo = mergeVertices(geo);
@@ -49,6 +57,8 @@ export function buildLiveRock(g, def, { seed = 1 } = {}) {
       0.09 * Math.sin(n.y * 7 + ph[2] + n.x * 5) +
       0.05 * Math.sin(n.z * 13 + ph[3] + n.y * 11);
     for (const l of lumps) f += (0.22 * Math.max(0, n.dot(l) - 0.7)) / 0.3;
+    // 多孔質の岩：細かな凹み（穴）
+    if (pal.rough) f -= pal.rough * Math.max(0, Math.sin(n.x * 23 + ph[9]) * Math.sin(n.y * 19 + ph[0]) * Math.sin(n.z * 29 + ph[1]) - 0.2);
     const flatten = n.y < 0 ? 0.55 : 1;
     pos.setXYZ(i, n.x * 0.5 * f * w, n.y * 0.5 * f * h * flatten, n.z * 0.5 * f * d);
 
@@ -57,7 +67,8 @@ export function buildLiveRock(g, def, { seed = 1 } = {}) {
     const cover = k + n.y * 0.25 > 1 - pal.cover;
     const j = (Math.sin(i * 12.9898) * 0.5 + 0.5) * 0.07;
     const fine = Math.sin(n.x * 17 + ph[7]) * Math.sin(n.z * 15 + ph[8]) > 0.4;
-    const c = cover ? pal.patch[(fine ? 1 : 0) + (k > 0.85 && pal.patch[2] ? 1 : 0)] ?? pal.patch[0] : fine ? pal.patch[1] ?? pal.base : pal.base;
+    const vein = pal.vein && Math.abs(Math.sin((n.x * 0.8 + n.y * 0.5 + n.z * 0.3) * 14 + ph[2])) > 0.86;
+    const c = vein ? pal.vein : cover ? pal.patch[(fine ? 1 : 0) + (k > 0.85 && pal.patch[2] ? 1 : 0)] ?? pal.patch[0] : fine ? pal.patch[1] ?? pal.base : pal.base;
     colors[i * 3] = c[0] - j;
     colors[i * 3 + 1] = c[1] - j;
     colors[i * 3 + 2] = c[2] - j;
@@ -125,6 +136,20 @@ export function buildDriftwood(g, def, { seed = 1, growth } = {}) {
   });
 }
 
+/** 玉石：川原の丸く平たい石。群れとして広がり、密度で石の数が変わる（河川・アマゾンの展示の底） */
+export function buildCobble(g, def, opt) {
+  const P = new Parts();
+  const stone = new THREE.IcosahedronGeometry(1, 1);
+  const cols = [0x8a8580, 0x6a6560, 0xa09888, 0x7a6a58, 0x9a9a96];
+  for (const c of colony(opt, 0.08, 520, 0.01)) {
+    const r = 0.012 + c.rand() * 0.02;
+    const s = new THREE.Vector3(r * (1 + c.rand() * 0.5), r * (0.45 + c.rand() * 0.25), r);
+    P.add(stone, tone(cols[Math.floor(c.rand() * cols.length)], c.rand, 0.06), place([c.x, c.y + s.y * 0.6, c.z], [(c.rand() - 0.5) * 0.3, c.rand() * 6, (c.rand() - 0.5) * 0.3], s));
+  }
+  stone.dispose();
+  P.into(g, { flat: false, roughness: 0.6 });
+}
+
 /** 海藻・水草。growth.ext の方向へ群生の範囲が伸び、本数は面積に比例（1本の細かさは同じ） */
 export function buildPlants(g, def, { seed = 1, growth, surface = () => 0 } = {}) {
   const { w, h } = def.size;
@@ -138,7 +163,7 @@ export function buildPlants(g, def, { seed = 1, growth, surface = () => 0 } = {}
   const blade = new THREE.ConeGeometry(0.5, 1, 5);
   blade.translate(0, 0.5, 0);
   const thick = 0.012;
-  for (const { p, rand } of lattice(seed, 900, region, 0.01)) {
+  for (const { p, rand } of lattice(seed, 900, region, 0.01, growth)) {
     const m = new THREE.Mesh(blade, greens[Math.floor(rand() * greens.length)]);
     const bh = h * (0.35 + rand() * 0.65);
     m.scale.set(thick * (0.6 + rand() * 0.6), bh, thick * (0.6 + rand() * 0.6));

@@ -52,6 +52,9 @@ export const STRUCTURE_DEFS = [
 
 // ---- 水槽内オブジェ ----------------------------------------------------------
 // group: カタログのタブ。growth: ドラッグで成長できる種類（'colony' = 群体が広がる / 'driftwood' = 枝・幹）
+// colony は「伸ばす」で範囲が広がり、「密度」で個体（枝・ポリプ・株・石）の数を変えられる（growth.js）
+// 品ぞろえは美ら海水族館「サンゴの海」・モントレーベイ水族館「ケルプの森」・各地の公立水族館のサンゴ礁・藻場・河川展示で
+// よく使われる種類（造礁サンゴ・ソフトコーラル・クマノミの宿主のイソギンチャク・海藻・水草・石）
 
 const ROCK_SIZES = [
   { cm: 10, size: { w: 0.1, h: 0.08, d: 0.1 }, price: 500, appeal: 0.2 },
@@ -65,11 +68,16 @@ const ROCK_PALETTES = [
   { id: 'dark', label: '黒め', suffix: '_dark' },
   { id: 'brown', label: '茶色め', suffix: '_brown' },
   { id: 'gray', label: 'グレー', suffix: '_gray' },
+  // 岩の種類（名前ごと変える）
+  { id: 'base', label: '', suffix: '_base', name: 'ベースロック', text: '生物の付いていない白い岩。サンゴ水槽の土台に' },
+  { id: 'lava', label: '', suffix: '_lava', name: '溶岩石', text: '赤黒く穴の多い軽い石。日本の磯や水草水槽の石組みに' },
+  { id: 'seiryu', label: '', suffix: '_seiryu', name: '青龍石', text: '白い筋の入った角ばった灰色の石。河川・水草水槽の石組みに' },
 ];
 const ROCK_DEFS = ROCK_PALETTES.flatMap((p) =>
   ROCK_SIZES.map((r) => ({
     id: `rock${r.cm}${p.suffix}`,
-    name: `ライブロック${r.cm === 100 ? '1m' : `${r.cm}cm`}・${p.label}`,
+    name: `${p.name ?? 'ライブロック'}${r.cm === 100 ? '1m' : `${r.cm}cm`}${p.label ? `・${p.label}` : ''}`,
+    ...(p.text && { text: p.text }),
     shape: 'liveRock',
     palette: p.id,
     size: r.size,
@@ -84,7 +92,23 @@ const CORAL_DEFS = [
   { id: 'brain', name: 'ノウサンゴ', shape: 'brain', size: { w: 0.12, h: 0.06, d: 0.12 }, price: 5000, appeal: 1.6 },
   { id: 'euphyllia', name: 'ナガレハナサンゴ', shape: 'euphyllia', size: { w: 0.12, h: 0.09, d: 0.12 }, price: 5500, appeal: 1.8 },
   { id: 'gsp', name: 'スターポリプ', shape: 'gsp', size: { w: 0.14, h: 0.02, d: 0.14 }, price: 2500, appeal: 1 },
+  // 造礁サンゴ（coralReef.js）
+  { id: 'montipora', name: 'コモンサンゴ', shape: 'montipora', size: { w: 0.16, h: 0.06, d: 0.16 }, price: 6000, appeal: 2, text: '薄い板が渦を巻いて重なるサンゴ。縁ほど明るい' },
+  { id: 'porites', name: 'ハマサンゴ', shape: 'porites', size: { w: 0.16, h: 0.08, d: 0.16 }, price: 7000, appeal: 2, text: '丸いこぶが盛り上がる塊状のサンゴ。何百年もかけて巨大になる' },
+  { id: 'pocillopora', name: 'ハナヤサイサンゴ', shape: 'pocillopora', size: { w: 0.13, h: 0.07, d: 0.13 }, price: 6500, appeal: 2, text: '太く短い枝が密に分かれる。枝の間に小魚が隠れる' },
+  { id: 'turbinaria', name: 'スリバチサンゴ', shape: 'turbinaria', size: { w: 0.14, h: 0.06, d: 0.14 }, price: 6000, appeal: 1.8, text: 'すり鉢・巻いた葉のような黄緑の板状サンゴ' },
+  { id: 'fungia', name: 'クサビライシ', shape: 'fungia', size: { w: 0.14, h: 0.02, d: 0.14 }, price: 4000, appeal: 1.4, text: '岩に付かず砂の上で暮らす円盤形の単体サンゴ' },
+  { id: 'tubastraea', name: 'イボヤギ', shape: 'tubastraea', size: { w: 0.09, h: 0.03, d: 0.09 }, price: 4500, appeal: 1.6, text: '光合成をしない橙色のサンゴ。岩の陰で黄色い触手を開く' },
 ].map((d) => ({ ...d, group: 'coral', growth: 'colony' }));
+
+// ソフトコーラル・イソギンチャク（coralSoft.js）。イソギンチャクはクマノミ類の住みかになる
+const SOFT_DEFS = [
+  { id: 'sarcophyton', name: 'ウミキノコ', shape: 'sarcophyton', size: { w: 0.11, h: 0.07, d: 0.11 }, price: 5000, appeal: 1.8, text: '太い柄の上に波打つ傘。傘の上でポリプが開く' },
+  { id: 'discosoma', name: 'イソギンチャクモドキ', shape: 'discosoma', size: { w: 0.13, h: 0.02, d: 0.13 }, price: 3000, appeal: 1.2, text: '色とりどりの円盤が岩を覆う' },
+  { id: 'entacmaea', name: 'タマイタダキイソギンチャク', shape: 'entacmaea', size: { w: 0.11, h: 0.08, d: 0.11 }, price: 8000, appeal: 2.4, text: '触手の先が玉のように膨らむ。クマノミの宿主' },
+  { id: 'heteractis', name: 'センジュイソギンチャク', shape: 'heteractis', size: { w: 0.15, h: 0.09, d: 0.15 }, price: 12000, appeal: 3, text: '鮮やかな体に長い触手。岩の上でカクレクマノミが暮らす' },
+  { id: 'stichodactyla', name: 'ハタゴイソギンチャク', shape: 'stichodactyla', size: { w: 0.18, h: 0.03, d: 0.18 }, price: 10000, appeal: 2.6, text: '大きく波打つ平らな口盤を短い触手が覆う。砂地に広がる' },
+].map((d) => ({ ...d, group: 'soft', growth: 'colony' }));
 
 // パーツ単位で追加・削除できるサンゴ（growth: 'modular'。tosaka / xenia は旧IDを引き継ぐ）
 const MODULAR_CORAL_DEFS = [
@@ -115,9 +139,19 @@ const SEAWEED_DEFS = [
   { id: 'aosa', name: 'アオサ', shape: 'aosa', size: { w: 0.25, h: 0.1, d: 0.2 }, price: 1500, appeal: 0.6, text: '薄く波打つ明るい緑の緑藻' },
   { id: 'tengusa', name: 'テングサ', shape: 'tengusa', size: { w: 0.18, h: 0.16, d: 0.18 }, price: 2000, appeal: 0.9, text: '細かく枝分かれする紅藻。寒天の原料' },
   { id: 'umiuchiwa', name: 'ウミウチワ', shape: 'umiuchiwa', size: { w: 0.2, h: 0.12, d: 0.14 }, price: 2500, appeal: 1, text: '白い縞のある扇形の褐藻' },
-].map((d) => ({ ...d, group: 'seaweed' }));
+  { id: 'konbu', name: 'コンブ', shape: 'konbu', size: { w: 0.16, h: 0.5, d: 0.16 }, price: 3500, appeal: 1.2, text: '帯のように長い葉を1枚伸ばす褐藻。北の海の藻場' },
+  { id: 'miru', name: 'ミル', shape: 'miru', size: { w: 0.14, h: 0.16, d: 0.14 }, price: 2000, appeal: 0.9, text: '円柱の枝が二又に分かれる濃い緑の緑藻' },
+  { id: 'saboten', name: 'サボテングサ', shape: 'saboten', size: { w: 0.13, h: 0.1, d: 0.13 }, price: 2500, appeal: 1, text: '石灰質の節が鎖のようにつながる緑藻。サンゴ礁の砂地' },
+].map((d) => ({ ...d, group: 'seaweed', growth: 'colony' }));
 
-export const INTERIOR_DEFS = [...ROCK_DEFS, ...CORAL_DEFS, ...MODULAR_CORAL_DEFS, ...SEAWEED_DEFS, ...DECOR_DEFS].map(withCategory(CATEGORY.INTERIOR));
+// 淡水の水草・川原の石（アマゾン・河川の展示）
+const FRESH_DEFS = [
+  { id: 'amazonSword', name: 'アマゾンソード', shape: 'amazonSword', size: { w: 0.16, h: 0.3, d: 0.16 }, price: 2500, appeal: 1, text: '長い葉柄の葉がロゼット状に広がるアマゾン川の水草' },
+  { id: 'vallisneria', name: 'バリスネリア', shape: 'vallisneria', size: { w: 0.16, h: 0.4, d: 0.16 }, price: 2000, appeal: 0.9, text: 'リボン状の葉が密生する水草。ランナーで増える' },
+  { id: 'cobble', name: '玉石', shape: 'cobble', size: { w: 0.18, h: 0.03, d: 0.18 }, price: 1500, appeal: 0.4, text: '川原の丸い石。広げると川底になる' },
+].map((d) => ({ ...d, group: 'decor', growth: 'colony' }));
+
+export const INTERIOR_DEFS = [...ROCK_DEFS, ...CORAL_DEFS, ...MODULAR_CORAL_DEFS, ...SOFT_DEFS, ...SEAWEED_DEFS, ...DECOR_DEFS, ...FRESH_DEFS].map(withCategory(CATEGORY.INTERIOR));
 
 /** カタログのタブ */
 export const GROUP_LABELS = {
@@ -125,6 +159,7 @@ export const GROUP_LABELS = {
   structure: '館内オブジェ',
   rock: 'ライブロック',
   coral: 'サンゴ',
+  soft: 'ソフトコーラル・イソギンチャク',
   seaweed: '海藻',
   decor: '流木・水草',
 };

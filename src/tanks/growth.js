@@ -5,12 +5,17 @@ import { mulberry32 } from './random.js';
  * 方向つきの成長。growth.ext = { x, z }（オブジェのローカル XZ, m）。
  * 群体の範囲は「原点から ext まで伸びたカプセル」（半径 R は種ごとに一定）。
  * ドラッグした方向にだけ範囲が伸び、反対側は広がらない。
+ * growth.density は個体の密度の倍率（0.25〜3、標準1）。範囲の広さはそのままで、枝・ポリプ・株の数が変わる。
  */
 export const MAX_EXT = 0.8;
+export const DENSITY = { min: 0.25, max: 3 };
+/** 密度の倍率（保存値が無い・壊れているときは1） */
+export const densityOf = (g) => Math.min(DENSITY.max, Math.max(DENSITY.min, Number.isFinite(g?.density) ? g.density : 1));
 
 export function normalizeGrowth(g = {}) {
   const ext = g.ext ?? { x: 0, z: 0 };
   const out = { ext: { x: ext.x ?? 0, z: ext.z ?? 0 } };
+  if (g.density != null && densityOf(g) !== 1) out.density = densityOf(g);
   if (Array.isArray(g.parts)) out.parts = g.parts.map((p) => ({ pts: p.pts.map((q) => [...q]), r: p.r })); // 流木の各パーツ
   if (Array.isArray(g.nodes)) out.nodes = g.nodes.map((n) => ({ a: [...n.a], b: [...n.b], r: n.r, p: n.p })); // パーツ編集サンゴ
   return out;
@@ -47,8 +52,8 @@ function hashInt(seed, i, j) {
  * 格子点 + ゆらぎで個体の位置を決める。各個体は格子セル固有の乱数を持つので、
  * 範囲が伸びても既存の個体は動かず、新しいセルにだけ個体が増える。
  */
-export function lattice(seed, density, region, margin = 0) {
-  const cell = 1 / Math.sqrt(density);
+export function lattice(seed, density, region, margin = 0, growth) {
+  const cell = 1 / Math.sqrt(density * densityOf(growth));
   const { x0, x1, z0, z1 } = region.bounds;
   const out = [];
   for (let i = Math.floor(x0 / cell); i <= Math.ceil(x1 / cell); i++) {

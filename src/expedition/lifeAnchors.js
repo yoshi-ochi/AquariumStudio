@@ -21,7 +21,7 @@ export function lifeAnchors(tank) {
     const def = getDef(item.userData.defId);
     if (!def) continue;
     const g = def.group;
-    const kind = g === 'rock' ? 'rock' : g === 'seaweed' ? 'hold' : g === 'coral' ? 'coral' : HOLD_DECOR.has(def.id) ? 'hold' : null;
+    const kind = g === 'rock' ? 'rock' : g === 'seaweed' ? 'hold' : g === 'coral' || g === 'soft' ? 'coral' : HOLD_DECOR.has(def.id) ? 'hold' : null;
     if (!kind) continue;
     box.setFromObject(item).applyMatrix4(inv);
     if (box.isEmpty()) continue;

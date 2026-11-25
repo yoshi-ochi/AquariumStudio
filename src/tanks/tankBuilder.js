@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 import { MATERIALS, RENDER_ORDER } from './materials.js';
 import { CATEGORY } from './tankData.js';
-import { buildLiveRock, buildDriftwood, buildPlants } from './interiorBuilder.js';
+import { buildLiveRock, buildDriftwood, buildPlants, buildCobble } from './interiorBuilder.js';
 import { CORAL_BUILDERS } from './coralBuilder.js';
 import { MODULAR_BUILDERS } from './coralModular.js';
 import { buildSouvenirShop, buildCafe, buildResearchLab, buildBreedingTank, buildWaterPlant, buildCleanCenter, buildFreezer, buildLiveFeed, buildFoodPrep } from './facilityBuilder.js';
 import { buildAirstone } from './aeration.js';
 import { SEAWEED_BUILDERS } from './seaweedBuilder.js';
+import { MORE_FLORA_BUILDERS } from './seaweedMore.js';
+import { REEF_BUILDERS } from './coralReef.js';
+import { SOFT_BUILDERS } from './coralSoft.js';
 import { buildPolyTank } from './polyTank.js';
 import { normalizeGrowth } from './growth.js';
 import { waterSurfaceMesh } from '../water/waterSurface.js';
@@ -423,5 +426,9 @@ const BUILDERS = {
   ...CORAL_BUILDERS,
   ...MODULAR_BUILDERS,
   ...SEAWEED_BUILDERS,
+  ...MORE_FLORA_BUILDERS,
+  ...REEF_BUILDERS,
+  ...SOFT_BUILDERS,
+  cobble: buildCobble,
   airstone: buildAirstone,
 };

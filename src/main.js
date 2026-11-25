@@ -322,6 +322,7 @@ async function boot() {
     onAction: (action, obj, value) => {
       if (action.startsWith('brush-')) return interior.setBrush('mode', action === 'brush-off' ? null : action.slice(6));
       if (action.startsWith('grow-')) return interior.setGrowMode(action === 'grow-off' ? null : action.slice(5));
+      if (action === 'param-density') return interior.setDensity(obj, value);
       if (action === 'param-brush-radius') return interior.setBrush('radius', value);
       if (action === 'param-brush-strength') return interior.setBrush('strength', value);
       if (action === 'param-embed-ratio') return hall.setEmbedParam(obj, 'ratio', value);
