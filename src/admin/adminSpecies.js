@@ -3,8 +3,8 @@ import { METHODS, SPECIES_METHODS } from '../expedition/fishingData.js';
 import { NOTES } from '../expedition/creatureNotes.js';
 import { WATER, zoneOf } from '../expedition/husbandry.js';
 import { baseCreature } from '../expedition/creatureConfig.js';
-import { speciesEntry, allPools, setInPool, validId, idTaken } from './adminState.js';
-import { esc, hex, unhex, field, select, checks, readFields, readChecks } from './adminUi.js';
+import { speciesEntry, allPools, setInPool, validId, idTaken, pruneConfig } from './adminState.js';
+import { esc, hex, unhex, field, select, checks, readFields, readChecks, toast } from './adminUi.js';
 import { swimHtml, bindSwim, readSwim } from './adminSwim.js';
 
 const FORMS = () => [...new Set(CREATURES.map((c) => c.form))].sort();
@@ -99,6 +99,7 @@ export class SpeciesTab {
     const f = readFields(root);
     if (!f.name.trim()) return alert('名前を入力してください');
     if (!(f.len > 0)) return alert('体長は0より大きくしてください');
+    const before = JSON.stringify(pruneConfig(this.state.cfg));
     const e = speciesEntry(this.state.cfg, c.id);
     Object.assign(e, { name: f.name.trim(), rarity: +f.rarity, len: +f.len, appeal: +f.appeal || 0, zone: f.zone, note: f.note.trim() });
     delete e.xp;
@@ -112,7 +113,9 @@ export class SpeciesTab {
     }
     const chosen = new Set(readChecks(root, 'pool'));
     for (const p of allPools()) if (chosen.has(p.id) !== p.pool.includes(c.id)) setInPool(this.state.cfg, p.id, c.id, chosen.has(p.id));
+    const same = JSON.stringify(pruneConfig(this.state.cfg)) === before;
     this.changed();
+    toast(same ? `${f.name.trim()}：変更はありません` : `${f.name.trim()} の内容を確定しました。全プレイヤーへは右上の「保存して全プレイヤーに反映」で公開されます`, same ? 'info' : 'ok');
   }
 
   _setRemoved(on) {

@@ -5,7 +5,7 @@ import { pruneConfig, auditConfig } from './adminState.js';
 import { SpeciesTab } from './adminSpecies.js';
 import { PlacesTab } from './adminPlaces.js';
 import { GrowthTab } from './adminGrowth.js';
-import { esc } from './adminUi.js';
+import { esc, toast } from './adminUi.js';
 
 /**
  * 管理者ツール（ゲームとは別サイト：admin/。npm run admin で起動）。生物のレア度・季節・生息環境・採取地・成長を編集し、
@@ -79,7 +79,7 @@ $('ad-save').addEventListener('click', async () => {
   state.saved = JSON.stringify(data);
   state.dirty = false;
   render();
-  alert('保存しました。プレイヤーは次にゲームを起動したときに反映されます。');
+  toast('保存しました。プレイヤーは次にゲームを起動したときに反映されます。');
 });
 
 window.addEventListener('beforeunload', (e) => {

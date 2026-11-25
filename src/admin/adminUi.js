@@ -22,3 +22,15 @@ export function readFields(root) {
   return out;
 }
 export const readChecks = (root, group) => [...root.querySelectorAll(`[data-multi="${group}"]:checked`)].map((el) => el.value);
+
+/** 画面下に短く出す知らせ（kind: ok / info / error）。画面を描き直しても消えない */
+export function toast(text, kind = 'ok') {
+  document.querySelector('.ad-toast')?.remove();
+  const el = document.createElement('div');
+  el.className = `ad-toast ${kind}`;
+  el.setAttribute('role', 'status');
+  el.textContent = text;
+  document.body.append(el);
+  setTimeout(() => el.classList.add('out'), 3500);
+  setTimeout(() => el.remove(), 4000);
+}

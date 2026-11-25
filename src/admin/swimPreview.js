@@ -13,7 +13,6 @@ import { swimOf } from '../expedition/swimStyles.js';
 const FLOOR = 0x2a3f4a;
 const ROCK = 0x6d5f55;
 const WEED = 0x3f8a4a;
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 export class SwimPreview {
   constructor() {
@@ -66,8 +65,8 @@ export class SwimPreview {
   _rebuild(c) {
     this._clear(this.tank);
     this._clear(this.life);
-    // 水槽は体長に合わせる（小さな生き物は30cm、大きな生き物は180cm）。大きすぎる生き物はゲームと同じく縮める
-    const W = clamp(c.len * 6, 0.2, 1.8);
+    // 水槽の幅は体長の15倍（奥行・高さは幅の0.45・0.5倍）。体長との比が一定なので、どの種も同じ見え方で速さを比べられる
+    const W = c.len * 15;
     const D = W * 0.45;
     const H = W * 0.5;
     const box = { cx: 0, hx: (W / 2) * 0.86, hz: (D / 2) * 0.86, y0: 0.03 * W, y1: H - 0.03 * W, round: false };
@@ -101,6 +100,10 @@ export class SwimPreview {
     this.L = c.len * scale;
     this.H = H;
     this.W = W;
+    this.size = { W, D, H };
+    this.camera.near = W * 0.002;
+    this.camera.far = W * 20;
+    this.camera.updateProjectionMatrix();
     this.time = 0;
     this.frame();
   }
