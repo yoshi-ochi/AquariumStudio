@@ -13,6 +13,7 @@
  *   amii アミア型（リュウグウノツカイ・タチウオ）… 長い背びれに細かい波を流し、体はまっすぐ
  *   mola マンボウ … 背びれと尻びれを同じ側へそろえて羽ばたく（約0.4〜0.5回/秒）
  *   coel シーラカンス … 胸びれ・腹びれを左右交互に、第2背びれと尻びれを同時に振る
+ *   clio クリオネ … 左右の翼足を同時に背側・腹側へ羽ばたかせる（ゆっくり泳ぐとき約1〜2回/秒）
  *
  * 周期：体と尾で進む魚の尾びれの振動は、ストローハル数 0.25〜0.35 から「巡航で毎秒 体長×1〜2 進む」とき
  * 小さな魚ほど速い（およそ体長の-0.4乗）。マンタの胸びれは約0.3〜1回/秒、イルカの尾びれは0.5〜2.9回/秒。
@@ -30,7 +31,17 @@ const STYLES = {
   amii: { f: 1.5, ref: 1, start: -0.5, body: 0.005, waves: 0.5, caudal: 0.01, median: 0.08, mMode: 0, mWaves: 4, pect: 0.03, pMode: 0, pMul: 1 },
   mola: { f: 0.45, ref: 1.8, start: -0.5, body: 0, waves: 0.5, caudal: 0.02, median: 0.18, mMode: 1, mWaves: 1, pect: 0.04, pMode: 0, pMul: 1 },
   coel: { f: 0.5, ref: 1.8, start: -0.2, body: 0.01, waves: 0.6, caudal: 0.02, median: 0.07, mMode: 1, mWaves: 1, pect: 0.08, pMode: 2, pMul: 1 },
+  clio: { f: 1.6, ref: 0.03, start: -0.5, body: 0, waves: 0.5, caudal: 0, median: 0.16, mMode: 1, mWaves: 1, pect: 0, pMode: 0, pMul: 1 },
 };
+
+/** 管理者ツールの表示名 */
+export const STYLE_NAMES = {
+  sub: '亜鯵型（タイ・ハタ）', car: '鯵型（アジ・イワシ）', thu: 'マグロ型（カツオ・カジキ）', ang: 'ウナギ型', shark: 'サメ',
+  lab: 'ベラ型（胸びれで漕ぐ）', bal: 'モンガラ型（背・尻びれの波）', ost: 'ハコフグ型', amii: 'アミア型（長い背びれの波）',
+  mola: 'マンボウ', coel: 'シーラカンス', clio: 'クリオネ（翼足で羽ばたく）',
+};
+/** 管理者が魚種ごとに上書きできる値（c.swim）。hz は実際の振動数（回/秒）で、空なら体長から求める */
+export const SWIM_KEYS = ['hz', 'start', 'body', 'waves', 'caudal', 'median', 'mMode', 'mWaves', 'pect', 'pMode', 'pMul'];
 
 const FORM_STYLE = {
   perch: 'sub', grouper: 'sub', cod: 'sub', lump: 'sub', clown: 'lab', tang: 'lab', disc: 'lab', moorish: 'lab', bat: 'lab',
@@ -53,15 +64,32 @@ const ID_STYLE = {
   hakofugu: 'ost', harisenbon: 'ost', torafugu: 'ost',
   // ウナギ型
   ookamiuo: 'ang', utsubo: 'ang', hanahige: 'ang',
+  clione: 'clio',
 };
+
+const fin = (v) => typeof v === 'number' && Number.isFinite(v);
+
+/** 組み込みの泳法（id → 体形 → 亜鯵型） */
+export const baseStyleOf = (c) => ID_STYLE[c.id] ?? FORM_STYLE[c.form] ?? 'sub';
+export const styleOf = (c) => (STYLES[c.swim?.style] ? c.swim.style : baseStyleOf(c));
+
+/** 体長から求める振動数。小さな魚ほど速く振る（体長の-0.4乗）。見た目のちらつきを避けて 0.25〜6 回/秒に収める */
+const autoHz = (s, len) => Math.min(6, Math.max(0.25, s.f * (s.ref / Math.max(0.02, len)) ** 0.4));
+
+/** 泳ぎの値（組み込みの泳法に管理者の上書き c.swim を重ねる）。{ hz, start, body, ... } */
+export function swimParams(c, { base = false } = {}) {
+  const s = STYLES[base ? baseStyleOf(c) : styleOf(c)];
+  const out = { ...s, hz: autoHz(s, c.len) };
+  if (!base) for (const k of SWIM_KEYS) if (fin(c.swim?.[k])) out[k] = c.swim[k];
+  out.hz = Math.min(12, Math.max(0.05, out.hz));
+  return out;
+}
 
 /** 魚種の泳ぎ方。シェーダーの uniform（4成分×3）にそのまま渡す値 */
 export function swimOf(c) {
-  const s = STYLES[ID_STYLE[c.id] ?? FORM_STYLE[c.form] ?? 'sub'];
-  // 小さな魚ほど速く振る（体長の-0.4乗）。見た目のちらつきを避けて 0.25〜6 回/秒に収める
-  const f = Math.min(6, Math.max(0.25, s.f * (s.ref / Math.max(0.02, c.len)) ** 0.4));
+  const s = swimParams(c);
   return {
-    a: [f, s.start, s.body, s.waves],
+    a: [s.hz, s.start, s.body, s.waves],
     b: [s.caudal, s.median, s.mMode, s.mWaves],
     c: [s.pect, s.pMode, s.pMul, 0],
   };

@@ -54,7 +54,8 @@ export function pruneConfig(cfg) {
     for (const k of Object.keys(o)) {
       const v = o[k];
       const base = k === 'methods' ? baseMethods(id) : k === 'note' ? baseNote(id) : k === 'removed' ? false : b[k];
-      if (k === 'xp' || k === 'stars' || v === '' || v == null || same(v, base) || (k === 'seasons' && !v.length && !base) || (k === 'zone' && !v)) delete o[k];
+      const empty = (k === 'swim' || k === 'beh') && (typeof v !== 'object' || !Object.keys(v).length);
+      if (empty || k === 'xp' || k === 'stars' || v === '' || v == null || same(v, base) || (k === 'seasons' && !v.length && !base) || (k === 'zone' && !v)) delete o[k];
     }
     if (!Object.keys(o).length) delete out.species[id];
   }
