@@ -80,6 +80,14 @@ export class HallInteraction {
     return copy.contents.reduce((s, it) => s + (getDef(it.defId)?.price ?? 0), 0);
   }
 
+  /**
+   * 貼り付けの代金。水槽本体は在庫があれば在庫から（0円）。在庫が無いとき・特注水槽のときは代金を払ってその場で作る
+   */
+  _pasteCost(def, copy) {
+    const fromStock = !def.custom && this.inventory.count(def.id) > 0;
+    return { fromStock, tank: fromStock ? 0 : def.price, layout: this._copyValue(copy) };
+  }
+
   /** エリア中央の十字線を今の階・解放状況で描き直す */
   refreshCenters() {
     this.guides.showCenters(this.room.plan, this.getUnlocked(), this.enabled);
@@ -152,10 +160,12 @@ export class HallInteraction {
 
   /** 水槽は在庫から、それ以外は資金で設置する。不足時は理由を返す */
   _lack(def, copy) {
-    // 貼り付け：水槽本体は在庫から、水槽内レイアウトは資金で買い直す
+    // 貼り付け：水槽本体と水槽内レイアウトの代金がそろえば置ける。足りないときだけ内訳を出す
     if (copy) {
-      if (this.inventory.count(def.id) < 1) return `${def.name} の在庫がありません（水槽建造で作ってください）`;
-      return this.economy.canAfford(this._copyValue(copy)) ? '' : `水槽内レイアウトの代金 ¥${this._copyValue(copy).toLocaleString('ja-JP')} が足りません`;
+      const { tank, layout } = this._pasteCost(def, copy);
+      if (this.economy.canAfford(tank + layout)) return '';
+      const yen = (n) => `¥${n.toLocaleString('ja-JP')}`;
+      return `資金が足りません：${yen(tank + layout)}（${tank ? `水槽 ${yen(tank)} ＋ ` : ''}水槽内レイアウト ${yen(layout)}）`;
     }
     if (this.inventory.count(def.id) > 0) return '';
     if (def.category === CATEGORY.TANK) return '在庫がありません';
@@ -226,8 +236,13 @@ export class HallInteraction {
     const p = this.placing;
     if (!p.ghost.visible) return;
     if (!p.valid) return this.toast(p.reason, { error: true });
-    if (!this.inventory.take(p.def.id)) this.economy.spend(p.def.price);
-    if (p.copy) this.economy.spend(this._copyValue(p.copy));
+    let built = false;
+    if (p.copy) {
+      const cost = this._pasteCost(p.def, p.copy);
+      if (cost.fromStock) this.inventory.take(p.def.id);
+      built = !cost.fromStock;
+      this.economy.spend(cost.tank + cost.layout);
+    } else if (!this.inventory.take(p.def.id)) this.economy.spend(p.def.price);
     const obj = this.manager.add(p.def.id, {
       x: p.ghost.position.x,
       z: p.ghost.position.z,
@@ -237,7 +252,7 @@ export class HallInteraction {
       ...(p.copy && { look: p.copy.look ? structuredClone(p.copy.look) : null, contents: structuredClone(p.copy.contents) }),
     });
     if (p.def.wallMount) this.onWallsChanged?.();
-    this.toast(p.copy ? `${p.def.name} を複製しました（展示生物は空です）` : `${p.def.name} を設置しました`);
+    this.toast(p.copy ? `${p.def.name} を${built ? '作って' : ''}複製しました（展示生物は空です）` : `${p.def.name} を設置しました`);
     if (p.copy && e.shiftKey && !this._lack(p.def, p.copy)) return this.onChanged?.();
     if (p.copy && e.shiftKey) {
       this.cancelPlacement();
