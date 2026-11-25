@@ -122,7 +122,6 @@ const ID_BEH = {
   itachizame: B('cruise', 0.6, { burst: 2.5, every: 60, layer: [0.2, 0.7], hunt: 90 }),
   suzuki: B('wander', 0.8, { kick: 0.5, burst: 3, every: 40, hunt: 60 }), // 小魚の群れを追う
   // つがいで並んで泳ぐ（チョウチョウウオ類は一夫一妻で、つがいがそろって餌をつつく）
-  chocho: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
   akebono: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
   togecho: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
   fuuraicho: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
@@ -138,7 +137,6 @@ const ID_BEH = {
   tamakai: B('rest', 0.25, { rest: [30, 90], rock: true }),
   akahata: B('rest', 0.5, { rest: [15, 40], rock: true }),
   kijihata: B('rest', 0.5, { rest: [15, 40], rock: true }),
-  koori: B('rest', 0.3, { rest: [40, 120] }), // 腹びれで体を支えて底にじっと止まる
   hatahata: B('rest', 0.6, { bury: 0.7, rest: [30, 90] }), // 昼は砂に潜って目だけ出す
   redtail: B('rest', 0.4, { rest: [40, 120] }),
   houbou: B('walk', 0.3, { ground: 0.08 }), // 胸びれの軟条で海底を歩く
@@ -166,7 +164,6 @@ const ID_BEH = {
   nenbutsu: B('wander', 0.6, { home: 0.4, layer: [0.3, 0.7], school: true, rock: true, pause: 0.3 }),
   gonzui: B('wander', 0.6, { layer: [0.02, 0.2], school: true, tight: true }), // 幼魚は「ゴンズイ玉」に固まる
   hanamino: B('wander', 0.2, { pause: 0.7, layer: [0.1, 0.5], rock: true }), // ひれを広げてゆっくり漂う
-  mebaru: B('wander', 0.4, { pause: 0.7, layer: [0.3, 0.7], rock: true, tilt: 0.3 }), // 頭をやや上に向けて静止する
   kawahagi: B('wander', 0.6, { pause: 0.5, events: ['peck'] }),
   umazura: B('wander', 0.7, { pause: 0.4, school: true }),
   budai: B('wander', 0.6, { events: ['peck'] }),

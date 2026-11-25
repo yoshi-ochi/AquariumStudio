@@ -28,7 +28,7 @@ const hasImage = (name) => fs.existsSync(path.join(REF, name)) || ['png', 'jpg',
 console.log('■ 追加予定種');
 for (const s of plannedStatus()) {
   const state = s.released ? `公開 ${s.released}` : s.modeled ? 'モデル済み・公開日未記録' : hasImage(s.name) ? '画像あり・モデル待ち' : '画像待ち';
-  console.log(`  ${s.name.padEnd(14, '　')} ${state.padEnd(16, '　')} ${s.places.join('・')}`);
+  console.log(`  ${s.name.padEnd(14, '　')} ${state.padEnd(16, '　')} ${s.places.map((id) => [...DESTINATIONS, ...HIDDEN_PLACES].find((d) => d.id === id)?.name ?? id).join('・')}`);
 }
 console.log('\n■ 採取地');
 console.log(`  公開中 ${DESTINATIONS.length}か所 / 魚種がそろうまで非表示 ${HIDDEN_PLACES.map((d) => `${d.name}(${d.pool.length})`).join('、') || 'なし'}`);

@@ -1,7 +1,7 @@
 import { ANATOMY } from './creatureAnatomy.js';
 import { SPECIES_METHODS } from './fishingData.js';
 import { NOTES } from './creatureNotes.js';
-import { PLANNED, NEW_PLACES, MIN_POOL } from './speciesRoster.js';
+import { PLANNED, NEW_PLACES, MIN_POOL, plannedPlaceIds } from './speciesRoster.js';
 import { RELEASES } from './speciesReleases.js';
 
 /**
@@ -13,7 +13,7 @@ export const isModeled = (p) => !!ANATOMY[p.id] || p.model === true;
 export function releaseModeled({ creatures, places, hidden }) {
   for (const p of PLANNED) {
     if (!isModeled(p) || creatures.some((c) => c.id === p.id)) continue;
-    const { methods, note, model, ...c } = p;
+    const { methods, note, model, at, ...c } = p;
     creatures.push(c);
     if (methods?.length && !SPECIES_METHODS[p.id]) SPECIES_METHODS[p.id] = [...methods];
     if (note && !NOTES[p.id]) NOTES[p.id] = note;
@@ -21,6 +21,14 @@ export function releaseModeled({ creatures, places, hidden }) {
   for (const c of creatures) if (RELEASES[c.id]) c.released = RELEASES[c.id];
 
   for (const d of NEW_PLACES) if (!places.some((x) => x.id === d.id)) places.push(structuredClone(d));
+  // 後から足した予定種は、項目の at に書いた採取地に加わる
+  for (const p of PLANNED) {
+    if (!isModeled(p)) continue;
+    for (const id of p.at ?? []) {
+      const d = places.find((x) => x.id === id);
+      if (d && !d.pool.includes(p.id)) d.pool.push(p.id);
+    }
+  }
   const alive = new Set(creatures.map((c) => c.id));
   for (const d of places) d.pool = d.pool.filter((id) => alive.has(id));
   // 捕れる種が少ない採取地は地図に出さない（予定種のモデルがそろったら出る）
@@ -28,4 +36,4 @@ export function releaseModeled({ creatures, places, hidden }) {
 }
 
 /** 予定種の状況（開発用：tools/species-release.mjs が使う） */
-export const plannedStatus = () => PLANNED.map((p) => ({ id: p.id, name: p.name, modeled: isModeled(p), released: RELEASES[p.id] ?? null, places: NEW_PLACES.filter((d) => d.pool.includes(p.id)).map((d) => d.name) }));
+export const plannedStatus = () => PLANNED.map((p) => ({ id: p.id, name: p.name, modeled: isModeled(p), released: RELEASES[p.id] ?? null, places: plannedPlaceIds(p) }));

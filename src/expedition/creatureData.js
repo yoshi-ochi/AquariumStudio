@@ -1,4 +1,5 @@
 import { releaseModeled } from './speciesRelease.js';
+import { SCI, AKA } from './speciesSci.js';
 
 // 展示生物・採取地・合同調査の定義（データのみ）。
 // len は全長(m)、rarity はレア度（1〜4）、slots は水槽の収容枠の消費量、form は体形（creatureForms.js）、pat は模様。
@@ -25,7 +26,6 @@ export const CREATURES = [
   // 慶良間
   c('kakure', 'カクレクマノミ', 'clown', 0.07, 1, 1, 0.8, 0xef7a1f, 0xf59a42, 0xe2701c, { pat: 'clown', mark: 0xffffff }),
   c('nanyouhagi', 'ナンヨウハギ', 'tang', 0.1, 1, 1, 0.9, 0x1f55c9, 0x2f6fe0, 0xf2d33c, { pat: 'palette', mark: 0x10182e }),
-  c('chocho', 'チョウチョウウオ', 'disc', 0.11, 2, 1, 1.6, 0xf3d54a, 0xfaf0b4, 0xe0a92c, { pat: 'mask', mark: 0x2a2a2e }),
   c('tsunodashi', 'ツノダシ', 'moorish', 0.13, 3, 2, 3.5, 0xf5efd8, 0xffffff, 0xf0cf3e, { pat: 'bands', bands: 3, mark: 0x1f2226 }),
   // 小笠原
   c('maaji', 'マアジ', 'tuna', 0.2, 1, 2, 1.2, 0xd2b24a, 0xdcd8e0, 0xdcae34, { pat: 'lateral', mark: 0xd8c36a }),
@@ -45,7 +45,7 @@ export const CREATURES = [
   // オホーツク海
   c('hokke', 'ホッケ', 'perch', 0.3, 1, 3, 1.5, 0x6d7450, 0xd6d4b8, 0x4f5639, { pat: 'bands', bands: 5, mark: 0x4d5338 }),
   c('fuusen', 'フウセンウオ', 'lump', 0.06, 2, 1, 4, 0xd9583f, 0xf0a184, 0xc2452f),
-  c('clione', 'クリオネ', 'clione', 0.03, 2, 1, 6, 0xe8f1f6, 0xf08a7a, 0xf4f9fc),
+  c('clione', 'ハダカカメガイ', 'clione', 0.03, 2, 1, 6, 0xe8f1f6, 0xf08a7a, 0xf4f9fc),
   c('ookamiuo', 'オオカミウオ', 'eel', 0.9, 3, 12, 16, 0x5c6168, 0xa6aab0, 0x44484e, { pat: 'bands', bands: 9, mark: 0x35383d }),
   // グレートバリアリーフ
   c('tsubame', 'ツバメウオ', 'bat', 0.3, 1, 3, 3, 0xc9c6b8, 0xe6e3d8, 0x3a3a38, { pat: 'bands', bands: 2, mark: 0x2c2c2a }),
@@ -102,16 +102,13 @@ export const CREATURES = [
   c('seela', 'シーラカンス', 'coelacanth', 1.8, 4, 28, 70, 0x2b4a6e, 0x6f8ba8, 0x223c5a, { pat: 'spots', mark: 0xd8e2ea }),
   c('demenigisu', 'デメニギス', 'barreleye', 0.15, 4, 3, 40, 0x2c2c33, 0x4a4a55, 0x1e1e24, { bigEye: true, iris: 0x7cf0a8 }),
   c('daiou', 'ダイオウイカ', 'squid', 10, 4, 40, 110, 0xa23d33, 0xd98a78, 0x852f28),
-  c('koori', 'コオリウオ', 'cod', 0.45, 4, 8, 60, 0xd5e4ea, 0xf2f8fa, 0xbdd2da, { bigEye: true }),
   c('greenland', 'ニシオンデンザメ', 'shark', 4, 4, 50, 150, 0x4a4f50, 0x77807f, 0x3a3f40),
   c('harisenbon', 'ハリセンボン', 'box', 0.25, 2, 2, 5, 0xc9a878, 0xe0e4e8, 0xe8d878, { pat: 'spots', mark: 0x3a3428 }),
   c('bashou', 'バショウカジキ', 'tuna', 2.7, 4, 40, 90, 0x1d3568, 0xe4e8ec, 0x16254a),
   c('suzuki', 'スズキ', 'perch', 0.6, 1, 6, 3, 0x6f8062, 0xd4dae0, 0x9aa088),
-  c('karei', 'カレイ', 'flat', 0.35, 1, 3, 3, 0x8a6238, 0xf3efe4, 0x6a4a30),
   c('nokogiri', 'ノコギリザメ', 'shark', 1.2, 3, 20, 30, 0x8a8274, 0xe6dcd4, 0x7a7468),
   c('chochin', 'チョウチンアンコウ', 'lump', 0.4, 4, 6, 50, 0x3a3640, 0x55505c, 0x2a2730),
   c('kurodai', 'クロダイ', 'perch', 0.4, 1, 3, 2.5, 0x4a5058, 0xc6cace, 0x2a2e34),
-  c('mebaru', 'メバル', 'perch', 0.25, 1, 2, 1.8, 0x8a6a44, 0xe2d4b8, 0x6e5a40, { bigEye: true }),
   c('akahata', 'アカハタ', 'grouper', 0.3, 1, 2, 2.5, 0xd8603a, 0xf0b088, 0xe07a3a, { pat: 'bands', bands: 5, mark: 0xb8402e }),
   c('kawahagi', 'カワハギ', 'perch', 0.25, 1, 2, 2, 0x9a8a70, 0xd8ccb4, 0xd8c8b0, { pat: 'mottle', mark: 0x4a4036 }),
   c('umazura', 'ウマヅラハギ', 'perch', 0.3, 1, 2, 1.8, 0x7a8288, 0xc8ccd0, 0x7a9a98),
@@ -183,9 +180,9 @@ export const seasonOf = (time = Date.now()) => Math.floor(((new Date(time).getMo
 export const inSeason = (c, time = Date.now()) => !c?.seasons?.length || c.seasons.includes(seasonOf(time));
 
 export const DESTINATIONS = [
-  { id: 'iso', name: '相模湾', text: '黒潮が寄せる、はじめての採取地', stage: 1, cost: 3000, seconds: 60, lat: 35.1, lon: 139.4, pool: ['akaumigame', 'takanoha', 'kijihata', 'kabutogani', 'akakurage', 'kouika', 'oniokoze', 'gonzui', 'houbou', 'nenbutsu', 'kagokaki', 'nizadai', 'torafugu', 'kawahagi', 'mebaru', 'kurodai', 'suzuki', 'mejina', 'kasago', 'hakofugu', 'ishidai', 'madai', 'hirame', 'madako', 'iseebi', 'utsubo', 'tatsu', 'nekozame', 'akaei'] },
-  { id: 'sanriku', name: '三陸沖', text: '親潮と黒潮がぶつかる豊かな漁場', stage: 1, cost: 8000, seconds: 120, lat: 39.4, lon: 142.6, pool: ['umazura', 'karei', 'ainame', 'madara', 'sanma', 'mola', 'maiwashi', 'katsuo', 'zuwai', 'surume', 'ankou', 'mizudako'] },
-  { id: 'reef', name: '慶良間諸島', text: '色あざやかな熱帯魚が暮らすサンゴ礁', stage: 1, cost: 12000, seconds: 180, lat: 26.2, lon: 127.3, pool: ['fuuraicho', 'togecho', 'takokurage', 'shimayakko', 'akebono', 'yashahaze', 'mongara', 'murasame', 'kingyohana', 'rurisuzume', 'nishikianago', 'kiirohagi', 'misuji', 'hatatate', 'akahata', 'harisenbon', 'kakure', 'nanyouhagi', 'chocho', 'tsunodashi', 'chinanago', 'deba', 'hanamino', 'otohime', 'budai'] },
+  { id: 'iso', name: '相模湾', text: '黒潮が寄せる、はじめての採取地', stage: 1, cost: 3000, seconds: 60, lat: 35.1, lon: 139.4, pool: ['akaumigame', 'takanoha', 'kijihata', 'kabutogani', 'akakurage', 'kouika', 'oniokoze', 'gonzui', 'houbou', 'nenbutsu', 'kagokaki', 'nizadai', 'torafugu', 'kawahagi', 'kurodai', 'suzuki', 'mejina', 'kasago', 'hakofugu', 'ishidai', 'madai', 'hirame', 'madako', 'iseebi', 'utsubo', 'tatsu', 'nekozame', 'akaei'] },
+  { id: 'sanriku', name: '三陸沖', text: '親潮と黒潮がぶつかる豊かな漁場', stage: 1, cost: 8000, seconds: 120, lat: 39.4, lon: 142.6, pool: ['umazura', 'ainame', 'madara', 'sanma', 'mola', 'maiwashi', 'katsuo', 'zuwai', 'surume', 'ankou', 'mizudako'] },
+  { id: 'reef', name: '慶良間諸島', text: '色あざやかな熱帯魚が暮らすサンゴ礁', stage: 1, cost: 12000, seconds: 180, lat: 26.2, lon: 127.3, pool: ['fuuraicho', 'togecho', 'takokurage', 'shimayakko', 'akebono', 'yashahaze', 'mongara', 'murasame', 'kingyohana', 'rurisuzume', 'nishikianago', 'kiirohagi', 'misuji', 'hatatate', 'akahata', 'harisenbon', 'kakure', 'nanyouhagi', 'tsunodashi', 'chinanago', 'deba', 'hanamino', 'otohime', 'budai'] },
   { id: 'okhotsk', name: 'オホーツク海', text: '流氷の下で暮らす冷たい海の生き物', stage: 2, cost: 30000, seconds: 300, lat: 44.7, lon: 145.6, pool: ['shiroiruka', 'hokke', 'fuusen', 'clione', 'ookamiuo', 'taraba', 'kegani', 'sake', 'nishin'] },
   { id: 'ocean', name: '小笠原諸島', text: '大型の回遊魚に出会える外洋', stage: 2, cost: 60000, seconds: 600, lat: 27.1, lon: 142.2, pool: ['bandou', 'aoumigame', 'seanettle', 'bluejelly', 'shirowani', 'akamanbou', 'tobiuo', 'bashou', 'maaji', 'mizukurage', 'shiira', 'manta', 'kuromaguro', 'buri', 'jinbei'] },
   { id: 'gbr', name: 'グレートバリアリーフ', text: '世界最大のサンゴ礁', stage: 2, cost: 80000, seconds: 900, lat: -18.3, lon: 147.7, pool: ['adeyakko', 'gomamongara', 'tsubame', 'hagi2', 'tsumaguro', 'napoleon', 'tamakai', 'hanahige'] },
@@ -198,6 +195,8 @@ export const RETIRED_PLACES = [];
 /** 捕れる魚種がそろうまで地図に出さない採取地（speciesRoster.js） */
 export const HIDDEN_PLACES = [];
 // モデルが出来た予定種と、新しい採取地を加える（speciesRelease.js）
+// 学名・別名（図鑑の詳細に出す）
+for (const c of CREATURES) Object.assign(c, SCI[c.id] && { sci: SCI[c.id] }, AKA[c.id] && { aka: AKA[c.id] });
 releaseModeled({ creatures: CREATURES, places: DESTINATIONS, hidden: HIDDEN_PLACES });
 recomputeDerived();
 export const getDestination = (id) => DESTINATIONS.find((d) => d.id === id) ?? RETIRED_PLACES.find((d) => d.id === id) ?? HIDDEN_PLACES.find((d) => d.id === id);
@@ -242,7 +241,7 @@ export function travelPlan(dest, home) {
 export const JOINT_PROJECTS = [
   { id: 'ship', name: '調査船の共同運航', text: '調査船を共同で運航し、外洋の深みを調べます', cost: 5000000, level: 1, hours: 1, pool: ['seela', 'demenigisu'] },
   { id: 'rov', name: 'ROV深海調査', text: '無人潜水機 ROV を共同所有し、超深海へ潜ります', cost: 20000000, level: 2, hours: 3, pool: ['demenigisu', 'daiou', 'seela'] },
-  { id: 'polar', name: '極地探検', text: '砕氷船で北極と南極の海へ遠征します', cost: 80000000, level: 3, hours: 12, pool: ['koori', 'greenland', 'daiou'] },
+  { id: 'polar', name: '極地探検', text: '砕氷船で北極と南極の海へ遠征します', cost: 80000000, level: 3, hours: 12, pool: ['greenland', 'daiou'] },
 ];
 
 /** 同盟レベル（最大10）。各レベルに必要な累計の貢献（xp）。データベースの alliance_level と同じ値 */

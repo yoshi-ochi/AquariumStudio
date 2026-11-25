@@ -188,7 +188,7 @@ export class MailView {
     if (m.kind === 'daily') return `総合評価 ${gradeOf(d)} ・ 収入 ${yen(d.income)} ・ 来館者 最大${num(d.peak)}人`;
     if (m.kind === 'offline') return `受け取り ${yen(d.net)}（来館者 ${num(d.visitors)}人）${m.done ? ' ・ 受け取り済み' : ''}`;
     if ((m.kind === 'trip' || m.kind === 'allyrun') && d.got) {
-      const all = Object.entries(d.got).map(([id, n]) => `${getCreature(id)?.name}×${n}`).join('、');
+      const all = Object.entries(d.got).filter(([id]) => getCreature(id)).map(([id, n]) => `${getCreature(id).name}×${n}`).join('、'); // 削除した魚種は出さない
       return all || '持ち帰れる生き物はいませんでした';
     }
     return null;

@@ -1,11 +1,11 @@
 /** 最初から居る魚種（新種としては案内しない） */
 export const INITIAL = [
-  'mejina', 'kasago', 'hakofugu', 'ishidai', 'kakure', 'nanyouhagi', 'chocho', 'tsunodashi', 'maaji', 'mizukurage', 'shiira', 'manta', 'kinmedai',
+  'mejina', 'kasago', 'hakofugu', 'ishidai', 'kakure', 'nanyouhagi', 'tsunodashi', 'maaji', 'mizukurage', 'shiira', 'manta', 'kinmedai',
   'mizuuo', 'mendako', 'ryugu', 'ainame', 'madara', 'sanma', 'mola', 'hokke', 'fuusen', 'clione', 'ookamiuo', 'tsubame', 'hagi2', 'tsumaguro',
-  'napoleon', 'gingame', 'kingangel', 'galashark', 'hammer', 'seela', 'demenigisu', 'daiou', 'koori', 'greenland', 'madai', 'hirame', 'madako',
+  'napoleon', 'gingame', 'kingangel', 'galashark', 'hammer', 'seela', 'demenigisu', 'daiou', 'greenland', 'madai', 'hirame', 'madako',
   'iseebi', 'utsubo', 'tatsu', 'nekozame', 'akaei', 'maiwashi', 'katsuo', 'zuwai', 'surume', 'ankou', 'mizudako', 'chinanago', 'deba', 'hanamino',
   'otohime', 'budai', 'taraba', 'kegani', 'sake', 'nishin', 'kuromaguro', 'buri', 'jinbei', 'tamakai', 'hanahige', 'takaashi', 'ogusoku', 'sakuraebi',
-  'tachiuo', 'madaraotobi', 'harisenbon', 'bashou', 'suzuki', 'karei', 'nokogiri', 'chochin',
+  'tachiuo', 'madaraotobi', 'harisenbon', 'bashou', 'suzuki', 'nokogiri', 'chochin',
 ];
 
 /**
@@ -15,7 +15,7 @@ export const INITIAL = [
  */
 export const RELEASES = {
   // 2026-11-19 第1弾
-  kurodai: '2026-11-19', mebaru: '2026-11-19', akahata: '2026-11-19', kawahagi: '2026-11-19', umazura: '2026-11-19', torafugu: '2026-11-19',
+  kurodai: '2026-11-19', akahata: '2026-11-19', kawahagi: '2026-11-19', umazura: '2026-11-19', torafugu: '2026-11-19',
   hatatate: '2026-11-19', misuji: '2026-11-19', nizadai: '2026-11-19', kiirohagi: '2026-11-19', kagokaki: '2026-11-19', nenbutsu: '2026-11-19',
   houbou: '2026-11-19', gonzui: '2026-11-19', oniokoze: '2026-11-19', nishikianago: '2026-11-19',
   // 2026-11-20 第2弾

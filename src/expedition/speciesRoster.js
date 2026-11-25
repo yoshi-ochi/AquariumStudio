@@ -11,9 +11,14 @@
  * 項目は creatureData.js の c() と同じ（len は全長 m、rarity 1〜4、appeal は集客力、colors は体・腹・ひれの色）。
  * methods は漁法（fishingData.js）、note は図鑑の解説、seasons は捕れる季節（0春〜3冬）。
  */
+import { SCI } from './speciesSci.js';
+import { PLANNED_JAPAN } from './speciesPlannedJapan.js';
+import { PLANNED_REEF } from './speciesPlannedReef.js';
+import { PLANNED_WORLD } from './speciesPlannedWorld.js';
+
 const p = (id, name, form, len, rarity, appeal, body, belly, fin, extra = {}) => ({ id, name, form, len, rarity, slots: 1, appeal, colors: { body, belly, fin }, ...extra });
 
-export const PLANNED = [
+const PLANNED_FIRST = [
   // ---- 日本海 ----
   p('hotaruika', 'ホタルイカ', 'squid', 0.07, 2, 4, 0x3b3f7a, 0x8790c0, 0x2c2f5c, { seasons: [0], methods: ['setnet'], note: '昼は水深200m以深にすみ、夜に浅場へ上がる。腕先と腹の発光器で青白く光る。春の富山湾で産卵のため岸に寄る。' }),
   p('shiroebi', 'シロエビ', 'lobster', 0.07, 2, 3, 0xf2d6cc, 0xfbeae4, 0xe8b8ac, { school: true, methods: ['trawl'], note: '富山湾の「あいがめ」と呼ばれる海底谷に群れる半透明のエビ。死ぬと白くなる。' }),
@@ -53,11 +58,15 @@ export const PLANNED = [
   p('denkiunagi', 'デンキウナギ', 'eel', 2.0, 4, 40, 0x4a4a3a, 0xd88a3a, 0x3a3a2e, { methods: ['gill'], note: '最大860ボルトの電気を出す。口から空気を吸う呼吸が必要で、数分ごとに水面へ上がる。長い尻びれを波打たせて前後に泳ぐ。' }),
 ];
 
+/** 追加予定種の全部（最初の33種＋日本・サンゴ礁と外洋・世界の各ファイル）。後半の種は at に採取地の id を持つ */
+for (const p of PLANNED_FIRST) p.sci ??= SCI[p.id];
+export const PLANNED = [...PLANNED_FIRST, ...PLANNED_JAPAN, ...PLANNED_REEF, ...PLANNED_WORLD];
+
 /** 新しい採取地（日本海側と世界各地）。pool にはモデルのある種だけが残る */
 export const NEW_PLACES = [
-  { id: 'oki', name: '隠岐諸島', text: '対馬暖流が洗う日本海の島々。コブダイが岩礁に暮らす', stage: 1, cost: 15000, seconds: 600, lat: 36.2, lon: 133.2, opened: '2026-11-25', zone: 'temperate', pool: ['kobudai', 'kyusen', 'kurosoi', 'nodoguro', 'mejina', 'ishidai', 'madai', 'kurodai', 'kijihata', 'kasago', 'mebaru', 'kawahagi', 'umazura', 'tobiuo', 'buri', 'surume', 'hirame'] },
+  { id: 'oki', name: '隠岐諸島', text: '対馬暖流が洗う日本海の島々。コブダイが岩礁に暮らす', stage: 1, cost: 15000, seconds: 600, lat: 36.2, lon: 133.2, opened: '2026-11-25', zone: 'temperate', pool: ['kobudai', 'kyusen', 'kurosoi', 'nodoguro', 'mejina', 'ishidai', 'madai', 'kurodai', 'kijihata', 'kasago', 'kawahagi', 'umazura', 'tobiuo', 'buri', 'surume', 'hirame'] },
   { id: 'toyama', name: '富山湾', text: '春にホタルイカが群れ、深い冷水にシロエビやベニズワイガニがすむ日本海の湾', stage: 2, cost: 40000, seconds: 600, lat: 36.85, lon: 137.25, opened: '2026-11-25', zone: 'cold', pool: ['hotaruika', 'shiroebi', 'benizuwai', 'norogenge', 'nodoguro', 'buri', 'zuwai', 'surume', 'madara', 'mizudako', 'hirame', 'ankou'] },
-  { id: 'oga', name: '男鹿半島', text: '冬の雷とともにハタハタが押し寄せる秋田の海', stage: 2, cost: 30000, seconds: 600, lat: 39.9, lon: 139.7, opened: '2026-11-25', zone: 'cold', pool: ['hatahata', 'kurosoi', 'madara', 'hokke', 'ainame', 'mebaru', 'zuwai', 'surume', 'buri', 'sake', 'mizudako', 'karei'] },
+  { id: 'oga', name: '男鹿半島', text: '冬の雷とともにハタハタが押し寄せる秋田の海', stage: 2, cost: 30000, seconds: 600, lat: 39.9, lon: 139.7, opened: '2026-11-25', zone: 'cold', pool: ['hatahata', 'kurosoi', 'madara', 'hokke', 'ainame', 'zuwai', 'surume', 'buri', 'sake', 'mizudako'] },
   { id: 'palau', name: 'パラオ', text: '外洋の潮が当たるドロップオフと、タコクラゲの湖がある南の島', stage: 2, cost: 70000, seconds: 900, lat: 7.3, lon: 134.4, opened: '2026-11-25', zone: 'tropical', pool: ['nanyoumanta', 'nemuribuka', 'rouninaji', 'nishikiteguri', 'hanagoi', 'takokurage', 'gingame', 'tsumaguro', 'napoleon', 'kakure', 'hanahige', 'gomamongara', 'tsubame', 'hagi2', 'budai', 'mongara', 'nanyouhagi', 'harisenbon'] },
   { id: 'hawaii', name: 'ハワイ諸島', text: '太平洋のまんなかにある、固有種の多い火山島', stage: 3, cost: 150000, seconds: 1800, lat: 20.8, lon: -156.6, opened: '2026-11-25', zone: 'tropical', pool: ['hashinagairuka', 'fueyakko', 'nanyoumanta', 'kiirohagi', 'tsunodashi', 'aoumigame', 'itachizame', 'harisenbon', 'fuuraicho', 'togecho', 'hatatate'] },
   { id: 'maldives', name: 'モルディブ', text: 'ジンベエザメとマンタが集まるインド洋の環礁', stage: 3, cost: 200000, seconds: 1800, lat: 3.2, lon: 73.2, opened: '2026-11-25', zone: 'tropical', pool: ['nanyoumanta', 'nemuribuka', 'rouninaji', 'kumanomi', 'jinbei', 'tsumaguro', 'nanyouhagi', 'napoleon', 'hanahige', 'mongara', 'gomamongara', 'tsunodashi', 'kingyohana', 'aoumigame', 'hatatate'] },
@@ -66,7 +75,19 @@ export const NEW_PLACES = [
   { id: 'monterey', name: 'モントレー湾', text: 'ケルプの森とラッコが暮らすカリフォルニアの海', stage: 3, cost: 180000, seconds: 2400, lat: 36.8, lon: -121.9, opened: '2026-11-25', zone: 'temperate', pool: ['rakko', 'ashika', 'garibaldi', 'leopardshark', 'seanettle', 'mizukurage', 'mola', 'mizudako', 'kuromaguro'] },
   { id: 'caribbean', name: 'カリブ海', text: 'ブルーホールとマングローブが広がる暖かい海', stage: 3, cost: 300000, seconds: 3000, lat: 24.0, lon: -77.0, opened: '2026-11-25', zone: 'tropical', pool: ['queenangel', 'komorizame', 'oomejirozame', 'itachizame', 'hammer', 'madaraotobi', 'hanamino', 'aoumigame', 'akaumigame', 'bandou', 'bashou', 'shiira', 'harisenbon', 'jinbei'] },
   { id: 'amazon', name: 'アマゾン川', text: '世界最大の流域をもつ熱帯の大河。巨大な淡水魚が暮らす', stage: 3, cost: 350000, seconds: 3000, lat: -3.1, lon: -60.0, opened: '2026-11-25', zone: 'tropical', pool: ['arapaima', 'arowana', 'piranha', 'redtail', 'polkadot', 'denkiunagi'] },
+  { id: 'ariake', name: '有明海', text: '干満の差が6mにもなる、広い干潟の海', stage: 2, cost: 25000, seconds: 600, lat: 33.0, lon: 130.3, opened: '2026-11-26', zone: 'temperate', pool: [] },
+  { id: 'shimanto', name: '四万十川', text: '「日本最後の清流」と呼ばれる高知の川と河口', stage: 2, cost: 30000, seconds: 600, lat: 33.0, lon: 132.9, opened: '2026-11-26', zone: 'temperate', pool: [] },
+  { id: 'biwa', name: '琵琶湖', text: '400万年の歴史をもつ日本一大きな湖。固有種が多い', stage: 2, cost: 35000, seconds: 600, lat: 35.25, lon: 136.08, opened: '2026-11-26', zone: 'temperate', pool: [] },
+  { id: 'kushiro', name: '釧路湿原', text: '幻の魚イトウが暮らす、日本最大の湿原を流れる川', stage: 2, cost: 45000, seconds: 900, lat: 43.1, lon: 144.4, opened: '2026-11-26', zone: 'cold', pool: [] },
+  { id: 'eastaus', name: 'オーストラリア東岸', text: '海藻の森にシードラゴンがすみ、川に古代の肺魚が残る', stage: 3, cost: 260000, seconds: 2400, lat: -33.9, lon: 151.3, opened: '2026-11-26', zone: 'temperate', pool: [] },
+  { id: 'antarctic', name: '南極海', text: '氷山の浮かぶ極寒の海。ペンギンとコオリウオが暮らす', stage: 3, cost: 400000, seconds: 3600, lat: -64.8, lon: -62.9, opened: '2026-11-26', zone: 'cold', pool: [] },
+  { id: 'mekong', name: 'メコン川', text: '東南アジアを貫く大河。巨大なナマズやコイが暮らす', stage: 3, cost: 280000, seconds: 2400, lat: 13.5, lon: 105.9, opened: '2026-11-26', zone: 'tropical', pool: [] },
+  { id: 'africa', name: 'アフリカの川と湖', text: 'タンガニーカ湖のシクリッドとコンゴ川の古代魚', stage: 3, cost: 320000, seconds: 3000, lat: -6.0, lon: 29.5, opened: '2026-11-26', zone: 'tropical', pool: [] },
+  { id: 'mississippi', name: 'ミシシッピ川', text: '北アメリカ最大の川。ガーやヘラチョウザメなど古代魚が暮らす', stage: 3, cost: 240000, seconds: 2400, lat: 30.0, lon: -90.1, opened: '2026-11-26', zone: 'temperate', pool: [] },
 ];
 
 /** 地図に出すのに必要な、捕れる魚種の数 */
 export const MIN_POOL = 3;
+
+/** 予定種が捕れる採取地の id（NEW_PLACES の pool に入っている所と、項目の at） */
+export const plannedPlaceIds = (p) => [...new Set([...NEW_PLACES.filter((d) => d.pool.includes(p.id)).map((d) => d.id), ...(p.at ?? [])])];

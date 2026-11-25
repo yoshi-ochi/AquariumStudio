@@ -140,7 +140,7 @@ export class SeaPen extends EventTarget {
   fromJSON(data) {
     const st = { ...SeaPen.emptyState(), ...(data ?? {}) };
     st.sections = (st.sections ?? []).filter((s) => [s.x0, s.z0, s.x1, s.z1].every((v) => Number.isInteger(v) && v >= 0 && v < PEN_N));
-    for (const s of st.sections) s.creatures = Object.fromEntries(Object.entries(s.creatures ?? {}).filter(([, n]) => n > 0));
+    for (const s of st.sections) s.creatures = Object.fromEntries(Object.entries(s.creatures ?? {}).filter(([id, n]) => n > 0 && getCreature(id)));
     this.state = st;
     this._emit();
   }

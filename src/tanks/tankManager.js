@@ -8,6 +8,7 @@ import { applyTankLook, normalizeLook } from './tankLook.js';
 import { applySand } from './sandLook.js';
 import { updateBubbles } from './aeration.js';
 import { syncLife, updateLife, lifeAppeal } from '../expedition/tankLife.js';
+import { getCreature } from '../expedition/creatureData.js';
 import { cleanAppealFactor, updateCareVisual } from './tankCleaning.js';
 import { tankHealth } from '../expedition/husbandry.js';
 import { FLOOR_COUNT, STORY_H } from '../building/blueprint.js';
@@ -68,7 +69,7 @@ export class TankManager {
       this.regrowInterior(item, item.userData.growth);
     }
     if (creatures && obj.userData.clip) {
-      obj.userData.creatures = { ...creatures };
+      obj.userData.creatures = Object.fromEntries(Object.entries(creatures).filter(([id]) => getCreature(id))); // 削除した魚種は捨てる
       if (care) obj.userData.care = { ...care };
       syncLife(obj);
     }

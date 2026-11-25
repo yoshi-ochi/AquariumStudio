@@ -92,7 +92,8 @@ export class ZukanView {
 
   _pop(id, col) {
     const c = getCreature(id);
-    const detail = `<div class="zk-note"><small>全長 ${c.len >= 1 ? `${c.len}m` : `${Math.round(c.len * 100)}cm`} ・ ${WATER[zoneOf(id)].label}</small><small>${NOTES[id] ?? ''}</small></div>`;
+    const name = c.sci || c.aka ? `<small class="zk-sci">${c.sci ? `<i>${c.sci}</i>` : ''}${c.aka ? `${c.sci ? ' ・ ' : ''}別名 ${c.aka}` : ''}</small>` : '';
+    const detail = `<div class="zk-note">${name}<small>全長 ${c.len >= 1 ? `${c.len}m` : `${Math.round(c.len * 100)}cm`} ・ ${WATER[zoneOf(id)].label}</small><small>${NOTES[id] ?? ''}</small></div>`;
     return `<div class="cg-pop" style="--tip:${((col + 0.5) / 4) * 100}%">${growPanel({ expeditions: this.expeditions, manager: this.manager, id, qty: this.qty, note: detail })}</div>`;
   }
 

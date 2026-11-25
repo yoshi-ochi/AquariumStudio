@@ -10,6 +10,7 @@ export const countIds = (list) => list.reduce((o, id) => ((o[id] = (o[id] ?? 0) 
  */
 export function catchBlocks(previews, got = {}, released = {}) {
   const cell = (id, n, gone) => `<div class="cb-cell ${gone ? 'gone' : ''}">${creatureThumb(previews, id)}<b class="cb-n">×${n}</b><small>${getCreature(id)?.name ?? id}</small>${gone ? '<i class="cb-tag">放流</i>' : ''}</div>`;
-  const cells = [...Object.entries(got).map(([id, n]) => cell(id, n, false)), ...Object.entries(released).map(([id, n]) => cell(id, n, true))];
+  const known = (o) => Object.entries(o).filter(([id]) => getCreature(id)); // 削除した魚種は出さない
+  const cells = [...known(got).map(([id, n]) => cell(id, n, false)), ...known(released).map(([id, n]) => cell(id, n, true))];
   return cells.length ? `<div class="cb-grid">${cells.join('')}</div>` : '<p class="gs-empty">持ち帰れる生き物はいませんでした。</p>';
 }
