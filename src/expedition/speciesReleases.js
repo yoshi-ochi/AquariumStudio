@@ -30,4 +30,6 @@ export const RELEASES = {
   nodoguro: '2026-11-26',
   rouninaji: '2026-11-26',
   fueyakko: '2026-11-26',
+  // 2026-11-26
+  arapaima: '2026-11-26',
 };
