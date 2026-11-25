@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SPECS } from './floraSpecs.js';
-import { rng } from './floraKit.js';
+import { rng, Unit, stick, rgb } from './floraKit.js';
 import { floraMaterial } from './floraMaterial.js';
 
 /**
@@ -43,16 +43,18 @@ export const pointCount = (g) => Math.floor((g?.p?.length ?? 0) / 4);
 export const pointAt = (p, i, out = new THREE.Vector3()) => out.set(p[i * 4] / 1000, p[i * 4 + 1] / 1000, p[i * 4 + 2] / 1000);
 export const pushPoint = (p, pos, n) => p.push(Math.round(pos.x * 1000), Math.round(pos.y * 1000), Math.round(pos.z * 1000), encodeNormal(n));
 
-/** 置いたときの個体の並び（ひまわりの種の並びで原点の周りに init 個） */
+/** 六角形に詰めた並びの点（原点から近い順）。間隔 step */
+export function hexRing(n, step) {
+  const out = [];
+  const K = Math.ceil(Math.sqrt(n)) + 1;
+  for (let j = -K; j <= K; j++) for (let i = -K; i <= K; i++) out.push([(i + (j & 1) * 0.5) * step, j * step * 0.866]);
+  return out.sort((a, b) => a[0] * a[0] + a[1] * a[1] - b[0] * b[0] - b[1] * b[1]).slice(0, n);
+}
+
+/** 置いたときの個体の並び：原点の周りに init 個を、隣どうしが間隔 gap で接するように六角形に詰める */
 function initialPoints(spec) {
-  const p = [0, 0, 0, 0];
-  if (spec.kind !== 'cover') return p;
-  for (let k = 1; k < spec.init; k++) {
-    const a = k * 2.4;
-    const d = spec.gap * 1.05 * Math.sqrt(k);
-    p.push(Math.round(Math.cos(a) * d * 1000), 0, Math.round(Math.sin(a) * d * 1000), 0);
-  }
-  return p;
+  if (spec.kind !== 'cover') return [0, 0, 0, 0];
+  return hexRing(spec.init, spec.gap).flatMap(([x, z]) => [Math.round(x * 1000), 0, Math.round(z * 1000), 0]);
 }
 
 /**
@@ -137,4 +139,77 @@ export function buildFlora(body, def, { seed = 1, growth }) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   body.add(mesh);
+  if (spec.link && n > 1) body.add(linkMesh(def, spec, growth));
+}
+
+// ---- 個体どうしをつなぐ匍匐枝・地下茎・共肉（spec.link） -----------------------
+
+const LINK_GEO = new Map();
+function linkGeo(def, link) {
+  let g = LINK_GEO.get(def.id);
+  if (!g) {
+    // 高さ1・半径1の筒（付け根が原点）。平たい種（共肉・マット）は z を潰して帯にする
+    g = new Unit().add(stick(1, 1, 1, link.flat ? 6 : 4), rgb(link.color)).build();
+    LINK_GEO.set(def.id, g);
+  }
+  return g;
+}
+
+/**
+ * 各個体から近い順に k 本、間隔の range 倍以内の個体へつなぐ（同じ組は1本だけ）。
+ * 匍匐枝で増える種（ウミブドウ・バリスネリア・アマモの地下茎）や、共肉・マットでつながる群体（スナギンチャク・スターポリプ）
+ */
+const _a = new THREE.Vector3();
+const _b = new THREE.Vector3();
+const _na = new THREE.Vector3();
+const _nb = new THREE.Vector3();
+function linkMesh(def, spec, growth) {
+  const { link } = spec;
+  const p = growth.p;
+  const n = pointCount(growth);
+  const reach = spec.gap * (link.range ?? 1.6);
+  const pairs = new Set();
+  const list = [];
+  for (let i = 0; i < n; i++) {
+    pointAt(p, i, _a);
+    const near = [];
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const d = pointAt(p, j, _b).distanceTo(_a);
+      if (d <= reach) near.push([d, j]);
+    }
+    near.sort((x, y) => x[0] - y[0]);
+    for (const [, j] of near.slice(0, link.k ?? 1)) {
+      const key = i < j ? `${i},${j}` : `${j},${i}`;
+      if (pairs.has(key)) continue;
+      pairs.add(key);
+      list.push([i, j]);
+    }
+  }
+  const mesh = new THREE.InstancedMesh(linkGeo(def, link), floraMaterial({ flat: !!spec.flat }), Math.max(1, list.length));
+  mesh.count = list.length;
+  const lift = link.lift ?? link.r;
+  list.forEach(([i, j], k) => {
+    // 面から少し浮かせて、2つの個体の付け根を結ぶ
+    pointAt(p, i, _a).add(decodeNormal(p[i * 4 + 3], _na).multiplyScalar(lift));
+    pointAt(p, j, _b).add(decodeNormal(p[j * 4 + 3], _nb).multiplyScalar(lift));
+    const len = _b.distanceTo(_a);
+    _q.setFromUnitVectors(UP, _b.sub(_a).normalize());
+    // 帯は面の法線の向きに潰す（筒の局所 z を、2点の法線の平均へ合わせる）
+    if (link.flat) {
+      const nrm = _na.add(_nb).normalize();
+      const side = new THREE.Vector3(0, 0, 1).applyQuaternion(_q);
+      const along = new THREE.Vector3(0, 1, 0).applyQuaternion(_q);
+      const want = nrm.clone().addScaledVector(along, -nrm.dot(along)).normalize();
+      const ang = Math.atan2(side.clone().cross(want).dot(along), side.dot(want));
+      _q.multiply(_q2.setFromAxisAngle(UP, ang));
+    }
+    _s.set(link.r, len, link.r * (link.flat ? 0.3 : 1));
+    mesh.setMatrixAt(k, _m.compose(_a, _q, _s));
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingBox();
+  mesh.computeBoundingSphere();
+  mesh.receiveShadow = true;
+  return mesh;
 }
