@@ -654,6 +654,7 @@ body.tutorial-on #goal-card { display: none; }
 .zk-cell.sel { border-color: #2f8fd0; }
 .zk-note { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 6px; }
 .zk-note small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.zk-sci i { font-style: italic; letter-spacing: 0.02em; }
 
 /* ---- 小さな通知バッジ（数は出さず点だけ。数は読み上げ用に残す） ---- */
 .sa-badge, #clean-badge { top: 3px; right: 3px; min-width: 0; width: 10px; height: 10px; padding: 0; border-width: 1.5px; border-radius: 50%; font-size: 0; line-height: 0; }

@@ -30,9 +30,9 @@ export const OFFLINE_RATE = 0.5;
 export const MONTHLY = [
   { name: '冬の深海特集', text: '寒い季節においしくなる深海の生き物を集めよう', featured: ['madara', 'ankou', 'kinmedai', 'mendako', 'zuwai', 'kasago'] },
   { name: '流氷の海', text: 'オホーツクの流氷の下で暮らす生き物を紹介', featured: ['clione', 'fuusen', 'kegani', 'hokke', 'ookamiuo', 'taraba'] },
-  { name: '春の磯あそび', text: '潮だまりで出会える身近な生き物たち', featured: ['mebaru', 'kasago', 'kawahagi', 'madako', 'hakofugu', 'tatsu'] },
+  { name: '春の磯あそび', text: '潮だまりで出会える身近な生き物たち', featured: ['kasago', 'kawahagi', 'madako', 'hakofugu', 'tatsu'] },
   { name: 'サクラ色の海', text: '桜の季節にちなんだ、桜色の生き物を集めよう', featured: ['madai', 'kingyohana', 'sakuraebi', 'hanamino', 'akahata', 'kouika'] },
-  { name: 'こどもの日 サンゴ礁', text: '子どもたちに人気のカラフルな熱帯魚', featured: ['kakure', 'nanyouhagi', 'kiirohagi', 'chocho', 'rurisuzume', 'nishikianago'] },
+  { name: 'こどもの日 サンゴ礁', text: '子どもたちに人気のカラフルな熱帯魚', featured: ['kakure', 'nanyouhagi', 'kiirohagi', 'rurisuzume', 'nishikianago'] },
   { name: '梅雨のクラゲ展', text: 'ふわふわ漂うクラゲで館内を涼しく', featured: ['mizukurage', 'akakurage', 'takokurage', 'bluejelly', 'seanettle'] },
   { name: '夏の回遊魚', text: '外洋を泳ぎ回るスピードスターたち', featured: ['katsuo', 'buri', 'maaji', 'tobiuo', 'kuromaguro', 'shiira'] },
   { name: 'サメ・エイ特集', text: '夏休みの主役、サメとエイが大集合', featured: ['nekozame', 'akaei', 'shirowani', 'hammer', 'itachizame', 'manta'] },

@@ -21,7 +21,7 @@ export const WATER = {
 };
 
 export const REGION_ZONE = { iso: 'temperate', sanriku: 'temperate', reef: 'tropical', gbr: 'tropical', ocean: 'tropical', galapagos: 'tropical', okhotsk: 'cold', deep: 'cold' };
-export const JOINT_ZONE = { seela: 'cold', demenigisu: 'cold', daiou: 'cold', koori: 'cold', greenland: 'cold' };
+export const JOINT_ZONE = { seela: 'cold', demenigisu: 'cold', daiou: 'cold', greenland: 'cold' };
 const PREDATOR_FORMS = new Set(['shark', 'hammer', 'eel', 'squid', 'whale']);
 
 export function zoneOf(id) {

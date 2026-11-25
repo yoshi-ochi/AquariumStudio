@@ -135,7 +135,7 @@ export const SPECIES_METHODS = {
   maiwashi: ['purse', 'boatseine', 'setnet'], katsuo: ['pole', 'troll', 'purse'], zuwai: ['kakemawashi', 'pots'], surume: ['squid', 'trawl', 'setnet'],
   ankou: ['trawl', 'gill'], mizudako: ['takotsubo', 'pots'],
   // 慶良間諸島
-  kakure: ['diving'], nanyouhagi: ['diving', 'oikomi'], chocho: ['diving', 'oikomi'], tsunodashi: ['diving', 'oikomi'],
+  kakure: ['diving'], nanyouhagi: ['diving', 'oikomi'], tsunodashi: ['diving', 'oikomi'],
   chinanago: ['diving'], deba: ['diving', 'oikomi'], hanamino: ['diving'], otohime: ['diving'], budai: ['oikomi', 'diving'],
   // オホーツク海
   hokke: ['setnet', 'gill', 'trawl'], fuusen: ['diving', 'trawl'], clione: ['diving'], ookamiuo: ['gill', 'trawl'],
@@ -152,11 +152,9 @@ export const SPECIES_METHODS = {
   harisenbon: ['diving', 'setnet'],
   bashou: ['longline', 'troll'],
   suzuki: ['setnet', 'gill'],
-  karei: ['trawl', 'gill'],
   nokogiri: ['trawl'],
   chochin: ['trawl'],
   kurodai: ['setnet', 'gill'],
-  mebaru: ['setnet', 'gill'],
   akahata: ['diving', 'setnet'],
   kawahagi: ['setnet', 'diving'],
   umazura: ['setnet', 'gill'],

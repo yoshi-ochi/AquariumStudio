@@ -1,4 +1,5 @@
-import { PLANNED, NEW_PLACES } from '../expedition/speciesRoster.js';
+import { PLANNED, plannedPlaceIds } from '../expedition/speciesRoster.js';
+import { DESTINATIONS, HIDDEN_PLACES } from '../expedition/creatureData.js';
 import { isModeled } from '../expedition/speciesRelease.js';
 import { RELEASES } from '../expedition/speciesReleases.js';
 import { esc, toast } from './adminUi.js';
@@ -25,6 +26,7 @@ const STATES = {
 };
 const FILTERS = [['todo', '未完成'], ['wait', '画像待ち'], ['ready', '画像あり'], ['req', '依頼・制作中'], ['done', '完成・公開'], ['all', 'すべて']];
 const MAX_SIDE = 2000;
+const placeName = (id) => [...DESTINATIONS, ...HIDDEN_PLACES].find((d) => d.id === id)?.name ?? id;
 
 /** 画像を縦横 MAX_SIDE 以内の JPEG にする（スマホの大きな写真をそのまま送らない） */
 async function shrink(file) {
@@ -46,6 +48,7 @@ export class ModelingTab {
     this.urls = new Map(); // path → 署名付き URL
     this.sel = null;
     this.filter = 'todo';
+    this.q = '';
     this.busy = false;
     this.error = '';
   }
@@ -53,7 +56,7 @@ export class ModelingTab {
   /** 一覧の項目 [{ id, name, places, planned, row, state }] */
   _list() {
     const rows = this.rows ?? {};
-    const out = PLANNED.map((p) => ({ id: p.id, name: p.name, planned: p, places: NEW_PLACES.filter((d) => d.pool.includes(p.id)).map((d) => d.name) }));
+    const out = PLANNED.map((p) => ({ id: p.id, name: p.name, planned: p, places: plannedPlaceIds(p).map(placeName) }));
     for (const r of Object.values(rows)) if (!out.some((x) => x.id === r.id)) out.push({ id: r.id, name: r.name, places: [] });
     for (const x of out) {
       x.row = rows[x.id];
@@ -70,7 +73,8 @@ export class ModelingTab {
     }
     const all = this._list();
     const cls = (x) => STATES[x.state][1];
-    const shown = all.filter((x) => this.filter === 'all' || (this.filter === 'todo' ? cls(x) !== 'done' : this.filter === 'req' ? cls(x) === 'req' || cls(x) === 'work' : cls(x) === this.filter));
+    const q = this.q.trim();
+    const shown = all.filter((x) => !q || x.name.includes(q) || x.id.includes(q) || x.planned?.sci?.toLowerCase().includes(q.toLowerCase())).filter((x) => this.filter === 'all' || (this.filter === 'todo' ? cls(x) !== 'done' : this.filter === 'req' ? cls(x) === 'req' || cls(x) === 'work' : cls(x) === this.filter));
     const count = (f) => all.filter((x) => (f === 'all' ? true : f === 'todo' ? cls(x) !== 'done' : f === 'req' ? cls(x) === 'req' || cls(x) === 'work' : cls(x) === f)).length;
     const chips = FILTERS.map(([f, t]) => `<button data-filter="${f}" class="${this.filter === f ? 'active' : ''}">${t} ${count(f)}</button>`).join('');
     const items = shown.map((x) => {
@@ -78,13 +82,13 @@ export class ModelingTab {
       const thumb = side && this.urls.get(side.path) ? `<img src="${esc(this.urls.get(side.path))}" alt="">` : '<span>🐟</span>';
       const n = x.row?.images.length ?? 0;
       return `<li data-id="${esc(x.id)}" class="${this.sel === x.id ? 'sel' : ''}"><div class="ad-mthumb">${thumb}</div>
-        <div><b>${esc(x.name)}</b><small>${esc(x.planned ? x.places.join('・') || '採取地なし' : 'リスト外')}${n ? ` ・ 画像${n}枚` : ''}</small></div>
+        <div><b>${esc(x.name)}</b>${x.planned?.sci ? ` <em>${esc(x.planned.sci)}</em>` : ''}<small>${esc(x.planned ? x.places.join('・') || '採取地なし' : 'リスト外')}${n ? ` ・ 画像${n}枚` : ''}</small></div>
         <i class="ad-mst ${cls(x)}">${STATES[x.state][0]}</i></li>`;
     }).join('');
     const cur = all.find((x) => x.id === this.sel);
     return `<div class="ad-split"><section class="ad-card"><h3>モデル待ちの魚種</h3>
       <p class="ad-note">参考画像を登録して「モデル制作へ」を押すと、制作の対象になります。モデルが出来た種は、次の公開で自動的にゲームへ加わります。</p>
-      <div class="ad-chips">${chips}</div><ul class="ad-mlist">${items || '<p class="ad-note">該当する種はありません。</p>'}</ul>
+      <div class="ad-bar"><input id="ad-mq" placeholder="和名・学名で検索" value="${esc(this.q)}"><span>${shown.length}種</span></div><div class="ad-chips">${chips}</div><ul class="ad-mlist">${items || '<p class="ad-note">該当する種はありません。</p>'}</ul>
       <div class="ad-acts"><button id="ad-mnew">＋ リスト外の種を追加</button></div></section>
       <section class="ad-card ad-edit">${cur ? this._editor(cur) : '<p class="ad-note">一覧の種を選ぶと、画像を登録できます。</p>'}</section></div>`;
   }
@@ -99,7 +103,7 @@ export class ModelingTab {
       return `<div class="ad-mslot"><h4>${label}${kind === 'side' ? ' <small>必須</small>' : ''}</h4><p class="ad-note">${hint}</p><div class="ad-mpics">${pics}${add}</div></div>`;
     }).join('');
     const p = x.planned;
-    const info = p ? `<p class="ad-note">id ${esc(p.id)} ・ 全長 ${p.len}m ・ ${esc(x.places.join('・') || '採取地なし')}</p>${p.note ? `<p class="ad-note">${esc(p.note)}</p>` : ''}` : '<p class="ad-note">リスト外の種です。制作のときに採取地・データも決めます。</p>';
+    const info = p ? `${p.sci ? `<p><em>${esc(p.sci)}</em></p>` : ''}<p class="ad-note">id ${esc(p.id)} ・ 全長 ${p.len}m ・ ${esc(x.places.join('・') || '採取地なし')}</p>${p.note ? `<p class="ad-note">${esc(p.note)}</p>` : ''}` : '<p class="ad-note">リスト外の種です。制作のときに採取地・データも決めます。</p>';
     const status = x.row?.status ?? 'draft';
     const act = locked
       ? `<p class="ad-note">モデルは完成しています（${STATES[x.state][0]}）。</p>`
@@ -125,6 +129,14 @@ export class ModelingTab {
       this.rerender();
       if (innerWidth <= 900) root.querySelector('.ad-edit')?.scrollIntoView({ behavior: 'smooth' });
     });
+    const qi = root.querySelector('#ad-mq');
+    if (qi) qi.oninput = () => {
+      this.q = qi.value;
+      this.rerender();
+      const el = document.getElementById('ad-mq');
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    };
     root.querySelector('#ad-mnew')?.addEventListener('click', () => this._addCustom());
     const edit = root.querySelector('.ad-edit');
     const x = this._list().find((i) => i.id === this.sel);

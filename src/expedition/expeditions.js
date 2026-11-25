@@ -175,9 +175,11 @@ export class Expeditions extends EventTarget {
   fromJSON(data) {
     this.extraTeams = data?.extraTeams ?? 0;
     this.trips = Array.isArray(data?.trips) ? data.trips.filter((t) => getDestination(t.dest)).map((t) => ({ ...t })) : [];
-    this.creatures = { ...(data?.creatures ?? {}) };
-    this.seen = { ...(data?.seen ?? {}) };
-    this.xp = { ...(data?.xp ?? {}) };
+    // 削除した魚種（総称だった種など）は捨てる
+    const known = (o) => Object.fromEntries(Object.entries(o ?? {}).filter(([id]) => getCreature(id)));
+    this.creatures = known(data?.creatures);
+    this.seen = known(data?.seen);
+    this.xp = known(data?.xp);
     // xpv 4・2 は使った匹数。版なし・xpv 3 は経験値なので、旧版の1匹の経験値で割って匹数に直す
     if (data?.xpv !== 4 && data?.xpv !== 2) for (const id of Object.keys(this.xp)) this.xp[id] = legacyXpToFish(id, this.xp[id]);
     for (const [id, n] of Object.entries(this.creatures)) if (n > 0) this.markSeen(id);
