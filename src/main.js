@@ -8,6 +8,7 @@ import { Economy } from './management/economy.js';
 import { Inventory } from './management/inventory.js';
 import { HALL_DEFS, INTERIOR_DEFS, ALL_DEFS, CATEGORY, getDef } from './tanks/tankData.js';
 import { buildObject, disposeObject } from './tanks/tankBuilder.js';
+import { setSwayTime } from './flora/floraMaterial.js';
 import { TankManager } from './tanks/tankManager.js';
 import { TankCustomizer, format as formatParam } from './tanks/tankCustom.js';
 import { HallInteraction } from './interaction/hallInteraction.js';
@@ -319,10 +320,12 @@ async function boot() {
     getBrush: () => interior.brush,
     stairsTo,
     getGrowMode: () => interior.growMode,
+    getFloraRadius: () => interior.floraRadius,
     onAction: (action, obj, value) => {
       if (action.startsWith('brush-')) return interior.setBrush('mode', action === 'brush-off' ? null : action.slice(6));
       if (action.startsWith('grow-')) return interior.setGrowMode(action === 'grow-off' ? null : action.slice(5));
-      if (action === 'param-density') return interior.setDensity(obj, value);
+      if (action === 'param-flora-size') return interior.setFloraSize(obj, value);
+      if (action === 'param-flora-radius') return (interior.floraRadius = value);
       if (action === 'param-brush-radius') return interior.setBrush('radius', value);
       if (action === 'param-brush-strength') return interior.setBrush('strength', value);
       if (action === 'param-embed-ratio') return hall.setEmbedParam(obj, 'ratio', value);
@@ -1356,6 +1359,7 @@ async function boot() {
     cameraCtl.update();
     manager.updateClips();
     manager.updateAeration(clock.elapsedTime);
+    setSwayTime(clock.elapsedTime); // ソフトコーラル・海藻の揺れ
     manager.updateLife(clock.elapsedTime);
     updateCaustics(clock.elapsedTime, sceneMgr.renderer, manager.tanks, sceneMgr.camera);
     penScene.update(clock.elapsedTime);

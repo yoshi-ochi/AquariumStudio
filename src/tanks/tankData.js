@@ -51,8 +51,9 @@ export const STRUCTURE_DEFS = [
 ].map(withCategory(CATEGORY.STRUCTURE));
 
 // ---- 水槽内オブジェ ----------------------------------------------------------
-// group: カタログのタブ。growth: ドラッグで成長できる種類（'colony' = 群体が広がる / 'driftwood' = 枝・幹）
-// colony は「伸ばす」で範囲が広がり、「密度」で個体（枝・ポリプ・株・石）の数を変えられる（growth.js）
+// group: カタログのタブ。flora: 生き物オブジェ（サンゴ・ソフトコーラル・イソギンチャク・海藻・水草）と玉石。
+//   1個体の形を繰り返して描き、ブラシで面に広げる／固着点から育てる（src/flora/。種ごとの設定は floraSpecs.js）
+// growth: 'driftwood' は流木（枝・幹を編集できる）
 // 品ぞろえは美ら海水族館「サンゴの海」・モントレーベイ水族館「ケルプの森」・各地の公立水族館のサンゴ礁・藻場・河川展示で
 // よく使われる種類（造礁サンゴ・ソフトコーラル・クマノミの宿主のイソギンチャク・海藻・水草・石）
 
@@ -99,7 +100,7 @@ const CORAL_DEFS = [
   { id: 'turbinaria', name: 'スリバチサンゴ', shape: 'turbinaria', size: { w: 0.14, h: 0.06, d: 0.14 }, price: 6000, appeal: 1.8, text: 'すり鉢・巻いた葉のような黄緑の板状サンゴ' },
   { id: 'fungia', name: 'クサビライシ', shape: 'fungia', size: { w: 0.14, h: 0.02, d: 0.14 }, price: 4000, appeal: 1.4, text: '岩に付かず砂の上で暮らす円盤形の単体サンゴ' },
   { id: 'tubastraea', name: 'イボヤギ', shape: 'tubastraea', size: { w: 0.09, h: 0.03, d: 0.09 }, price: 4500, appeal: 1.6, text: '光合成をしない橙色のサンゴ。岩の陰で黄色い触手を開く' },
-].map((d) => ({ ...d, group: 'coral', growth: 'colony' }));
+].map((d) => ({ ...d, shape: 'flora', flora: true, group: 'coral' }));
 
 // ソフトコーラル・イソギンチャク（coralSoft.js）。イソギンチャクはクマノミ類の住みかになる
 const SOFT_DEFS = [
@@ -108,9 +109,9 @@ const SOFT_DEFS = [
   { id: 'entacmaea', name: 'タマイタダキイソギンチャク', shape: 'entacmaea', size: { w: 0.11, h: 0.08, d: 0.11 }, price: 8000, appeal: 2.4, text: '触手の先が玉のように膨らむ。クマノミの宿主' },
   { id: 'heteractis', name: 'センジュイソギンチャク', shape: 'heteractis', size: { w: 0.15, h: 0.09, d: 0.15 }, price: 12000, appeal: 3, text: '鮮やかな体に長い触手。岩の上でカクレクマノミが暮らす' },
   { id: 'stichodactyla', name: 'ハタゴイソギンチャク', shape: 'stichodactyla', size: { w: 0.18, h: 0.03, d: 0.18 }, price: 10000, appeal: 2.6, text: '大きく波打つ平らな口盤を短い触手が覆う。砂地に広がる' },
-].map((d) => ({ ...d, group: 'soft', growth: 'colony' }));
+].map((d) => ({ ...d, shape: 'flora', flora: true, group: 'soft' }));
 
-// パーツ単位で追加・削除できるサンゴ（growth: 'modular'。tosaka / xenia は旧IDを引き継ぐ）
+// 以前はパーツ単位で編集していた種（ID はそのまま）
 const MODULAR_CORAL_DEFS = [
   { id: 'tosaka', name: 'アカバナトサカ', shape: 'mod_akabana', size: { w: 0.14, h: 0.12, d: 0.14 }, price: 4500, appeal: 1.6 },
   { id: 'akayagi', name: 'アカヤギ', shape: 'mod_akayagi', size: { w: 0.22, h: 0.3, d: 0.05 }, price: 7000, appeal: 2.2 },
@@ -121,12 +122,12 @@ const MODULAR_CORAL_DEFS = [
   { id: 'tama', name: 'タマイワスナギンチャク', shape: 'mod_tama', size: { w: 0.08, h: 0.03, d: 0.08 }, price: 2500, appeal: 1 },
   { id: 'xenia', name: 'ウミアザミ', shape: 'mod_xenia', size: { w: 0.1, h: 0.06, d: 0.1 }, price: 3000, appeal: 1.2 },
   { id: 'junceella', name: 'リュウキュウミゾヤギ', shape: 'mod_junceella', size: { w: 0.12, h: 0.28, d: 0.12 }, price: 4000, appeal: 1.4 },
-].map((d) => ({ ...d, group: 'coral', growth: 'modular' }));
+].map((d) => ({ ...d, shape: 'flora', flora: true, group: ['tosaka', 'akayagi', 'xenia', 'junceella', 'tama'].includes(d.id) ? 'soft' : 'coral' }));
 
 const DECOR_DEFS = [
   { id: 'driftwood', name: '流木', shape: 'driftwood', size: { w: 0.4, h: 0.25, d: 0.15 }, price: 3000, appeal: 0.8, growth: 'driftwood' },
   { id: 'aeration', name: 'エアレーション', shape: 'airstone', size: { w: 0.05, h: 0.03, d: 0.05 }, price: 1500, appeal: 0.3, bubbles: true },
-  { id: 'plants', name: '海藻・水草', shape: 'plants', size: { w: 0.3, h: 0.25, d: 0.2 }, price: 2500, appeal: 0.8, growth: 'colony' },
+  { id: 'plants', name: '水草の茂み', shape: 'flora', flora: true, size: { w: 0.12, h: 0.25, d: 0.12 }, price: 2500, appeal: 0.8 },
 ].map((d) => ({ ...d, group: 'decor' }));
 
 // 海藻・海草（seaweedBuilder.js）。日本の水族館の藻場・海中林・沖縄の展示でよく見られる種類
@@ -142,14 +143,14 @@ const SEAWEED_DEFS = [
   { id: 'konbu', name: 'コンブ', shape: 'konbu', size: { w: 0.16, h: 0.5, d: 0.16 }, price: 3500, appeal: 1.2, text: '帯のように長い葉を1枚伸ばす褐藻。北の海の藻場' },
   { id: 'miru', name: 'ミル', shape: 'miru', size: { w: 0.14, h: 0.16, d: 0.14 }, price: 2000, appeal: 0.9, text: '円柱の枝が二又に分かれる濃い緑の緑藻' },
   { id: 'saboten', name: 'サボテングサ', shape: 'saboten', size: { w: 0.13, h: 0.1, d: 0.13 }, price: 2500, appeal: 1, text: '石灰質の節が鎖のようにつながる緑藻。サンゴ礁の砂地' },
-].map((d) => ({ ...d, group: 'seaweed', growth: 'colony' }));
+].map((d) => ({ ...d, shape: 'flora', flora: true, group: 'seaweed' }));
 
 // 淡水の水草・川原の石（アマゾン・河川の展示）
 const FRESH_DEFS = [
   { id: 'amazonSword', name: 'アマゾンソード', shape: 'amazonSword', size: { w: 0.16, h: 0.3, d: 0.16 }, price: 2500, appeal: 1, text: '長い葉柄の葉がロゼット状に広がるアマゾン川の水草' },
   { id: 'vallisneria', name: 'バリスネリア', shape: 'vallisneria', size: { w: 0.16, h: 0.4, d: 0.16 }, price: 2000, appeal: 0.9, text: 'リボン状の葉が密生する水草。ランナーで増える' },
   { id: 'cobble', name: '玉石', shape: 'cobble', size: { w: 0.18, h: 0.03, d: 0.18 }, price: 1500, appeal: 0.4, text: '川原の丸い石。広げると川底になる' },
-].map((d) => ({ ...d, group: 'decor', growth: 'colony' }));
+].map((d) => ({ ...d, shape: 'flora', flora: true, group: 'decor' }));
 
 export const INTERIOR_DEFS = [...ROCK_DEFS, ...CORAL_DEFS, ...MODULAR_CORAL_DEFS, ...SOFT_DEFS, ...SEAWEED_DEFS, ...DECOR_DEFS, ...FRESH_DEFS].map(withCategory(CATEGORY.INTERIOR));
 
