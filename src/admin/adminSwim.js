@@ -31,6 +31,8 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 const differs = (a, b) => Math.abs(r3(a) - r3(b)) > 1e-9;
 
 let preview = null;
+/** キーの順に関係なく比べる */
+const norm = (o) => JSON.stringify(o ?? null, o ? Object.keys(o).sort() : undefined);
 
 const num = (attr, k, label, step, hint, v) =>
   `<label class="ad-field"><span>${label}</span><input type="number" ${attr}="${k}" step="${step}" value="${v == null ? '' : r3(v)}">${hint ? `<small>${esc(hint)}</small>` : ''}</label>`;
@@ -55,6 +57,7 @@ export function swimHtml(c) {
   return `<h4>ひれ・泳ぎ・行動 ${changed}<small>組み込み：${esc(STYLE_NAMES[baseStyleOf(c)])}・${esc(MODE_NAMES[base.mode])}・${base.cruise}体長/秒</small></h4>
     <div class="ad-swim-view" id="ad-swim-view"><button type="button" class="ad-swim-zoom" id="ad-swim-zoom">${preview?.follow ? '水槽全体' : '寄って見る'}</button></div>
     <p class="ad-note" id="ad-swim-info"></p>
+    <p class="ad-swim-state" id="ad-swim-state"></p>
     <div class="ad-swim" id="ad-swim">
       <div class="ad-grid">${opts('data-sw', 'style', '泳法', Object.entries(STYLE_NAMES), style)}</div>
       <div class="ad-grid" id="ad-swim-params">${swimInputs(c, style)}</div>
@@ -111,7 +114,18 @@ export function bindSwim(root, c) {
     const cm = (v) => (v * 100 >= 10 ? Math.round(v * 100) : r3(v * 100));
     info.textContent = `振動数 ${r3(s.hz)}回/秒 ・ 巡航 ${cm(b.cruise * c.len)}cm/秒（体長${cm(c.len)}cm × ${b.cruise}）${b.every && b.burst > 1 ? ` ・ 突進 ${cm(b.cruise * b.burst * c.len)}cm/秒（約${b.every}秒ごと）` : ''}`;
     preview?.show(d);
+    if (preview?.size) {
+      const { W, D, H } = preview.size;
+      const u = (v) => (W >= 1 ? `${Math.round(v * 10) / 10}m` : `${cm(v)}cm`);
+      info.textContent += ` ・ 水槽 幅${u(W)}×奥行${u(D)}×高さ${u(H)}（体長の15倍）`;
+    }
+    // 確定済みの値（c.swim・c.beh）と入力欄が違えば「未確定」
+    const cur = readSwim(panel, c);
+    const pending = norm(cur.swim) !== norm(c.swim) || norm(cur.beh) !== norm(c.beh);
+    state.className = `ad-swim-state ${pending ? 'pending' : 'done'}`;
+    state.textContent = pending ? '● 未確定：試し見だけの変更です。下の「この内容にする」で確定します' : '✓ 確定済みの内容です';
   };
+  const state = root.querySelector('#ad-swim-state');
   if (preview) preview.mount(view);
   const zoom = root.querySelector('#ad-swim-zoom');
   zoom.onclick = () => {
