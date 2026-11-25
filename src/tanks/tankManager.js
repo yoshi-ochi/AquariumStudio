@@ -117,6 +117,28 @@ export class TankManager {
     if (tank?.userData.clip) applyClip(newBody, tank.userData.clip);
   }
 
+  /** 水槽内オブジェの状態（保存・巻き戻し用） */
+  dumpInterior(tank) {
+    return this.interiorItems(tank).map((c) => ({
+      defId: c.userData.defId,
+      seed: c.userData.seed,
+      x: round(c.position.x),
+      y: round(c.position.y),
+      z: round(c.position.z),
+      rotY: round(c.rotation.y),
+      ...(c.userData.growth && { growth: roundGrowth(c.userData.growth) }),
+      ...(c.userData.locked && { locked: true }),
+      ...(c.userData.bubbles !== undefined && { bubbles: c.userData.bubbles }),
+      ...(c.userData.sculpted && { sculpt: encodePositions(c.getObjectByName('rock').geometry) }),
+    }));
+  }
+
+  /** 水槽内オブジェを dumpInterior の状態に置き直す（巻き戻し） */
+  restoreInterior(tank, list) {
+    for (const item of this.interiorItems(tank)) this.removeInterior(item);
+    for (const item of list) if (hasDef(item.defId)) this.createInterior(tank, item.defId, item);
+  }
+
   removeInterior(item) {
     item.parent?.remove(item);
     disposeObject(item);
@@ -341,20 +363,7 @@ export class TankManager {
       ...(o.userData.creatures && { creatures: { ...o.userData.creatures } }),
       ...(o.userData.clean && { clean: { ...o.userData.clean } }),
       ...(o.userData.care && { care: { ...o.userData.care } }),
-      ...(o.userData.clip && {
-        contents: this.interiorItems(o).map((c) => ({
-          defId: c.userData.defId,
-          seed: c.userData.seed,
-          x: round(c.position.x),
-          y: round(c.position.y),
-          z: round(c.position.z),
-          rotY: round(c.rotation.y),
-          ...(c.userData.growth && { growth: roundGrowth(c.userData.growth) }),
-          ...(c.userData.locked && { locked: true }),
-          ...(c.userData.bubbles !== undefined && { bubbles: c.userData.bubbles }),
-          ...(c.userData.sculpted && { sculpt: encodePositions(c.getObjectByName('rock').geometry) }),
-        })),
-      }),
+      ...(o.userData.clip && { contents: this.dumpInterior(o) }),
     }));
   }
 

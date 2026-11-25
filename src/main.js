@@ -341,6 +341,7 @@ async function boot() {
         return;
       }
       if (action === 'lock') {
+        if (obj.userData.interiorItem) return interior.setLocked(obj, !obj.userData.locked); // 解除できるのは1つだけ
         obj.userData.locked = !obj.userData.locked;
         customizer.syncLock();
         customizer.renderPanel();
@@ -513,7 +514,14 @@ async function boot() {
     onExitRequest: () => onDone(),
     onBrushChange: (m) => shell.setHint(m ? HINT.sculpt.replace('{mode}', m === 'inflate' ? '盛る' : '削る') : HINT.interior),
     onGrowChange: (m) => shell.setHint(m ? HINT.grow : HINT.interior),
+    // 元に戻すボタン：水槽内編集の間だけ出し、戻せる操作が無ければ押せない
+    onHistory: (h) => {
+      $('btn-undo').hidden = !h.tank;
+      $('btn-undo').disabled = !h.size;
+      $('btn-undo').textContent = h.size ? `↶ 戻す ${h.size}` : '↶ 戻す';
+    },
   });
+  $('btn-undo').addEventListener('click', () => interior.undo());
 
   // ---- モード ---------------------------------------------------------------
   //   home（館内の閲覧）→ 水槽タップ → tank（水槽の閲覧）→ ✎ → interior-edit

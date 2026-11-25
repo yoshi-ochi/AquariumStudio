@@ -717,3 +717,7 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 .tv-tabs button.active { color: #0f3550; background: var(--aqua); }
 .tv-look .section { margin-bottom: 12px; }
 .tv-look h4 { margin: 8px 0 6px; font-size: 13px; }
+
+/* 水槽内編集の「元に戻す」 */
+#btn-undo { margin-right: 6px; background: #fff; color: #1d3a52; }
+#btn-undo:disabled { opacity: 0.45; cursor: default; }
