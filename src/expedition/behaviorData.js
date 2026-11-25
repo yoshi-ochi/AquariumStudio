@@ -176,9 +176,32 @@ const ID_BEH = {
   polkadot: B('rest', 0.4, { bury: 0.3, rest: [20, 60] }),
 };
 
-/** 魚種の行動（id → 体形 → 標準） */
+/** 管理者ツールの表示名 */
+export const MODE_NAMES = {
+  cruise: '周回（外洋性）', wander: '泳いでは止まる', rest: '底で待ち伏せ・休む', crevice: '岩穴から顔を出す', burrow: '砂の巣穴から出入り',
+  cling: '海藻に尾を巻き付ける', pulse: '拍動で漂う', vertical: '縦の姿勢で静止', walk: '海底を歩く',
+};
+/** 管理者が魚種ごとに上書きできる値（c.beh）。layer は [下, 上]（水底0〜水面1） */
+export const BEH_KEYS = ['mode', 'cruise', 'burst', 'every', 'kick', 'pause', 'layer'];
+const LIMIT = { cruise: [0, 12], burst: [1, 10], every: [0, 3600], kick: [0, 1], pause: [0, 1] };
+
+/** 組み込みの行動（id → 体形 → 標準） */
+export const baseBehaviorOf = (c) => ID_BEH[c.id] ?? FORM_BEH[c.form] ?? FORM_BEH.perch;
+
+/** 魚種の行動。管理者の上書き c.beh を、範囲外や壊れた値を除いて重ねる */
 export function behaviorOf(c) {
-  return ID_BEH[c.id] ?? FORM_BEH[c.form] ?? FORM_BEH.perch;
+  const b = baseBehaviorOf(c);
+  const o = c.beh;
+  if (!o) return b;
+  const out = { ...b };
+  if (MODE_NAMES[o.mode]) out.mode = o.mode;
+  for (const [k, [lo, hi]] of Object.entries(LIMIT)) if (typeof o[k] === 'number' && Number.isFinite(o[k])) out[k] = Math.min(hi, Math.max(lo, o[k]));
+  const L = o.layer;
+  if (Array.isArray(L) && L.length === 2 && L.every(Number.isFinite)) {
+    const [a, z] = L.map((v) => Math.min(1, Math.max(0, v)));
+    out.layer = [Math.min(a, z), Math.max(a, z)];
+  }
+  return out;
 }
 
 /** 体の中心から腹（接地面）までの高さ（全長比）。モデルの原点が底にある体形は 0 */

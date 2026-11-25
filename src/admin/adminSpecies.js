@@ -5,6 +5,7 @@ import { WATER, zoneOf } from '../expedition/husbandry.js';
 import { baseCreature } from '../expedition/creatureConfig.js';
 import { speciesEntry, allPools, setInPool, validId, idTaken } from './adminState.js';
 import { esc, hex, unhex, field, select, checks, readFields, readChecks } from './adminUi.js';
+import { swimHtml, bindSwim, readSwim } from './adminSwim.js';
 
 const FORMS = () => [...new Set(CREATURES.map((c) => c.form))].sort();
 const PATTERNS = [['', 'なし'], ['spots', '斑点'], ['bands', '横帯'], ['stripes', '縦じま'], ['mottle', 'まだら'], ['mask', '目の帯'], ['lateral', '側線'], ['clown', 'クマノミ'], ['palette', 'ナンヨウハギ']];
@@ -59,6 +60,7 @@ export class SpeciesTab {
       ${checks('採取地・合同調査', 'pool', pools.map((p) => [p.id, p.name]), pools.filter((p) => p.pool.includes(c.id)).map((p) => p.id))}
       <label class="ad-field wide"><span>図鑑の解説</span><textarea data-f="note" rows="3">${esc(NOTES[c.id] ?? '')}</textarea></label>
       ${look}
+      ${swimHtml(c)}
       <div class="ad-acts"><button id="ad-apply" class="primary">この内容にする</button>
         ${c.retired ? '<button id="ad-restore">削除を取り消す</button>' : '<button id="ad-remove" class="danger">この魚種を削除</button>'}</div>
       <p class="ad-note">削除しても、すでに持っているプレイヤーの在庫・展示は残ります（捕れなくなり、図鑑の対象から外れます）。</p>`;
@@ -85,6 +87,8 @@ export class SpeciesTab {
     };
     root.querySelector('#ad-new').onclick = () => this._add();
     const edit = root.querySelector('.ad-edit');
+    const c = this.sel && getCreature(this.sel);
+    if (c) bindSwim(edit, c);
     edit.querySelector('#ad-apply')?.addEventListener('click', () => this._save(edit));
     edit.querySelector('#ad-remove')?.addEventListener('click', () => this._setRemoved(true));
     edit.querySelector('#ad-restore')?.addEventListener('click', () => this._setRemoved(false));
@@ -100,6 +104,8 @@ export class SpeciesTab {
     delete e.xp;
     e.seasons = readChecks(root, 'season').map(Number);
     e.methods = readChecks(root, 'method');
+    const { swim, beh } = readSwim(root.querySelector('#ad-swim'), c);
+    for (const [k, v] of [['swim', swim], ['beh', beh]]) if (v) e[k] = v; else delete e[k];
     if (c.added) {
       Object.assign(e, { form: f.form, pat: f.pat, colors: { body: unhex(f.body), belly: unhex(f.belly), fin: unhex(f.fin) }, mark: unhex(f.mark) });
       if (!e.methods.length) e.methods = ['setnet'];

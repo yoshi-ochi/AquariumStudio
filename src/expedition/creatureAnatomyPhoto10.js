@@ -225,7 +225,7 @@ export const PHOTO_ANATOMY_10 = {
       { pts: [[615, 262], [627.5, 178.5], [640, 95]], w: 40, n: 2, colors: [0x6f9fdc, 0x8fb8ea] },
     ],
     minis: [[600, 720, 0.075, 0xf7a23a], [570, 320, 0.042, 0xef5a2c], [585, 450, 0.026, 0xf08a3c], [590, 1590, 0.018, 0xe0602c]],
-    mode: 1,
+    mode: 0, // 翼（翼足）は背びれとして印を付け、泳ぎのシェーダーで羽ばたかせる（swimStyles.js の clio）
     free: true,
     opacity: 0.9,
     eye: { at: [520, 300], ring: 0.006, pupil: 0.004, iris: 0x20304a },

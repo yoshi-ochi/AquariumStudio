@@ -8,7 +8,8 @@ import { PIECE_FISH, BASE_PIECE_FISH, rebuildGrowth } from './growth.js';
  * 起動時に読み込み、組み込みのデータ（creatureData.js など）へ上書きする。何度反映しても同じ結果になる。
  *
  * {
- *   species: { [id]: { name, rarity, len, appeal, zone, seasons, methods, note, removed } },
+ *   species: { [id]: { name, rarity, len, appeal, zone, seasons, methods, note, removed, swim, beh } },
+ *     swim … ひれ・泳ぎの上書き（swimStyles.js の style と SWIM_KEYS）、beh … 行動の上書き（behaviorData.js の BEH_KEYS）
  *   added:   [{ id, name, form, len, rarity, appeal, colors: { body, belly, fin }, pat, mark, zone, seasons, methods, note }],
  *   places:  { [id]: { name, text, stage, cost, lat, lon, zone, pool, removed } },
  *   addedPlaces: [{ id, name, text, stage, cost, lat, lon, zone, pool }],
@@ -19,7 +20,7 @@ import { PIECE_FISH, BASE_PIECE_FISH, rebuildGrowth } from './growth.js';
  */
 export const CONFIG_KEY = 'creatures';
 const CACHE = 'aq-creature-config';
-const SPECIES_KEYS = ['name', 'rarity', 'len', 'appeal', 'zone', 'seasons'];
+const SPECIES_KEYS = ['name', 'rarity', 'len', 'appeal', 'zone', 'seasons', 'swim', 'beh'];
 const PLACE_KEYS = ['name', 'text', 'stage', 'cost', 'lat', 'lon', 'zone', 'pool'];
 
 // 組み込みの値（反映のたびにここから作り直す）
@@ -65,6 +66,7 @@ export function applyConfig(cfg = {}) {
     if (a.methods?.length) SPECIES_METHODS[a.id] = [...a.methods];
     if (a.note) NOTES[a.id] = a.note;
     for (const k of ['zone', 'seasons']) if (a[k]?.length) CREATURES.at(-1)[k] = clone(a[k]);
+    for (const k of ['swim', 'beh']) if (a[k] && typeof a[k] === 'object') CREATURES.at(-1)[k] = clone(a[k]);
     if (a.removed) CREATURES.at(-1).retired = true;
   }
   // 魚種ごとの上書き
