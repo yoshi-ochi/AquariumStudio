@@ -80,6 +80,17 @@ export function initHost(m, ctx, sh, index) {
   m.face = ctx.current; // 流れに頭を向ける（チンアナゴと同じ向き）
 }
 
+/** 捕食者から隠れる：すぐに宿主の触手へ潜り込む */
+export function hideInHost(m) {
+  if (m.st === 'in') {
+    if (m.wr) m.t = Math.max(m.t, 2); // 捕食者がいるあいだは出てこない
+    return;
+  }
+  m.st = 'in';
+  m.wr = null;
+  m.T = { x: m.host.x + (m.r() - 0.5) * m.host.r * 0.4, y: m.host.top - m.L * 0.3, z: m.host.z + (m.r() - 0.5) * m.host.r * 0.4 };
+}
+
 export function rehost(m, ctx) {
   if (m.sh) m.sh.host = null;
   m.host = sharedHost(m, ctx);

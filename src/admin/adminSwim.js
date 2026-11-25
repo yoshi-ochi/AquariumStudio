@@ -1,6 +1,7 @@
 import { STYLE_NAMES, SWIM_KEYS, swimParams, styleOf, baseStyleOf } from '../expedition/swimStyles.js';
 import { MODE_NAMES, BEH_KEYS, behaviorOf, baseBehaviorOf } from '../expedition/behaviorData.js';
 import { esc } from './adminUi.js';
+import { CREATURES, getCreature } from '../expedition/creatureData.js';
 import { SwimPreview } from './swimPreview.js';
 
 /**
@@ -17,6 +18,7 @@ const SWIM_FIELDS = [
   ['mWaves', '背・尻びれの波の数', 0.5, '波を流すときの波の数'],
   ['pect', '胸びれ・腹びれの振れ', 0.005, ''],
   ['pMul', '胸びれの周期倍', 0.1, '尾の何倍の速さで動かすか'],
+  ['pelv', '腹びれの動き（胸びれ比）', 0.05, '0.15 ほぼ動かさない 〜 1 胸びれと同じ'],
   ['gait', '尾びれ泳ぎに切り替わる速さ（体長/秒）', 0.1, '胸びれで泳ぐ魚。0 で切り替えない'],
   ['idle', '止まっている時のひれの動き', 0.05, '0 止める 〜 1 泳ぐ時と同じ。胸びれで定位する魚は0.4〜0.6'],
 ];
@@ -30,11 +32,16 @@ const BEH_FIELDS = [
   ['pause', '止まる割合', 0.05, '泳いでは止まる魚が止まっている割合'],
   ['range', '住みかから離れる距離（体長の倍数）', 0.5, '住みかの周りで暮らす魚（クマノミ）'],
   ['nestle', '住みかに潜り込む割合', 0.05, '住みかの周りで暮らす魚（クマノミ）'],
+  ['hunt', '狩りの間隔（秒）', 5, '自分の2.5分の1以下の別の種の群れを襲う。0 で狩らない'],
+  ['escape', '捕食者から逃げる速さ（体長/秒）', 0.5, '小魚の逃げ出しは体長の10倍/秒前後'],
+  ['gap', 'つがいの間隔（体長）', 0.1, 'つがいで並んで泳ぐときの横の間隔'],
+  ['leapH', '跳躍の高さ（体長）', 0.1, '水面から跳び出す種'],
 ];
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const differs = (a, b) => Math.abs(r3(a) - r3(b)) > 1e-9;
 
 let preview = null;
+let withId = ''; // 試し見で一緒に泳がせる種（魚種を切り替えても残す）
 /** キーの順に関係なく比べる */
 const norm = (o) => JSON.stringify(o ?? null, o ? Object.keys(o).sort() : undefined);
 
@@ -61,12 +68,14 @@ export function swimHtml(c) {
   return `<h4>ひれ・泳ぎ・行動 ${changed}<small>組み込み：${esc(STYLE_NAMES[baseStyleOf(c)])}・${esc(MODE_NAMES[base.mode])}・${base.cruise}体長/秒</small></h4>
     <div class="ad-swim-view" id="ad-swim-view"><button type="button" class="ad-swim-zoom" id="ad-swim-zoom">${preview?.follow ? '水槽全体' : '寄って見る'}</button></div>
     <p class="ad-note" id="ad-swim-info"></p>
+    <label class="ad-field ad-swim-with"><span>一緒に泳がせる（捕食・逃避・群れの確認）</span><select id="ad-swim-with"><option value="">なし</option>${CREATURES.filter((x) => x.id !== c.id && !x.retired).map((x) => `<option value="${x.id}" ${x.id === withId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
     <p class="ad-swim-state" id="ad-swim-state"></p>
     <div class="ad-swim" id="ad-swim">
       <div class="ad-grid">${opts('data-sw', 'style', '泳法', Object.entries(STYLE_NAMES), style)}</div>
       <div class="ad-grid" id="ad-swim-params">${swimInputs(c, style)}</div>
       <div class="ad-grid">
         ${opts('data-bh', 'mode', '動き方', Object.entries(MODE_NAMES), b.mode)}
+        ${opts('data-bh', 'pair', 'つがいで並んで泳ぐ', [['0', 'しない'], ['1', 'する（チョウチョウウオ・イルカ）']], b.pair ? '1' : '0')}
         ${BEH_FIELDS.map(([k, l, st, h]) => num('data-bh', k, l, st, h, b[k])).join('')}
         ${num('data-bh', 'layer0', '泳ぐ高さ（下）', 0.05, '水底 0 〜 水面 1', b.layer?.[0])}
         ${num('data-bh', 'layer1', '泳ぐ高さ（上）', 0.05, '', b.layer?.[1])}
@@ -91,10 +100,12 @@ export function readSwim(root, c) {
   const mode = val('[data-bh=mode]');
   if (mode && mode !== base.mode) beh.mode = mode;
   for (const k of BEH_KEYS) {
-    if (k === 'mode' || k === 'layer') continue;
+    if (k === 'mode' || k === 'layer' || k === 'pair') continue;
     const v = val(`[data-bh=${k}]`);
     if (v !== '' && Number.isFinite(+v) && differs(+v, base[k] ?? 0)) beh[k] = +v;
   }
+  const pair = val('[data-bh=pair]') === '1';
+  if (pair !== !!base.pair) beh.pair = pair;
   const layer = [val('[data-bh=layer0]'), val('[data-bh=layer1]')].map(Number);
   if (layer.every(Number.isFinite) && (differs(layer[0], base.layer[0]) || differs(layer[1], base.layer[1]))) beh.layer = layer;
   return { swim: Object.keys(swim).length ? swim : undefined, beh: Object.keys(beh).length ? beh : undefined };
@@ -117,7 +128,7 @@ export function bindSwim(root, c) {
     const b = behaviorOf(d);
     const cm = (v) => (v * 100 >= 10 ? Math.round(v * 100) : r3(v * 100));
     info.textContent = `振動数 ${r3(s.hz)}回/秒 ・ 巡航 ${cm(b.cruise * c.len)}cm/秒（体長${cm(c.len)}cm × ${b.cruise}）${b.every && b.burst > 1 ? ` ・ 突進 ${cm(b.cruise * b.burst * c.len)}cm/秒（約${b.every}秒ごと）` : ''}`;
-    preview?.show(d);
+    preview?.show(d, getCreature(withId) ?? null);
     if (preview?.size) {
       const { W, D, H } = preview.size;
       const u = (v) => (W >= 1 ? `${Math.round(v * 10) / 10}m` : `${cm(v)}cm`);
@@ -131,6 +142,10 @@ export function bindSwim(root, c) {
   };
   const state = root.querySelector('#ad-swim-state');
   if (preview) preview.mount(view);
+  root.querySelector('#ad-swim-with').onchange = (e) => {
+    withId = e.target.value;
+    update();
+  };
   const zoom = root.querySelector('#ad-swim-zoom');
   zoom.onclick = () => {
     if (!preview) return;

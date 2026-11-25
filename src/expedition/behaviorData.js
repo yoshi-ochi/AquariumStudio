@@ -24,6 +24,11 @@
  *   host    宿主（イソギンチャク代わりの柔らかいサンゴ）の上で定位し、飛び出しては戻る（クマノミ）。range は宿主から離れる
  *           最大距離（体長の倍数）、nestle は触手に潜り込む割合
  * layer は泳ぐ高さの範囲（水底0〜水面1）。events は周回中に起こす特別な行動
+ * 生き物どうし（lifeSocial.js）
+ *   hunt    狩りの平均間隔（秒）。自分の2.5分の1以下の別の種の群れへ突っ込む（0 は狩らない）
+ *   escape  捕食者から逃げる速さ（体長/秒）。小魚の逃避の初速は体長の10倍/秒を超える（標準8）
+ *   pair    つがいで並んで泳ぐ。gap は並ぶ間隔（体長の倍数）
+ *   leapH   跳躍の高さ（体長の倍数）
  *   breathe 水面へ呼吸に上がる（イルカ・ウミガメ・ピラルク・デンキウナギ）
  *   bask    水面で横倒しになって日光浴（マンボウ）
  *   loop    後方宙返りで採餌（マンタ）
@@ -31,6 +36,8 @@
  *   spin    水面で体をきりもみ回転（ハシナガイルカ）
  *   sleep   海底に降りて休む（ウミガメ）
  *   peck    底をつつく（カワハギ・ブダイ・チョウチョウウオ）
+ *   leap    水面から跳び出す（イルカ・マンタ・シイラ・マグロ・サケ・アロワナ）。群れの魚も1匹ずつ跳ぶ
+ *   glide   水面から飛び出して滑空する（トビウオ）。捕食者に追われたときも飛ぶ
  */
 const B = (mode, cruise, o = {}) => ({ mode, cruise, kick: 0, burst: 1, every: 0, layer: [0.25, 0.75], home: 1, ...o });
 
@@ -56,7 +63,7 @@ const FORM_BEH = {
   ribbon: B('vertical', 0.15),
   mola: B('cruise', 0.4, { layer: [0.5, 0.9], events: ['bask'] }),
   shark: B('cruise', 0.6, { burst: 2.5, every: 60, layer: [0.2, 0.7] }),
-  hammer: B('cruise', 0.7, { burst: 2.5, every: 60, layer: [0.3, 0.8] }),
+  hammer: B('cruise', 0.7, { burst: 2.5, every: 60, layer: [0.3, 0.8], hunt: 120 }),
   coelacanth: B('wander', 0.15, { pause: 0.6, layer: [0.1, 0.5], events: ['headstand'] }),
   jelly: B('pulse', 0.05, { layer: [0.3, 0.9] }),
   dumbo: B('pulse', 0.1, { layer: [0, 0.3], sit: true }),
@@ -78,20 +85,20 @@ const FORM_BEH = {
 /** 体形だけでは決まらない種 */
 const ID_BEH = {
   // マグロ・カジキ・外洋の高速遊泳魚（止まらずに泳ぎ続ける）
-  kuromaguro: B('cruise', 1.0, { burst: 3.5, every: 25, school: true, layer: [0.3, 0.85] }),
-  atlbluefin: B('cruise', 1.0, { burst: 3.5, every: 25, school: true, layer: [0.3, 0.85] }),
-  katsuo: B('cruise', 1.9, { burst: 3, every: 20, school: true, layer: [0.4, 0.9] }),
-  bashou: B('cruise', 0.8, { burst: 6, every: 30, layer: [0.5, 0.95] }),
-  shiira: B('cruise', 1.5, { burst: 4, every: 25, layer: [0.6, 0.95] }),
-  buri: B('cruise', 1.3, { burst: 3, every: 30, school: true }),
-  rouninaji: B('cruise', 1.2, { burst: 4, every: 30, layer: [0.3, 0.85] }),
-  gingame: B('cruise', 1.0, { burst: 2.5, every: 40, school: true, tight: true }),
-  sake: B('cruise', 1.0, { burst: 2.5, every: 45 }),
-  tobiuo: B('cruise', 1.6, { burst: 4, every: 20, school: true, layer: [0.82, 0.97] }),
+  kuromaguro: B('cruise', 1.0, { burst: 3.5, every: 25, school: true, layer: [0.3, 0.85], hunt: 50, events: ['leap'], leapH: 0.5 }), // 群れで小魚を追い、水面で跳ねる
+  atlbluefin: B('cruise', 1.0, { burst: 3.5, every: 25, school: true, layer: [0.3, 0.85], hunt: 50, events: ['leap'], leapH: 0.5 }),
+  katsuo: B('cruise', 1.9, { burst: 3, every: 20, school: true, layer: [0.4, 0.9], hunt: 40, events: ['leap'], leapH: 0.6 }), // ナブラ：イワシの群れを水面へ追い上げて跳ねる
+  bashou: B('cruise', 0.8, { burst: 6, every: 30, layer: [0.5, 0.95], hunt: 30, events: ['leap'], leapH: 0.6 }), // 群れで交互にイワシの群れを襲う
+  shiira: B('cruise', 1.5, { burst: 4, every: 25, layer: [0.6, 0.95], hunt: 40, events: ['leap'], leapH: 0.5 }), // トビウオを追って跳ねる
+  buri: B('cruise', 1.3, { burst: 3, every: 30, school: true, hunt: 50 }),
+  rouninaji: B('cruise', 1.2, { burst: 4, every: 30, layer: [0.3, 0.85], hunt: 35 }),
+  gingame: B('cruise', 1.0, { burst: 2.5, every: 40, school: true, tight: true, hunt: 60 }),
+  sake: B('cruise', 1.0, { burst: 2.5, every: 45, events: ['leap'], leapH: 0.6 }), // 海でも水面から跳ねる
+  tobiuo: B('cruise', 1.6, { burst: 4, every: 20, school: true, layer: [0.82, 0.97], events: ['glide'], escape: 10 }), // 追われると水面から飛び出して滑空する
   akamanbou: B('cruise', 0.8, { layer: [0.3, 0.8] }),
-  arowana: B('cruise', 0.5, { burst: 4, every: 60, layer: [0.8, 0.97] }),
+  arowana: B('cruise', 0.5, { burst: 4, every: 60, layer: [0.8, 0.97], hunt: 60, events: ['leap'], leapH: 0.8 }), // 水面上の虫を跳んで捕る
   // 群れる小魚（一斉に向きを変え、驚くと散って加速する）
-  maiwashi: B('cruise', 1.5, { burst: 3, every: 20, school: true, tight: true }),
+  maiwashi: B('cruise', 1.5, { burst: 3, every: 20, school: true, tight: true, escape: 10 }),
   maaji: B('cruise', 1.3, { burst: 3, every: 25, school: true }),
   nishin: B('cruise', 1.4, { burst: 3, every: 25, school: true }),
   sanma: B('cruise', 1.6, { burst: 3, every: 20, school: true, layer: [0.7, 0.97] }),
@@ -105,10 +112,22 @@ const ID_BEH = {
   nemuribuka: B('rest', 0.5, { rest: [30, 90] }), // 昼は洞窟の底で休む
   nokogiri: B('rest', 0.4, { rest: [30, 90] }),
   leopardshark: B('cruise', 0.6, { layer: [0.03, 0.3] }),
-  oomejirozame: B('cruise', 0.5, { burst: 3, every: 60, layer: [0.1, 0.6] }),
-  manta: B('cruise', 0.3, { layer: [0.5, 0.9], events: ['loop'] }),
-  nanyoumanta: B('cruise', 0.3, { layer: [0.5, 0.9], events: ['loop'] }),
-  madaraotobi: B('cruise', 0.5, { layer: [0.15, 0.6] }),
+  oomejirozame: B('cruise', 0.5, { burst: 3, every: 60, layer: [0.1, 0.6], hunt: 80 }),
+  manta: B('cruise', 0.3, { layer: [0.5, 0.9], events: ['loop', 'leap'], leapH: 0.4 }), // まれに水面から跳び出す（ブリーチ）
+  nanyoumanta: B('cruise', 0.3, { layer: [0.5, 0.9], events: ['loop', 'leap'], leapH: 0.4 }),
+  madaraotobi: B('cruise', 0.5, { layer: [0.15, 0.6], events: ['leap'], leapH: 0.6 }),
+  // サメ（小魚を襲う）
+  tsumaguro: B('cruise', 0.6, { burst: 3, every: 60, layer: [0.2, 0.7], hunt: 80 }),
+  galashark: B('cruise', 0.6, { burst: 2.5, every: 60, layer: [0.2, 0.7], hunt: 90 }),
+  itachizame: B('cruise', 0.6, { burst: 2.5, every: 60, layer: [0.2, 0.7], hunt: 90 }),
+  suzuki: B('wander', 0.8, { kick: 0.5, burst: 3, every: 40, hunt: 60 }), // 小魚の群れを追う
+  // つがいで並んで泳ぐ（チョウチョウウオ類は一夫一妻で、つがいがそろって餌をつつく）
+  chocho: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
+  akebono: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
+  togecho: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
+  fuuraicho: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
+  fueyakko: B('wander', 0.7, { pause: 0.4, events: ['peck'], pair: true }),
+  tsunodashi: B('wander', 0.6, { pause: 0.4, pair: true }),
   // 底の待ち伏せ
   kasago: B('rest', 0.4, { burst: 4, every: 80, rest: [30, 90], rock: true }),
   oniokoze: B('rest', 0.3, { bury: 0.2, rest: [40, 120] }),
@@ -156,7 +175,7 @@ const ID_BEH = {
   napoleon: B('wander', 0.5, { pause: 0.3 }),
   tsubame: B('wander', 0.4, { pause: 0.3, school: true }),
   nodoguro: B('wander', 0.4, { layer: [0.05, 0.4], pause: 0.4 }),
-  piranha: B('wander', 0.6, { burst: 5, every: 40, school: true, pause: 0.4 }),
+  piranha: B('wander', 0.6, { burst: 5, every: 40, school: true, pause: 0.4, hunt: 45 }),
   // 縦の姿勢
   ryugu: B('vertical', 0.1, { pitch: 1.45 }), // 頭を上にして長い背びれを波打たせ、立ち泳ぎで静止する
   tachiuo: B('vertical', 0.3, { pitch: 1.4, school: true }), // 頭を上にした「立ち泳ぎ」で漂う
@@ -170,10 +189,10 @@ const ID_BEH = {
   takaashi: B('walk', 0.05, { side: false }), // 深海の巨大ガニ。脚を高く上げてゆっくり歩く
   ogusoku: B('walk', 0.15),
   kabutogani: B('walk', 0.15, { bury: 0.3 }),
-  bandou: B('cruise', 1.2, { burst: 3, every: 30, layer: [0.3, 0.9], events: ['breathe'] }),
-  hashinagairuka: B('cruise', 1.2, { burst: 3, every: 25, layer: [0.4, 0.95], events: ['breathe', 'spin'] }),
+  bandou: B('cruise', 1.2, { burst: 3, every: 30, layer: [0.3, 0.9], events: ['breathe', 'leap'], leapH: 1, pair: true, hunt: 60 }), // 2頭で並んで泳ぎ、そろって呼吸・跳躍する
+  hashinagairuka: B('cruise', 1.2, { burst: 3, every: 25, layer: [0.4, 0.95], events: ['breathe', 'spin', 'leap'], leapH: 1, pair: true }),
   shiroiruka: B('cruise', 0.6, { layer: [0.3, 0.9], events: ['breathe'] }),
-  ashika: B('cruise', 1.5, { burst: 3, every: 20, layer: [0.2, 0.95], events: ['breathe'] }),
+  ashika: B('cruise', 1.5, { burst: 3, every: 20, layer: [0.2, 0.95], events: ['breathe', 'leap'], leapH: 0.4, hunt: 45 }), // 速く泳ぐときは水面を跳ねながら進む（ポーポイジング）
   rakko: B('cruise', 0.3, { layer: [0.9, 0.98], events: ['float'] }), // 水面に仰向けで浮き、ときどき底へ潜って餌を探す
   arapaima: B('cruise', 0.25, { layer: [0.2, 0.7], events: ['breathe'] }), // 10〜20分ごとに水面で空気を吸う
   polkadot: B('rest', 0.4, { bury: 0.3, rest: [20, 60] }),
@@ -185,8 +204,8 @@ export const MODE_NAMES = {
   cling: '海藻に尾を巻き付ける', pulse: '拍動で漂う', vertical: '縦の姿勢で静止', walk: '海底を歩く', host: '住みかの周りで暮らす（クマノミ）',
 };
 /** 管理者が魚種ごとに上書きできる値（c.beh）。layer は [下, 上]（水底0〜水面1） */
-export const BEH_KEYS = ['mode', 'cruise', 'burst', 'every', 'kick', 'pause', 'range', 'nestle', 'layer'];
-const LIMIT = { cruise: [0, 12], burst: [1, 10], every: [0, 3600], kick: [0, 1], pause: [0, 1], range: [1, 30], nestle: [0, 1] };
+export const BEH_KEYS = ['mode', 'cruise', 'burst', 'every', 'kick', 'pause', 'range', 'nestle', 'hunt', 'escape', 'gap', 'leapH', 'pair', 'layer'];
+const LIMIT = { cruise: [0, 12], burst: [1, 10], every: [0, 3600], kick: [0, 1], pause: [0, 1], range: [1, 30], nestle: [0, 1], hunt: [0, 3600], escape: [0, 30], gap: [0.3, 5], leapH: [0, 3] };
 
 /** 組み込みの行動（id → 体形 → 標準） */
 export const baseBehaviorOf = (c) => ID_BEH[c.id] ?? FORM_BEH[c.form] ?? FORM_BEH.perch;
@@ -198,6 +217,7 @@ export function behaviorOf(c) {
   if (!o) return b;
   const out = { ...b };
   if (MODE_NAMES[o.mode]) out.mode = o.mode;
+  if (typeof o.pair === 'boolean') out.pair = o.pair;
   for (const [k, [lo, hi]] of Object.entries(LIMIT)) if (typeof o[k] === 'number' && Number.isFinite(o[k])) out[k] = Math.min(hi, Math.max(lo, o[k]));
   const L = o.layer;
   if (Array.isArray(L) && L.length === 2 && L.every(Number.isFinite)) {

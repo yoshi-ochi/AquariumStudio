@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RIM } from './creatureFacet.js';
-import { FIN, tagFin, finKindOf } from './finTag.js';
+import { FIN, tagFin, finKindOf, pelvicSet } from './finTag.js';
 
 /** トレースした頂点（creatureAnatomy.js）をそのままつないだ低ポリゴンの魚 */
 class Mesh {
@@ -254,12 +254,13 @@ export function tracedParts(c, a) {
   unpack(a);
   const P = projector(a.photo);
   const parts = [tracedBody(a, c, P)];
+  const pelvic = a.topView ? new Set() : pelvicSet(a.fins, P);
   for (const f of a.fins) {
     const hex = f.cols ?? f.hex ?? c.colors.fin;
     for (const side of f.lift ? [-1, 1] : [1]) {
       // ひれの部位（背・尻・尾・胸と腹）と付け根を記録する
       const base = f.base.map((p) => P(p, f.lift ? side * surfaceDepth(a, p) * 0.9 : 0));
-      const kind = f.lift ? FIN.PAIRED : finKindOf(base);
+      const kind = f.lift ? (pelvic.has(f) ? FIN.PELVIC : FIN.PAIRED) : finKindOf(base);
       parts.push(...tracedFin(a, f, hex, P, side).map((g) => tagFin(g, kind, base)));
     }
   }

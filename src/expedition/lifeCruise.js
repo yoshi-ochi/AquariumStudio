@@ -27,7 +27,11 @@ const EVENTS = {
   stand: [[12, 25], [40, 90]],
   sleep: [[20, 45], [50, 120]],
   float: [[25, 50], [8, 20]],
+  leap: [[1.4, 2.2], [35, 90]],
+  glide: [[1.6, 2.8], [25, 60]],
 };
+/** 群れで泳ぐ魚も1匹ずつ起こす特別な行動 */
+const SOLO_OK = new Set(['leap', 'glide']);
 
 const A = { x: 0, y: 0, z: 0 };
 const N = { x: 0, y: 0, z: 0 };
@@ -36,9 +40,50 @@ export function initCruise(m, ctx, sh) {
   m.path = m.beh.school && sh ? (sh.path ??= newPath(m, ctx)) : newPath(m, ctx);
   const spread = m.beh.school && sh ? m.L * (m.beh.tight ? 0.45 : 0.9) * Math.cbrt(sh.n) : 0;
   m.off = [(m.r() * 2 - 1) * spread, (m.r() * 2 - 1) * spread * 0.4, (m.r() * 2 - 1) * spread];
-  m.evs = m.beh.school ? [] : (m.beh.events ?? []).filter((e) => EVENTS[e]);
+  m.evs = (m.beh.events ?? []).filter((e) => EVENTS[e] && (!m.beh.school || SOLO_OK.has(e)));
   m.evT = span(m.r, [8, 30]);
   m.ev = null;
+}
+
+/** 特別な行動をすぐに始める（トビウオが捕食者から滑空で逃げる）。始められたら true */
+export function forceEvent(m, ctx, type) {
+  if (m.mode !== 'cruise' || m.ev || !EVENTS[type]) return false;
+  m.ev = { type, t: 0, dur: span(m.r, EVENTS[type][0]) };
+  return true;
+}
+
+/**
+ * 跳躍（イルカ・マンタ・シイラ・サケ・アロワナ）：水中で加速して水面を破り、弧を描いて頭から戻る。空中は約1秒
+ * 滑空（トビウオ）：水面直下で尾を速く振って加速し、胸びれを広げて水面すれすれを長く滑る（実物は数十秒・数百 m）
+ */
+function airEvent(m, ctx, p, type) {
+  const { box } = ctx;
+  const top = box.y1 + 0.03;
+  if (type === 'glide') {
+    const h = m.L * 0.8;
+    const lift = smooth((p - 0.15) / 0.15) * smooth((0.95 - p) / 0.1);
+    m.air = lift > 0.02;
+    return { y: top + h * lift - m.L * 0.2 * (1 - lift), w: smooth(p / 0.15) * smooth((1 - p) / 0.05), speed: 1 + 3 * smooth(p / 0.2) * smooth((1 - p) / 0.15), pitch: lift > 0.5 ? 0.05 : p < 0.3 ? 0.3 : -0.3, tail: p < 0.3 ? 3 : lift > 0.5 ? 0.2 : 1 };
+  }
+  const H = m.L * (m.beh.leapH ?? 0.8);
+  const a = 0.3;
+  const b = 0.75;
+  let y;
+  let pitch;
+  if (p < a) {
+    y = top - m.L * 0.6 * (1 - smooth(p / a));
+    pitch = 0.7 * smooth(p / 0.1);
+  } else if (p < b) {
+    const q = (p - a) / (b - a);
+    y = top + H * Math.sin(Math.PI * q);
+    pitch = 1.1 * Math.cos(Math.PI * q);
+  } else {
+    const q = (p - b) / (1 - b);
+    y = top - m.L * 0.8 * smooth(q);
+    pitch = -0.9 * (1 - smooth(q));
+  }
+  m.air = y > top - m.L * 0.3;
+  return { y, w: smooth(p / 0.15) * smooth((1 - p) / 0.1), speed: 1.6, pitchSet: pitch };
 }
 
 /** 周回中の特別な行動。速さの倍率と、姿勢・高さの上書きを返す */
@@ -56,6 +101,7 @@ function cruiseEvent(m, ctx, dt) {
   if (p >= 1) {
     m.evT = span(m.r, EVENTS[ev.type][1]);
     m.ev = null;
+    m.air = false;
     return null;
   }
   const { box } = ctx;
@@ -77,6 +123,9 @@ function cruiseEvent(m, ctx, dt) {
       return { y: box.y1 - (m.L / 2) * Math.sin(Math.min(1.2, maxP)), w: e, speed: 1 - 0.9 * e, pitchSet: Math.min(1.2, maxP) * e };
     case 'loop':
       return { loop: TAU * smooth((p - 0.1) / 0.8), speed: 1 - 0.7 * e };
+    case 'leap':
+    case 'glide':
+      return airEvent(m, ctx, p, ev.type);
     default:
       return null;
   }
@@ -115,7 +164,7 @@ export function cruise(m, ctx, dt, time) {
   if (ev) {
     if (ev.y !== undefined) y += (ev.y - y) * ev.w;
     if (ev.pitch) pitch += ev.pitch;
-    if (ev.pitchSet !== undefined) pitch = Math.max(pitch, ev.pitchSet);
+    if (ev.pitchSet !== undefined) pitch = ev.type === 'leap' ? pitch + (ev.pitchSet - pitch) * ev.w : Math.max(pitch, ev.pitchSet);
     if (ev.roll) roll = ev.roll;
     if (ev.loop) {
       // 後方宙返り：頭を上げながら縦の円を描く
@@ -131,6 +180,6 @@ export function cruise(m, ctx, dt, time) {
   m.roll = roll;
   m.v = P.v;
   m.kickTail = P.kickTail;
-  m.tail = tailOf(m, P.v);
+  m.tail = tailOf(m, P.v) * (ev?.tail ?? 1);
   keepInside(m, ctx);
 }
