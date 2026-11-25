@@ -214,21 +214,26 @@ export function discosoma(S, lv, r, pal) {
 
 export function tama(S, lv, r, pal) {
   const u = new Unit();
-  const col = rgb(0x8a7a5a);
+  const mat = rgb(0x7a6a4a);
   const c0 = rgb([0x3ac86a, 0xf08a3a, 0xe04a7a, 0x4ab8d8][pal]);
   const c1 = rgb([0xf0a03a, 0x58d0a0, 0xf8e060, 0xf0f0a0][pal]);
-  // 短い柄の先に触手の輪を持つポリプが5つ寄り集まる
-  const crown = disc(0.009, 6, 1, (t) => t * 0.003, { inner: 0.3 });
-  for (let k = 0; k < 5; k++) {
-    const a = k * (TAU / 5) + r() * 0.6;
-    const d = k === 0 ? 0 : 0.014;
-    const h = 0.008 + r() * 0.008;
-    const p = V(Math.cos(a) * d, 0, Math.sin(a) * d);
-    u.add(stick(0.004, 0.0055, h, 5), col, at(p));
-    u.add(crown, (i, q, v) => (Math.hypot(v.x - p.x, v.z - p.z) < 0.005 ? c1 : c0), at([p.x, h, p.z]), 0.0015);
-    u.add(disc(0.003, 5, 1, () => 0.0005), c1, at([p.x, h, p.z]));
+  // 共肉（ポリプをつなぐ薄い膜）のマットの上に、径1cmほどのポリプが7つ六角形にすき間なく並ぶ。
+  // マットは隣の個体と重なり、つなぎの帯（spec.link）と合わせて岩を一面に覆う
+  u.add(disc(0.019, 8, 1, (t) => 0.003 * (1 - t * t)), mat);
+  const crown = disc(0.0062, 7, 1, (t) => t * 0.0028, { inner: 0.35 });
+  const oral = disc(0.0042, 6, 1, () => 0.0004);
+  for (let k = 0; k < 7; k++) {
+    const a = k * (TAU / 6) + 0.3;
+    const d = k === 0 ? 0 : 0.0115;
+    const h = 0.006 + r() * 0.005;
+    const p = V(Math.cos(a) * d, 0.002, Math.sin(a) * d);
+    u.add(stick(0.0042, 0.0052, h, 6), mat, at(p));
+    const top = [p.x, p.y + h, p.z];
+    u.add(crown, c0, at(top), 0.0012);
+    u.add(oral, c1, at(top));
   }
   crown.dispose();
+  oral.dispose();
   return u;
 }
 

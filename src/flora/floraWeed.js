@@ -156,17 +156,17 @@ export function saboten(S, lv, r) {
 export function umibudou(S, lv, r) {
   const u = new Unit();
   const sw = swayBy(S, S * 0.08, 1.5);
-  // 砂の上を這う茎から、粒の付いた直立枝が立つ
-  u.add(tube([V(-0.03, 0.003, 0), V(0, 0.004, 0.006), V(0.03, 0.003, -0.004)], 0.002, 3), rgb(0x5a9a40));
+  // 砂・岩の上を這う匍匐枝（となりの株と spec.link でつながる）から、1〜2cm おきに粒の付いた直立枝が立つ
+  u.add(blob(0), rgb(0x4a8a38), at([0, 0.002, 0], V(0, 1, 0), [0.004, 0.002, 0.004]));
   const grain = bead();
-  for (let k = -1; k <= 1; k++) {
+  for (let k = 0; k < 2; k++) {
     const h = S * (0.6 + r() * 0.4);
-    const x = k * 0.024;
-    const z = (r() - 0.5) * 0.008;
-    u.add(stick(0.0018, 0.0014, h, 3), rgb(0x4a8a38), at([x, 0, z]), sw);
-    for (let y = h * 0.2, i = 0; y < h; y += 0.009, i++) {
+    const x = (k - 0.5) * 0.014;
+    const z = (r() - 0.5) * 0.006;
+    u.add(stick(0.0018, 0.0014, h, 3), rgb(0x4a8a38), at([x, 0, z], V((r() - 0.5) * 0.2, 1, (r() - 0.5) * 0.2)), sw);
+    for (let y = h * 0.18, i = 0; y < h; y += 0.008, i++) {
       const a = i * 2.4;
-      u.add(grain, rgb(0x4cb850, 0.85 + r() * 0.3), at([x + Math.cos(a) * 0.0055, y, z + Math.sin(a) * 0.0055], V(0, 1, 0), 0.0042), sw);
+      u.add(grain, rgb(0x4cb850, 0.85 + r() * 0.3), at([x + Math.cos(a) * 0.0052, y, z + Math.sin(a) * 0.0052], V(0, 1, 0), 0.0042), sw);
     }
   }
   return u;

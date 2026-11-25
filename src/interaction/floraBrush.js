@@ -57,20 +57,36 @@ export function floraStroke(ctx, item, hit) {
     return changed;
   }
 
-  // ブラシの円（面に沿う）の中に候補を散らし、それぞれ面へ落として、近くに個体が無ければ足す
+  // ブラシの円（面に沿う）の中に、間隔 gap の六角格子の候補を置く。格子は面の向きごとに水槽で固定なので、
+  // 何度なぞっても同じ格子にそろい、隣どうしがすき間なく接する。候補を面へ落とし、近くに個体が無ければ足す
   const n = hit.n;
   _t1.set(1, 0, 0);
   if (Math.abs(n.x) > 0.9) _t1.set(0, 0, 1);
   _t1.cross(n).normalize();
   _t2.crossVectors(n, _t1);
-  const tries = Math.min(24, Math.max(1, Math.ceil(((R / spec.gap) ** 2) * 1.6)));
+  const step = spec.gap;
+  const row = step * 0.866;
+  const u0 = hit.p.dot(_t1);
+  const v0 = hit.p.dot(_t2);
+  const cands = [];
+  const K = Math.ceil(R / row) + 1;
+  for (let j = -K; j <= K; j++) {
+    const jj = Math.round(v0 / row) + j;
+    const v = jj * row - v0;
+    for (let i = -K; i <= K; i++) {
+      const u = (Math.round(u0 / step) + i + (jj & 1) * 0.5) * step - u0;
+      if (u * u + v * v <= R * R) cands.push([u, v]);
+    }
+  }
+  cands.sort((a, b) => a[0] * a[0] + a[1] * a[1] - b[0] * b[0] - b[1] * b[1]);
   const reach = Math.max(0.05, R * 0.7);
+  const min2 = (spec.gap * 0.8) ** 2;
   let changed = false;
-  for (let k = 0; k < tries; k++) {
-    const a = Math.random() * Math.PI * 2;
-    const d = k === 0 ? 0 : Math.sqrt(Math.random()) * R;
-    const from = hit.p.clone().addScaledVector(_t1, Math.cos(a) * d).addScaledVector(_t2, Math.sin(a) * d).addScaledVector(n, reach);
-    const s = k === 0 ? hit : castSurface(ctx.tank, ctx._floraTargets ?? [], from, _d.copy(n).negate(), reach * 2.5);
+  for (const [u, v] of cands.slice(0, 40)) {
+    // 格子の点にわずかなゆらぎ（並びが機械的に見えないように）
+    const jit = spec.gap * 0.12;
+    const from = hit.p.clone().addScaledVector(_t1, u + (Math.random() - 0.5) * jit).addScaledVector(_t2, v + (Math.random() - 0.5) * jit).addScaledVector(n, reach);
+    const s = castSurface(ctx.tank, ctx._floraTargets ?? [], from, _d.copy(n).negate(), reach * 2.5);
     if (!s) continue;
     if (!spec.wall && s.n.y < 0.5) continue; // 砂地・上向きの面にしか生えない種
     const lp = s.p.clone().applyMatrix4(_inv);
@@ -83,7 +99,7 @@ export function floraStroke(ctx, item, hit) {
       break;
     }
     let near = false;
-    for (let i = 0, c = pointCount(g); i < c && !near; i++) near = pointAt(p, i, _q).distanceToSquared(lp) < spec.gap * spec.gap;
+    for (let i = 0, c = pointCount(g); i < c && !near; i++) near = pointAt(p, i, _q).distanceToSquared(lp) < min2;
     if (near) continue;
     pushPoint(p, lp, s.n.clone().applyMatrix3(_rot).normalize());
     changed = true;
