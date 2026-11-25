@@ -226,6 +226,7 @@ async function boot() {
       const def = manager.defOf(tank);
       const e = tank.userData.embed;
       const run = findRunByKey(runs, e.key, e.along);
+      if (run && run.key !== e.key) e.key = run.key; // 壁の種類が変わった（外壁 → 仕切り壁など）
       if (run && placeEmbedded(tank, def, run, e)) {
         holes.push(holeFor(def, e));
       } else if (def.wallMount) {

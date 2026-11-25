@@ -22,7 +22,7 @@ export const runTheta = (run) => Math.atan2(run.normal[0], run.normal[1]);
 export function findNearestRun(runs, x, z, maxDist = 1.2, bothSides = false, partitionOnly = false) {
   let best = null;
   for (const run of runs) {
-    if (run.kind === 'rail' || run.kind === 'shutter') continue; // 手すりや工事パネルには埋め込めない
+    if (run.kind === 'rail' || run.kind === 'shutter' || run.noEmbed) continue; // 手すりや工事パネル、裏に観客席がある通路の壁には埋め込めない
     if (partitionOnly && run.kind !== 'partition') continue;
     const a = alongOf(run, x, z);
     if (a < run.from || a > run.to) continue;
@@ -37,7 +37,12 @@ export function findNearestRun(runs, x, z, maxDist = 1.2, bothSides = false, par
 }
 
 export function findRunByKey(runs, key, along) {
-  return runs.find((r) => r.key === key && along >= r.from - 1e-6 && along <= r.to + 1e-6) ?? null;
+  const inRun = (r) => along >= r.from - 1e-6 && along <= r.to + 1e-6;
+  const hit = runs.find((r) => r.key === key && inRun(r));
+  if (hit) return hit;
+  // 同じ線・同じ向きで、壁の種類だけ変わったもの（外壁の裏にバックヤードができて仕切り壁になった等）
+  const line = key.split(':').slice(0, 3).join(':') + ':';
+  return runs.find((r) => r.key.startsWith(line) && inRun(r) && !r.noEmbed && r.kind !== 'rail' && r.kind !== 'shutter') ?? null;
 }
 
 /** 埋め込み状態に合わせて水槽の位置・向きを決める。ランに収まらなければ false */

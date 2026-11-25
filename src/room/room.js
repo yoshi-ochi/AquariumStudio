@@ -34,6 +34,27 @@ function stripeTexture() {
  * 天井と照明器具は、カメラが天井より下にあるときだけ表示する（上から見下ろすときは隠す）。
  */
 /**
+ * 外壁に埋め込んだ水槽の外側の囲い（張り出し）を、並んだ穴どうしで1つにまとめる。
+ * 穴ごとに囲いを作ると、囲いの側面が隣の水槽に食い込むため
+ */
+export function mergeAlcoves(holes, gap = 0.01) {
+  const out = [];
+  for (const h of [...holes].sort((a, b) => a.along - a.width / 2 - (b.along - b.width / 2))) {
+    const g = out.at(-1);
+    const a0 = h.along - h.width / 2;
+    const a1 = h.along + h.width / 2;
+    if (g && a0 <= g.a1 + gap) {
+      g.a1 = Math.max(g.a1, a1);
+      g.bottom = Math.min(g.bottom, h.bottom);
+      g.top = Math.max(g.top, h.top);
+      g.depth = Math.max(g.depth, h.depth);
+      g.lightTop = Math.max(g.lightTop, h.bottom + h.lightTop - g.bottom);
+    } else out.push({ ...h, a0, a1 });
+  }
+  return out.map((g) => ({ ...g, along: (g.a0 + g.a1) / 2, width: g.a1 - g.a0 }));
+}
+
+/**
  * 壁の穴（長方形）を、重なる・接するものどうしで1つの輪郭にまとめる。
  * 並べて埋め込んだ水槽の穴が重なると、穴あきの面の三角形分割が壊れて壁が水槽の前に残るため。
  * 輪郭は左右に単調（下の辺を左から右、上の辺を右から左）：x の区間ごとに、かかる穴の一番下と一番上を使う
@@ -408,7 +429,7 @@ export class Room {
       } else {
         this.built.add(this._wallMesh(run, hs, run.side === CELL.YARD ? this.yardWallMat : this._wallMatFor(run, this.wallMat, false), false));
         // 外壁に埋め込んだ水槽の外側を囲う張り出し
-        for (const h of hs) this.built.add(this._alcove(run, h));
+        for (const h of mergeAlcoves(hs)) this.built.add(this._alcove(run, h));
       }
     }
     this.ceiling = this._ceilingMesh(plan);
