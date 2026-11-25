@@ -84,6 +84,8 @@ export class SpeciesTab {
       if (!tr) return;
       this.sel = tr.dataset.id;
       this.changed();
+      // スマホ（1列の表示）では一覧の下の編集欄へ移る
+      if (matchMedia('(max-width: 900px)').matches) document.querySelector('.ad-edit')?.scrollIntoView({ behavior: 'smooth' });
     };
     root.querySelector('#ad-new').onclick = () => this._add();
     const edit = root.querySelector('.ad-edit');
