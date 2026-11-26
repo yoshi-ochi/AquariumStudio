@@ -6,22 +6,68 @@ export const clamp01 = (v) => Math.min(1, Math.max(0, v));
 export const lerp = (a, b, t) => a + (b - a) * t;
 /** p のうち a〜b の区間の進み具合 */
 export const span = (p, a, b) => clamp01((p - a) / (b - a));
+/** なめらかな出だしと止まり */
+export const ease = (p) => {
+  const k = clamp01(p);
+  return k * k * (3 - 2 * k);
+};
+/** 作業 i の進み具合（前は 0、後は 1） */
+export const prog = (step, p, i) => (step < i ? 0 : step === i ? p : 1);
 
-export const mat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
-const netMat = (color) => new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.6 });
+export const mat = (color, roughness = 0.7) => new THREE.MeshStandardMaterial({ color, roughness });
 
-/** fn(u, v) → [x, y, z] で形が変わる網 */
-export function makeNet(group, nu, nv, color = 0xf2efe2) {
+let netCanvas;
+/** ひし形の網目のテクスチャ */
+function netTexture(ru, rv) {
+  if (!netCanvas) {
+    netCanvas = document.createElement('canvas');
+    netCanvas.width = netCanvas.height = 32;
+    const g = netCanvas.getContext('2d');
+    g.strokeStyle = '#fff';
+    g.lineWidth = 3.4;
+    g.beginPath();
+    for (const o of [-32, 0, 32]) {
+      g.moveTo(o, 0);
+      g.lineTo(o + 32, 32);
+      g.moveTo(o + 32, 0);
+      g.lineTo(o, 32);
+    }
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(netCanvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(ru, rv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** fn(u, v) → [x, y, z] で形が変わる網。floats を指定すると v=0 の縁に浮子が並ぶ */
+export function makeNet(group, nu, nv, { color = 0xf2efe2, floats = 0, floatColor = 0xf4a52c, cell = 1.2 } = {}) {
+  const holder = new THREE.Group();
   const geo = new THREE.PlaneGeometry(1, 1, nu, nv);
-  const mesh = new THREE.Mesh(geo, netMat(color));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, map: netTexture(nu * cell, nv * cell), transparent: true, side: THREE.DoubleSide, depthWrite: false }));
   mesh.frustumCulled = false;
-  group.add(mesh);
+  holder.add(mesh);
+  let balls = null;
+  if (floats) {
+    balls = new THREE.InstancedMesh(new THREE.SphereGeometry(0.2, 6, 5), mat(floatColor, 0.5), floats);
+    balls.frustumCulled = false;
+    holder.add(balls);
+  }
+  group.add(holder);
+  const m4 = new THREE.Matrix4();
   const draw = (fn) => {
     const pos = geo.attributes.position;
     for (let j = 0, k = 0; j <= nv; j++) for (let i = 0; i <= nu; i++, k++) pos.setXYZ(k, ...fn(i / nu, j / nv));
     pos.needsUpdate = true;
+    if (!balls) return;
+    for (let i = 0; i < floats; i++) {
+      const [x, y, z] = fn(i / (floats - 1), 0);
+      balls.setMatrixAt(i, m4.makeTranslation(x, y + 0.08, z));
+    }
+    balls.instanceMatrix.needsUpdate = true;
   };
-  draw.mesh = mesh;
+  draw.mesh = holder;
   return draw;
 }
 
@@ -42,6 +88,19 @@ export function buoy(group, color = 0xf0712c, r = 0.42) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), mat(color));
   group.add(m);
   return m;
+}
+
+/** 旗のついた浮標（ボンデン） */
+export function flagBuoy(group, color = 0xe5412d) {
+  const g = new THREE.Group();
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), mat(0xf0712c));
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.6, 5), mat(0x3a3026));
+  pole.position.y = 1.3;
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
+  flag.position.set(0.47, 2.3, 0);
+  g.add(ball, pole, flag);
+  group.add(g);
+  return g;
 }
 
 /** 点灯・消灯できるランプ */
@@ -76,22 +135,127 @@ export function particles(group, count, color = 0xffffff, size = 0.25) {
   return pts;
 }
 
-/** 釣れた魚（竿の先などで動かす） */
+/** 魚の形（頭が +X）。紡錘形の胴に尾びれがつく */
+const FISH_PROFILE = [[0, -0.5], [0.11, -0.3], [0.15, -0.05], [0.1, 0.25], [0.03, 0.4], [0.14, 0.5]];
+const fishGeo = (len, thick = 0.42) => new THREE.LatheGeometry(FISH_PROFILE.map(([x, y]) => new THREE.Vector2(x, y)), 7).rotateZ(Math.PI / 2).scale(len, len, len * thick);
+const fishMat = (color) => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55, metalness: 0.3, roughness: 0.4, side: THREE.DoubleSide });
+
+/** 1匹ずつ位置を決められる魚の集まり。put(i, x, y, z, 向き, 傾き, 大きさ) */
+export function fishSet(group, count, color = 0xbcd3df, len = 0.7, thick = 0.42) {
+  const mesh = new THREE.InstancedMesh(fishGeo(len, thick), fishMat(color), count);
+  mesh.frustumCulled = false;
+  group.add(mesh);
+  const o = new THREE.Object3D();
+  o.rotation.order = 'YZX';
+  mesh.put = (i, x, y, z, yaw = 0, pitch = 0, s = 1) => {
+    o.position.set(x, y, z);
+    o.rotation.set(0, yaw, pitch);
+    o.scale.setScalar(s);
+    o.updateMatrix();
+    mesh.setMatrixAt(i, o.matrix);
+  };
+  mesh.hide = (i) => mesh.put(i, 0, -999, 0, 0, 0, 0);
+  mesh.flush = () => (mesh.instanceMatrix.needsUpdate = true);
+  for (let i = 0; i < count; i++) mesh.hide(i);
+  return mesh;
+}
+
+/** 釣れた魚（竿の先などで動かす）。頭が +X */
 export function fishMesh(group, color = 0x36506e, len = 1.1) {
-  const m = new THREE.Mesh(new THREE.ConeGeometry(len * 0.25, len, 6).rotateZ(Math.PI / 2), mat(color));
+  const m = new THREE.Mesh(fishGeo(len), fishMat(color));
   group.add(m);
   return m;
 }
 
-/** ダイバー */
-export function diver(group) {
+/** ダイバー（頭が +X）。tank を外すと素潜り */
+export function diver(group, { tank = true, suit = 0x1d2730 } = {}) {
   const d = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 1.3, 3, 8).rotateZ(Math.PI / 2), mat(0x1d2730));
-  const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 8).rotateZ(Math.PI / 2), mat(0xf0c23c));
-  tank.position.y = 0.42;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), mat(0xe2b48c));
-  head.position.x = 1;
-  d.add(body, tank, head);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 1.2, 3, 8).rotateZ(Math.PI / 2), mat(suit));
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), mat(0xe2b48c));
+  head.position.x = 0.95;
+  const mask = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.36), mat(0x2a9bd6, 0.2));
+  mask.position.set(1.14, 0.04, 0);
+  d.add(body, head, mask);
+  for (const s of [-1, 1]) {
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 0.26), mat(0xf0c23c));
+    fin.position.set(-1.25, 0, s * 0.18);
+    d.add(fin);
+    d[s < 0 ? 'finL' : 'finR'] = fin;
+  }
+  if (tank) {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.9, 8).rotateZ(Math.PI / 2), mat(0xf0c23c));
+    t.position.y = 0.4;
+    d.add(t);
+  }
+  /** 足ひれをばたつかせる */
+  d.kick = (t) => {
+    d.finL.rotation.z = Math.sin(t * 6) * 0.5;
+    d.finR.rotation.z = -Math.sin(t * 6) * 0.5;
+  };
   group.add(d);
   return d;
 }
+
+/** 甲板や浜に立つ人 */
+export function crew(parent, x, y, z, color = 0xf2a13a) {
+  const g = new THREE.Group();
+  const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.17, 0.6, 6), mat(0x26323c));
+  legs.position.y = 0.3;
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.5, 3, 8), mat(color));
+  body.position.y = 1;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), mat(0xe2b48c));
+  head.position.y = 1.62;
+  g.add(legs, body, head);
+  g.position.set(x, y, z);
+  parent.add(g);
+  return g;
+}
+
+/** たも網。load は中の魚 */
+export function scoopNet(group, r = 0.9) {
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.05, 6, 18).rotateX(Math.PI / 2), mat(0x3a4046));
+  const bag = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf2efe2, wireframe: true, transparent: true, opacity: 0.7 }));
+  const load = new THREE.Mesh(new THREE.SphereGeometry(r * 0.72, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc9dbe6, metalness: 0.5, roughness: 0.3 }));
+  load.position.y = -r * 0.3;
+  load.scale.y = 0.6;
+  g.add(ring, bag, load);
+  g.load = load;
+  group.add(g);
+  return g;
+}
+
+/** 画面上で大きさが変わらない名札。at(x, y, z, 表示するか) */
+export function label(group, text) {
+  const c = document.createElement('canvas');
+  const g = c.getContext('2d');
+  const font = '700 40px sans-serif';
+  g.font = font;
+  c.width = Math.ceil(g.measureText(text).width) + 40;
+  c.height = 64;
+  g.font = font;
+  g.fillStyle = 'rgba(255,255,255,.93)';
+  g.beginPath();
+  g.roundRect(2, 2, c.width - 4, 60, 18);
+  g.fill();
+  g.fillStyle = '#0f3550';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, c.width / 2, 34);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true, sizeAttenuation: false, fog: false }));
+  const h = 0.036;
+  s.scale.set((h * c.width) / c.height, h, 1);
+  s.renderOrder = 20;
+  s.visible = false;
+  s.at = (x, y, z, show = true) => {
+    s.position.set(x, y, z);
+    s.visible = show;
+  };
+  group.add(s);
+  return s;
+}
+
+/** 名札をまとめて作る。{ key: '文字' } → { key: 名札 } */
+export const tags = (group, names) => Object.fromEntries(Object.entries(names).map(([k, v]) => [k, label(group, v)]));

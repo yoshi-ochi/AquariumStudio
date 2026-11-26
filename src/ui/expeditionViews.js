@@ -4,7 +4,7 @@ import { tankLabel } from '../tanks/tankLabel.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 import { CREATURES, SEASONS, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
-import { getMethod, methodsAt } from '../expedition/fishingData.js';
+import { getMethod, methodsAt, waterOf } from '../expedition/fishingData.js';
 
 const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 export const fmtTime = (s) => (s >= 60 ? `${Math.floor(s / 60)}分${s % 60 ? `${s % 60}秒` : ''}` : `${s}秒`);
@@ -50,6 +50,7 @@ export class ExpeditionView {
     return `<div class="st-sum"><div class="st-head"><b>${d.name}</b><small>立地から ${plan.km.toLocaleString('ja-JP')}km</small></div><small>${d.text}</small>
       <h4 class="gs-sub">漁法を選ぶ</h4><div class="ex-methods">${tabs}</div>
       <small>${sel.method.how}</small>
+      <button data-act="method-preview" data-id="${d.id}">▶ ${sel.method.name}の様子を見る</button>
       <div class="ex-species">${species}</div>
       <small>魚の保持 ${ex.usedSlots}/${this.getCapacity()}枠</small>
       ${full ? '<em class="gs-alert">保持枠がいっぱいです。バックヤードで拡張してください</em>' : ''}
@@ -76,15 +77,19 @@ export class ExpeditionView {
       this.methodId = id;
       return true;
     }
+    if (act === 'method-preview') {
+      this.fishing.play(this.methodId, '', waterOf(getDestination(id)));
+      return true;
+    }
     if (act === 'depart') {
       const d = getDestination(id);
-      const method = getMethod(this.methodId);
+      const method = getMethod(this.methodId, waterOf(d));
       const plan = this._plan(d, method);
       if (!ex.canDepart(this.economy.stage.level) || !this.economy.spend(plan.cost)) return true;
       // 漁の作業を再現してから、待ち時間に入る
       // はじめての遠征（まだ1種も見つけていない・隊も出ていない）は20秒で帰る（チュートリアルで長く待たせない）
       const first = !Object.keys(ex.seen).length && !ex.trips.length;
-      this.fishing.play(method.id).then(() => {
+      this.fishing.play(method.id, '', waterOf(d)).then(() => {
         ex.depart(d, first ? Math.min(20, plan.seconds) : plan.seconds, method.id);
       });
       return true;
@@ -95,7 +100,7 @@ export class ExpeditionView {
       const label = (list) => [...new Set(list)].map((c) => `${getCreature(c).name}×${list.filter((x) => x === c).length}`).join('、');
       const released = ex.released.length ? `／満杯のため放流：${label(ex.released)}` : '';
       const text = `${label(caught) || '持ち帰れる生き物はいませんでした'}${released}`;
-      if (trip?.method) this.fishing.play(trip.method, text);
+      if (trip?.method) this.fishing.play(trip.method, text, waterOf(getDestination(trip.dest)));
       return true;
     }
     return false;

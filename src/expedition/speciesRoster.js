@@ -62,7 +62,7 @@ const PLANNED_FIRST = [
 for (const p of PLANNED_FIRST) p.sci ??= SCI[p.id];
 export const PLANNED = [...PLANNED_FIRST, ...PLANNED_JAPAN, ...PLANNED_REEF, ...PLANNED_WORLD];
 
-/** 新しい採取地（日本海側と世界各地）。pool にはモデルのある種だけが残る */
+/** 新しい採取地（日本海側と世界各地）。pool にはモデルのある種だけが残る。water は水域（'river' 川・'lake' 湖。無ければ海）で、漁の再現が川用に変わる */
 export const NEW_PLACES = [
   { id: 'oki', name: '隠岐諸島', text: '対馬暖流が洗う日本海の島々。コブダイが岩礁に暮らす', stage: 1, cost: 15000, seconds: 600, lat: 36.2, lon: 133.2, opened: '2026-11-25', zone: 'temperate', pool: ['kobudai', 'kyusen', 'kurosoi', 'nodoguro', 'mejina', 'ishidai', 'madai', 'kurodai', 'kijihata', 'kasago', 'kawahagi', 'umazura', 'tobiuo', 'buri', 'surume', 'hirame'] },
   { id: 'toyama', name: '富山湾', text: '春にホタルイカが群れ、深い冷水にシロエビやベニズワイガニがすむ日本海の湾', stage: 2, cost: 40000, seconds: 600, lat: 36.85, lon: 137.25, opened: '2026-11-25', zone: 'cold', pool: ['hotaruika', 'shiroebi', 'benizuwai', 'norogenge', 'nodoguro', 'buri', 'zuwai', 'surume', 'madara', 'mizudako', 'hirame', 'ankou'] },
@@ -74,16 +74,16 @@ export const NEW_PLACES = [
   { id: 'mediterranean', name: '地中海', text: 'ヨーロッパとアフリカに囲まれた紺碧の内海', stage: 3, cost: 220000, seconds: 2400, lat: 37.5, lon: 15.3, opened: '2026-11-25', zone: 'temperate', pool: ['atlbluefin', 'madako', 'mola', 'akaumigame', 'bandou', 'mizukurage'] },
   { id: 'monterey', name: 'モントレー湾', text: 'ケルプの森とラッコが暮らすカリフォルニアの海', stage: 3, cost: 180000, seconds: 2400, lat: 36.8, lon: -121.9, opened: '2026-11-25', zone: 'temperate', pool: ['rakko', 'ashika', 'garibaldi', 'leopardshark', 'seanettle', 'mizukurage', 'mola', 'mizudako', 'kuromaguro'] },
   { id: 'caribbean', name: 'カリブ海', text: 'ブルーホールとマングローブが広がる暖かい海', stage: 3, cost: 300000, seconds: 3000, lat: 24.0, lon: -77.0, opened: '2026-11-25', zone: 'tropical', pool: ['queenangel', 'komorizame', 'oomejirozame', 'itachizame', 'hammer', 'madaraotobi', 'hanamino', 'aoumigame', 'akaumigame', 'bandou', 'bashou', 'shiira', 'harisenbon', 'jinbei'] },
-  { id: 'amazon', name: 'アマゾン川', text: '世界最大の流域をもつ熱帯の大河。巨大な淡水魚が暮らす', stage: 3, cost: 350000, seconds: 3000, lat: -3.1, lon: -60.0, opened: '2026-11-25', zone: 'tropical', pool: ['arapaima', 'arowana', 'piranha', 'redtail', 'polkadot', 'denkiunagi'] },
+  { id: 'amazon', name: 'アマゾン川', text: '世界最大の流域をもつ熱帯の大河。巨大な淡水魚が暮らす', stage: 3, cost: 350000, seconds: 3000, lat: -3.1, lon: -60.0, opened: '2026-11-25', zone: 'tropical', water: 'river', pool: ['arapaima', 'arowana', 'piranha', 'redtail', 'polkadot', 'denkiunagi'] },
   { id: 'ariake', name: '有明海', text: '干満の差が6mにもなる、広い干潟の海', stage: 2, cost: 25000, seconds: 600, lat: 33.0, lon: 130.3, opened: '2026-11-26', zone: 'temperate', pool: [] },
-  { id: 'shimanto', name: '四万十川', text: '「日本最後の清流」と呼ばれる高知の川と河口', stage: 2, cost: 30000, seconds: 600, lat: 33.0, lon: 132.9, opened: '2026-11-26', zone: 'temperate', pool: [] },
-  { id: 'biwa', name: '琵琶湖', text: '400万年の歴史をもつ日本一大きな湖。固有種が多い', stage: 2, cost: 35000, seconds: 600, lat: 35.25, lon: 136.08, opened: '2026-11-26', zone: 'temperate', pool: [] },
-  { id: 'kushiro', name: '釧路湿原', text: '幻の魚イトウが暮らす、日本最大の湿原を流れる川', stage: 2, cost: 45000, seconds: 900, lat: 43.1, lon: 144.4, opened: '2026-11-26', zone: 'cold', pool: [] },
+  { id: 'shimanto', name: '四万十川', text: '「日本最後の清流」と呼ばれる高知の川と河口', stage: 2, cost: 30000, seconds: 600, lat: 33.0, lon: 132.9, opened: '2026-11-26', zone: 'temperate', water: 'river', pool: [] },
+  { id: 'biwa', name: '琵琶湖', text: '400万年の歴史をもつ日本一大きな湖。固有種が多い', stage: 2, cost: 35000, seconds: 600, lat: 35.25, lon: 136.08, opened: '2026-11-26', zone: 'temperate', water: 'lake', pool: [] },
+  { id: 'kushiro', name: '釧路湿原', text: '幻の魚イトウが暮らす、日本最大の湿原を流れる川', stage: 2, cost: 45000, seconds: 900, lat: 43.1, lon: 144.4, opened: '2026-11-26', zone: 'cold', water: 'river', pool: [] },
   { id: 'eastaus', name: 'オーストラリア東岸', text: '海藻の森にシードラゴンがすみ、川に古代の肺魚が残る', stage: 3, cost: 260000, seconds: 2400, lat: -33.9, lon: 151.3, opened: '2026-11-26', zone: 'temperate', pool: [] },
   { id: 'antarctic', name: '南極海', text: '氷山の浮かぶ極寒の海。ペンギンとコオリウオが暮らす', stage: 3, cost: 400000, seconds: 3600, lat: -64.8, lon: -62.9, opened: '2026-11-26', zone: 'cold', pool: [] },
-  { id: 'mekong', name: 'メコン川', text: '東南アジアを貫く大河。巨大なナマズやコイが暮らす', stage: 3, cost: 280000, seconds: 2400, lat: 13.5, lon: 105.9, opened: '2026-11-26', zone: 'tropical', pool: [] },
-  { id: 'africa', name: 'アフリカの川と湖', text: 'タンガニーカ湖のシクリッドとコンゴ川の古代魚', stage: 3, cost: 320000, seconds: 3000, lat: -6.0, lon: 29.5, opened: '2026-11-26', zone: 'tropical', pool: [] },
-  { id: 'mississippi', name: 'ミシシッピ川', text: '北アメリカ最大の川。ガーやヘラチョウザメなど古代魚が暮らす', stage: 3, cost: 240000, seconds: 2400, lat: 30.0, lon: -90.1, opened: '2026-11-26', zone: 'temperate', pool: [] },
+  { id: 'mekong', name: 'メコン川', text: '東南アジアを貫く大河。巨大なナマズやコイが暮らす', stage: 3, cost: 280000, seconds: 2400, lat: 13.5, lon: 105.9, opened: '2026-11-26', zone: 'tropical', water: 'river', pool: [] },
+  { id: 'africa', name: 'アフリカの川と湖', text: 'タンガニーカ湖のシクリッドとコンゴ川の古代魚', stage: 3, cost: 320000, seconds: 3000, lat: -6.0, lon: 29.5, opened: '2026-11-26', zone: 'tropical', water: 'river', pool: [] },
+  { id: 'mississippi', name: 'ミシシッピ川', text: '北アメリカ最大の川。ガーやヘラチョウザメなど古代魚が暮らす', stage: 3, cost: 240000, seconds: 2400, lat: 30.0, lon: -90.1, opened: '2026-11-26', zone: 'temperate', water: 'river', pool: [] },
 ];
 
 /** 地図に出すのに必要な、捕れる魚種の数 */
