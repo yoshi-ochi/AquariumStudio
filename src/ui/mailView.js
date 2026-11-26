@@ -1,3 +1,4 @@
+import { askConfirm } from './dialog.js';
 import { getCreature, getDestination } from '../expedition/creatureData.js';
 import { isHungry, feedCost, hasLife } from '../expedition/husbandry.js';
 import { cleanSpec, isCleaning, needsCleaning, dirtLevel } from '../tanks/tankCleaning.js';
@@ -250,7 +251,14 @@ export class MailView {
       this.open = this.open === m.id ? null : m.id;
       mb.read(m.id);
     } else if (act === 'mail-del') {
-      if (m.actionable && !m.done && !confirm('まだ対応していないメールです。削除しますか？')) return true;
+      if (m.actionable && !m.done) {
+        askConfirm({ title: 'メールの削除', text: 'まだ対応していないメールです。削除しますか？', ok: '削除する', danger: true }).then((ok) => {
+          if (!ok) return;
+          mb.remove(m.id);
+          rerender?.();
+        });
+        return true;
+      }
       mb.remove(m.id);
     } else if (act === 'mail-take') {
       this.economy.earn(m.data.net);

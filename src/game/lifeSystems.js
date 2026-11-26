@@ -32,7 +32,12 @@ export class LifeSystems {
       zukan: { title: '生き物図鑑', view: new ZukanView({ expeditions, manager, previews, economy, state: this.state, toast }) },
       event: { title: 'イベント', live: true, view: new EventView({ economy, state: this.state, monthly: this.monthly, previews, getStats: () => this.stats(), toast, onStart: () => { this.state.flags.event = true; this.state.flags.events = (this.state.flags.events ?? 0) + 1; this.monthly.countEvent(); } }) },
     };
-    goalEl.addEventListener('click', (e) => e.target.closest('button') && this._claimGoal());
+    // 報酬のボタンで受け取る。カードのほかの所をタップすると、進め方の案内（main.js の onGoalTap）
+    goalEl.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return this._claimGoal();
+      const g = this._goal;
+      if (g && !g.done(this.stats())) this.onGoalTap?.(g);
+    });
     reportEl.addEventListener('click', (e) => e.target.closest('button') && (reportEl.hidden = true));
   }
 
@@ -139,7 +144,7 @@ export class LifeSystems {
     const inCh = GOALS.filter((x) => x.chapter === g.chapter);
     const head = `第${g.chapter}章 ${CHAPTERS[g.chapter - 1]} ${inCh.indexOf(g) + 1}/${inCh.length}`;
     const bar = prog && !ready ? `<small class="goal-prog">${prog[0]} / ${prog[1]}</small>` : '';
-    this.goalEl.innerHTML = `<small>${head}</small><b>${g.text}</b>${bar}${ready ? `<button class="primary">報酬 ${yen(g.reward)}</button>` : `<small>報酬 ${yen(g.reward)}</small>`}`;
+    this.goalEl.innerHTML = `<small>${head}</small><b>${g.text}</b>${bar}${ready ? `<button class="primary">報酬 ${yen(g.reward)}</button>` : `<small>報酬 ${yen(g.reward)} ・ <span class="goal-how">👆 タップで進め方</span></small>`}`;
   }
 
   _claimGoal() {

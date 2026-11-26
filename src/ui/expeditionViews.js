@@ -82,8 +82,10 @@ export class ExpeditionView {
       const plan = this._plan(d, method);
       if (!ex.canDepart(this.economy.stage.level) || !this.economy.spend(plan.cost)) return true;
       // 漁の作業を再現してから、待ち時間に入る
+      // はじめての遠征（まだ1種も見つけていない・隊も出ていない）は20秒で帰る（チュートリアルで長く待たせない）
+      const first = !Object.keys(ex.seen).length && !ex.trips.length;
       this.fishing.play(method.id).then(() => {
-        ex.depart(d, plan.seconds, method.id);
+        ex.depart(d, first ? Math.min(20, plan.seconds) : plan.seconds, method.id);
       });
       return true;
     }

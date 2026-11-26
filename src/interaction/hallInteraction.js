@@ -5,7 +5,7 @@ import { TankManager } from '../tanks/tankManager.js';
 import { REFUND_RATE } from '../management/stageData.js';
 import { CELL } from '../room/floorPlan.js';
 import { BASEMENT, zoneAt } from '../building/blueprint.js';
-import { findNearestRun, findRunByKey, placeEmbedded, alongOf, EMBED_RATIO_MAX } from '../room/embed.js';
+import { findNearestRun, findRunByKey, placeEmbedded, alongOf, runTheta, EMBED_RATIO_MAX } from '../room/embed.js';
 import { AlignGuides } from './alignGuides.js';
 
 const CLICK_TOLERANCE = 6; // px
@@ -19,7 +19,7 @@ const ROTATE_STEP = Math.PI / 2;
 export class HallInteraction {
   constructor({ sceneMgr, cameraCtl, manager, economy, inventory, customizer, room, toast, onPlacementChange, onChanged, onWallsChanged, onTankRemoved, getUnlocked, onClipboard }) {
     this.onClipboard = onClipboard;
-    this.clipboard = null; // 水槽のコピー（サイズ・見た目・水槽内レイアウト。展示生物は含めない）
+    this.clipboards = []; // 水槽のコピー（新しい順に5件まで。サイズ・見た目・水槽内レイアウト。展示生物は含めない）
     Object.assign(this, { sceneMgr, cameraCtl, manager, economy, inventory, customizer, room, toast, onPlacementChange, onChanged, onWallsChanged, onTankRemoved, getUnlocked });
     this.guides = new AlignGuides(sceneMgr.scene, manager);
     this.dom = sceneMgr.renderer.domElement;
@@ -52,27 +52,41 @@ export class HallInteraction {
 
   // ---- 水槽のコピー・貼り付け ------------------------------------------------
 
+  /** いちばん新しいコピー */
+  get clipboard() {
+    return this.clipboards[0] ?? null;
+  }
+
   /** 水槽をコピーする（水槽の種類・向き・見た目・水槽内レイアウト。展示生物と名前は含めない）。続けて貼り付けを始める */
   copy(tank) {
     if (!tank?.userData.clip) return;
-    this.clipboard = {
+    const def = getDef(tank.userData.defId);
+    const c = {
       defId: tank.userData.defId,
       rotY: tank.rotation.y,
       look: tank.userData.look ? structuredClone(tank.userData.look) : null,
       contents: this.manager.dumpInterior(tank),
+      label: `${tank.userData.name ? `${tank.userData.name}（${def.name}）` : def.name}・レイアウト${this.manager.interiorItems(tank).length}個`,
     };
-    this.onClipboard?.(this.enabled);
-    this.toast(`${getDef(tank.userData.defId).name} をコピーしました。貼り付ける場所をタップ（Shift で続けて）`);
-    this.paste();
+    // 同じ水槽をもう一度コピーしたら置き換える。古いものから消えて5件まで
+    this.clipboards = [c, ...this.clipboards.filter((x) => x.label !== c.label)].slice(0, 5);
+    this.onClipboard?.(this.enabled && !!this.clipboard);
+    this.toast(`${def.name} をコピーしました。置く場所を続けてタップできます（やめるときは「貼り付け終了」）`, { duration: 3500 });
+    this.paste(c);
   }
 
-  /** コピーした水槽を置き始める */
-  paste() {
-    const c = this.clipboard;
+  /** コピーした水槽を置き始める（置いたあとも同じコピーを続けて置ける） */
+  paste(c = this.clipboard) {
     if (!c || !this.enabled) return;
     this.startPlacement(c.defId);
     this.placing.copy = c;
     this.placing.rotY = c.rotY;
+    this.onClipboard?.(this.enabled && !!this.clipboard);
+  }
+
+  /** 貼り付け中か */
+  get pasting() {
+    return !!this.placing?.copy;
   }
 
   /** 水槽内レイアウトの代金 */
@@ -197,6 +211,7 @@ export class HallInteraction {
     helper.dispose();
     this.placing = null;
     this.onPlacementChange?.(null);
+    this.onClipboard?.(this.enabled && !!this.clipboard);
   }
 
   _updateGhost(e) {
@@ -204,7 +219,10 @@ export class HallInteraction {
     const hit = this._floorHit();
     if (!hit) return;
     if (p.def.wallMount) return this._updateWallGhost(p, hit);
-    const { x, z } = this._align(p.def, p.rotY, hit.x, hit.z, e, []);
+    let { x, z } = this._align(p.def, p.rotY, hit.x, hit.z, e, []);
+    // 壁際で壁にかかる位置なら、収まるいちばん近い位置へ寄せる（壁にめり込ませない）
+    const shift = this._fits(p.def, p.rotY, x, z) ? null : this._nearestFit(p.def, p.rotY, x, z, null);
+    if (shift) (x += shift.dx), (z += shift.dz);
     const fits = this._fits(p.def, p.rotY, x, z);
     p.ghost.position.set(x, this.manager.elevationAt(p.def, x, z, this.manager.currentFloor), z);
     p.ghost.rotation.y = p.rotY;
@@ -253,10 +271,14 @@ export class HallInteraction {
     });
     if (p.def.wallMount) this.onWallsChanged?.();
     this.toast(p.copy ? `${p.def.name} を${built ? '作って' : ''}複製しました（展示生物は空です）` : `${p.def.name} を設置しました`);
-    if (p.copy && e.shiftKey && !this._lack(p.def, p.copy)) return this.onChanged?.();
-    if (p.copy && e.shiftKey) {
-      this.cancelPlacement();
-      this.customizer.select(obj);
+    if (p.copy) {
+      // 貼り付けは続けて置ける（資金・在庫が尽きたら終わる）
+      const lack = this._lack(p.def, p.copy);
+      if (lack) {
+        this.cancelPlacement();
+        this.customizer.select(obj);
+        this.toast(`続けて貼り付けられません：${lack}`, { error: true });
+      }
       return this.onChanged?.();
     }
     if (!e.shiftKey) {
@@ -269,12 +291,22 @@ export class HallInteraction {
   // ---- 選択オブジェクト操作 -------------------------------------------------
 
   rotate(obj, dir) {
-    if (obj.userData.embed) return this.toast('埋め込み中の水槽は壁に向いて固定されます');
+    if (obj.userData.embed) return this._rotateEmbedded(obj, dir);
     const def = this.manager.defOf(obj);
     const angle = dir * ROTATE_STEP;
     const newRot = (obj.rotation.y + angle) % (Math.PI * 2);
-    if (!this._fits(def, newRot, obj.position.x, obj.position.z, obj)) return this.toast('回転すると床からはみ出します', { error: true });
+    // 回すと壁や床の外にかかるときは、収まるいちばん近い位置へずらしてから回す（壁にめり込ませない）
+    const shift = this._nearestFit(def, newRot, obj.position.x, obj.position.z, obj);
+    if (!shift) return this.toast('この場所では回せません。壁から少し離してください', { error: true });
     const riders = this.manager.getRiders(obj);
+    if (shift.dx || shift.dz) {
+      obj.position.x += shift.dx;
+      obj.position.z += shift.dz;
+      for (const r of riders) {
+        r.position.x += shift.dx;
+        r.position.z += shift.dz;
+      }
+    }
     obj.rotation.y = newRot;
     const c = Math.cos(-angle);
     const s = Math.sin(-angle);
@@ -304,6 +336,49 @@ export class HallInteraction {
     this.economy.earn(Math.floor(value * REFUND_RATE));
     this.toast(isTank ? `${def.name} を在庫に戻しました` : `${def.name} を撤去しました`);
     if (wasEmbedded) this.onWallsChanged?.();
+    this.onChanged?.();
+  }
+
+  /** 向き rotY で (x, z) の近く（60cm 以内）の、収まる位置へのずれ。そのままで収まれば {0,0}、無ければ null */
+  _nearestFit(def, rotY, x, z, self) {
+    if (this._fits(def, rotY, x, z, self)) return { dx: 0, dz: 0 };
+    for (let r = 0.05; r <= 0.6 + 1e-6; r += 0.05) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2;
+        const dx = Math.round(Math.cos(a) * r * 100) / 100;
+        const dz = Math.round(Math.sin(a) * r * 100) / 100;
+        if (this._fits(def, rotY, x + dx, z + dz, self)) return { dx, dz };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 埋め込み中の水槽を回す：回した向きに面する壁のうち、水槽が収まる近くの壁（3m 以内）へ付け替える。
+   * 収まる壁が無い向きには回さない
+   */
+  _rotateEmbedded(tank, dir) {
+    const def = this.manager.defOf(tank);
+    const want = tank.rotation.y + dir * ROTATE_STEP;
+    const same = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < 0.01;
+    const { w } = def.size;
+    let best = null;
+    for (const run of this.room.plan.runs()) {
+      if (run.kind === 'rail' || run.kind === 'shutter' || run.noEmbed || !same(runTheta(run), want)) continue;
+      if (run.to - run.from < w + 0.02) continue;
+      const along = Math.min(Math.max(alongOf(run, tank.position.x, tank.position.z), run.from + w / 2 + 0.01), run.to - w / 2 - 0.01);
+      const [px, pz] = run.axis === 'x' ? [along, run.line] : [run.line, along];
+      const d = Math.hypot(px - tank.position.x, pz - tank.position.z);
+      if (d <= 3 && (!best || d < best.d)) best = { run, along, d };
+    }
+    if (!best) return this.toast('この向きには、水槽が収まる壁が近くにありません', { error: true });
+    const embed = tank.userData.embed;
+    embed.key = best.run.key;
+    embed.along = best.along;
+    placeEmbedded(tank, def, best.run, embed);
+    this.manager.refreshElevations();
+    this.onWallsChanged?.();
+    this.customizer.renderPanel();
     this.onChanged?.();
   }
 

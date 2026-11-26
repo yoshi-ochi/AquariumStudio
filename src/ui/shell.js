@@ -12,13 +12,14 @@ const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
  * モード: 'home' | 'tank' | 'hall-edit' | 'interior-edit'
  */
 export class AppShell {
-  constructor({ economy, manager, getFloorOrder, onBack, onEdit, onDone, onFloorChange, onUpgrade }) {
+  constructor({ economy, manager, getFloorOrder, onBack, onEdit, onShare, onDone, onFloorChange, onUpgrade }) {
     this.economy = economy;
     this.manager = manager;
     this.mode = 'home';
 
     $('btn-back').addEventListener('click', onBack);
     $('btn-edit').addEventListener('click', onEdit);
+    $('btn-share').addEventListener('click', () => onShare?.());
     $('btn-done').addEventListener('click', onDone);
     this.getFloorOrder = getFloorOrder;
     const step = (d) => {
@@ -42,7 +43,9 @@ export class AppShell {
     document.body.dataset.mode = mode;
     const editing = mode === 'hall-edit' || mode === 'interior-edit';
     $('btn-back').hidden = mode !== 'tank';
+    $('btn-share').hidden = mode !== 'tank'; // 水槽に注目している間：共有
     $('btn-edit').hidden = editing;
+    $('btn-edit').title = mode === 'tank' ? '水槽を編集（生物・飼育・見た目・水槽内レイアウト）' : '館内レイアウトを編集';
     $('btn-done').hidden = !editing;
     $('editor').hidden = !editing;
     $('mode-title').textContent = title;

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { TankStage } from './tankStage.js';
 import { snapshotTank, packSnapshot, newShareId, shareUrl, MAX_BYTES } from './shareData.js';
+import { showText } from '../ui/dialog.js';
 
 /**
  * 水槽を共有する（館内の水槽パネルの「共有」）。
@@ -100,7 +101,6 @@ export async function sendUrl(url, title) {
     await navigator.clipboard.writeText(url);
     return 'copied';
   } catch {
-    prompt('この URL をコピーして送ってください', url);
-    return 'copied';
+    return (await showText({ title: '共有ページの URL', text: 'コピーして LINE やインスタに貼り付けてください', value: url })) ? 'copied' : 'cancel';
   }
 }

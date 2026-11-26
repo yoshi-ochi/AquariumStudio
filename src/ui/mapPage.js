@@ -35,6 +35,18 @@ export class MapPage {
     return !this.el.hidden;
   }
 
+  /** 採取地のピンの画面上の位置（操作の案内で指し示す）。地図を閉じていれば null */
+  pinRect(destId) {
+    if (!this.isOpen) return null;
+    const d = DESTINATIONS.find((x) => x.id === destId);
+    if (!d || !this.map.view) return null;
+    const c = this.map.canvas.getBoundingClientRect();
+    const p = this.map._screen(d.lat, d.lon);
+    const x = c.left + p.x;
+    const y = c.top + p.y;
+    return new DOMRect(x - 16, y - 16, 32, 32);
+  }
+
   async open() {
     this.el.hidden = false;
     document.body.classList.add('map-open');
