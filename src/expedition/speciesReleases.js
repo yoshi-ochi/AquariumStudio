@@ -32,4 +32,18 @@ export const RELEASES = {
   fueyakko: '2026-11-26',
   // 2026-11-26
   arapaima: '2026-11-26',
+  // 2026-11-26
+  hotaruika: '2026-11-26',
+  benizuwai: '2026-11-26',
+  norogenge: '2026-11-26',
+  kobudai: '2026-11-26',
+  kyusen: '2026-11-26',
+  kurosoi: '2026-11-26',
+  nemuribuka: '2026-11-26',
+  kumanomi: '2026-11-26',
+  hirenagahagi: '2026-11-26',
+  hashinagairuka: '2026-11-26',
+  queenangel: '2026-11-26',
+  piranha: '2026-11-26',
+  redtail: '2026-11-26',
 };

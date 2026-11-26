@@ -92,4 +92,12 @@ export function updateLife(tank, time) {
     }
   }
   for (const fish of group.children) stepMotion(fish, fish.userData.motion, ctx, dt, time);
+  // 発光する生き物：水槽のライトが消えている・暗いほど強く光る（光量は 0.2〜4.0）
+  const light = tank.userData.look?.light;
+  const dark = !light?.on ? 1 : Math.min(1, Math.max(0.12, (4.2 - light.intensity) / 4));
+  for (const fish of group.children) {
+    if (!fish.userData.glows) continue;
+    const ph = fish.userData.motion?.phase ?? fish.id;
+    fish.userData.uni.uGlow.value = dark * (0.78 + 0.22 * Math.sin(time * 1.6 + ph));
+  }
 }

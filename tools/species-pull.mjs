@@ -33,6 +33,11 @@ if (!url || !key) {
 const sb = createClient(url, key, { auth: { persistSession: false } });
 
 const res = await sb.from('species_intake').select('*').in('status', ['requested', 'modeling']).order('updated_at');
+// モデルが出来た種（ゲームに加わった種）は取り込み済みなので飛ばす
+const { PLANNED } = await import('../src/expedition/speciesRoster.js');
+const { isModeled } = await import('../src/expedition/speciesRelease.js');
+const done = new Set(PLANNED.filter(isModeled).map((p) => p.id));
+if (!res.error) res.data = res.data.filter((r) => !done.has(r.id));
 if (res.error) {
   console.error(`読み込めませんでした：${res.error.message}`);
   process.exit(1);
