@@ -32,6 +32,9 @@ import { loadCached, saveCached } from './water/waveCache.js';
 import { setWaveData, updateWater } from './water/waterSurface.js';
 import { LAYOUT_VERSION } from './io/layoutIO.js';
 import { writeJournal, markJournalSynced, pendingJournal } from './online/localJournal.js';
+import { ShareApi, sendUrl } from './share/shareTank.js';
+import { shareUrl } from './share/shareData.js';
+import { chooseShare } from './share/shareSheet.js';
 import { Online } from './online/online.js';
 import { AutoSave } from './online/autoSave.js';
 import { FriendPanel } from './ui/friendPanel.js';
@@ -349,6 +352,7 @@ async function boot() {
         return;
       }
       if (action === 'copy') return hall.enabled ? hall.copy(obj) : toast('館内レイアウト編集でコピーできます');
+      if (action === 'share') return shareTank(obj);
       if (obj.userData.locked && (action.startsWith('rotate') || action === 'delete')) return;
       const target = obj.userData.interiorItem ? interior : hall;
       if (action === 'rotate-left') target.rotate(obj, 1);
@@ -927,6 +931,45 @@ async function boot() {
   // ---- オンライン：クラウド保存・フレンド・訪問 -------------------------------
   const online = new Online();
   let visiting = null; // { mine: 自分のスナップショット }
+
+  // ---- 水槽の共有（URL を知っている人がログインなしで見られる。src/share/） ----
+  const shareApi = new ShareApi(online);
+  let sharing = false;
+  async function shareTank(obj) {
+    if (visiting) return toast('自分の水族館の水槽だけ共有できます');
+    if (!online.user) return toast('共有するにはログインしてください', { error: true });
+    if (sharing) return;
+    sharing = true;
+    const title = obj.userData.name || getDef(obj.userData.defId).name;
+    try {
+      const old = await shareApi.find(obj.userData.uid);
+      let pick = 'update';
+      if (old) {
+        pick = await chooseShare({
+          title: 'この水槽は共有中です',
+          text: `これまでに ${old.views} 回見られました。
+共有した時点の姿が表示されています。`,
+          buttons: [{ key: 'update', label: '今の水槽で更新して送る', kind: 'primary' }, { key: 'send', label: 'URL だけ送る' }, { key: 'stop', label: '共有をやめる', kind: 'danger' }],
+        });
+        if (!pick) return;
+      }
+      if (pick === 'stop') {
+        await shareApi.unshare(obj.userData.uid);
+        return toast('共有をやめました。URL を開いても表示されなくなります');
+      }
+      let url = shareUrl(old?.id);
+      if (pick === 'update') {
+        toast('共有の準備中…（水槽を撮影しています）', { duration: 4000 });
+        url = await shareApi.share(manager, obj);
+      }
+      const r = await sendUrl(url, title);
+      if (r === 'copied') toast('共有ページの URL をコピーしました。LINE やインスタに貼り付けて送れます', { duration: 4000 });
+    } catch (e) {
+      toast(e.message ?? String(e), { error: true, duration: 4000 });
+    } finally {
+      sharing = false;
+    }
+  }
   /** 訪問先のセーブを5分間だけ覚えておく（続けて訪問しても読み直さない＝転送量を減らす） */
   const VISIT_CACHE_MS = 5 * 60 * 1000;
   const visitCache = new Map();

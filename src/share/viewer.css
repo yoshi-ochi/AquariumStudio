@@ -1,0 +1,26 @@
+/* 共有された水槽の閲覧ページ（share.html）。影は使わない */
+:root {
+  --bg: #0b1a26;
+  --panel: rgba(10, 24, 34, 0.86);
+  --fg: #e6f1f7;
+  --muted: #9fb4c2;
+  --accent: #4cb2f0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif; overflow: hidden; }
+#sv-view { position: fixed; inset: 0; touch-action: none; }
+#sv-view canvas { display: block; }
+#sv-head { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: var(--panel); }
+#sv-head b { font-size: 16px; display: block; }
+#sv-head small { color: var(--muted); font-size: 12px; }
+#sv-head button, #sv-play { border: 1px solid var(--accent); border-radius: 999px; padding: 6px 14px; background: transparent; color: var(--fg); font: inherit; text-decoration: none; white-space: nowrap; }
+#sv-list { position: fixed; top: calc(60px + env(safe-area-inset-top)); right: 12px; left: 12px; max-width: 420px; margin-left: auto; max-height: 55vh; overflow: auto; padding: 10px 14px; background: var(--panel); border-radius: 12px; }
+#sv-list h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+#sv-list ul { list-style: none; margin: 0; padding: 0; }
+#sv-list li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+#sv-list li i { grid-column: 1; color: var(--muted); font-size: 12px; }
+#sv-list li span { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--muted); }
+#sv-msg { position: fixed; top: 45%; left: 16px; right: 16px; text-align: center; color: var(--muted); margin: 0; pointer-events: none; }
+#sv-foot { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--panel); color: var(--muted); font-size: 12px; }
+#sv-play { background: var(--accent); border-color: var(--accent); color: #062033; font-weight: 600; }
