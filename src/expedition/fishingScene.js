@@ -1,74 +1,11 @@
 import * as THREE from 'three';
-import { BED, GEAR } from './fishingGear.js';
+import { GEAR, RIVER_GEAR } from './fishingGear.js';
 import { getMethod } from './fishingData.js';
+import { buildStage } from './fishingStage.js';
+import { School } from './fishingFx.js';
 
-const SCHOOL = 70;
-
-/** 小さな魚の群れ。set() で指定した位置へ少しずつ移動する */
-class School {
-  constructor(group) {
-    const geo = new THREE.ConeGeometry(0.16, 0.7, 5).rotateZ(-Math.PI / 2);
-    this.mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xbcd3df, metalness: 0.5, roughness: 0.3 }), SCHOOL);
-    this.mesh.frustumCulled = false;
-    group.add(this.mesh);
-    this.c = new THREE.Vector3();
-    this.target = new THREE.Vector3();
-    this.r = 6;
-    this.tr = 6;
-    this.first = true;
-    this.m = new THREE.Matrix4();
-    this.q = new THREE.Quaternion();
-    this.up = new THREE.Vector3(0, 1, 0);
-    this.p = new THREE.Vector3();
-    this.s = new THREE.Vector3(1, 1, 1);
-  }
-
-  set(x, y, z, r) {
-    this.target.set(x, y, z);
-    this.tr = r;
-    if (this.first) {
-      this.c.copy(this.target);
-      this.r = r;
-      this.first = false;
-    }
-  }
-
-  update(dt, t) {
-    const k = Math.min(1, dt * 1.6);
-    this.c.lerp(this.target, k);
-    this.r += (this.tr - this.r) * k;
-    for (let i = 0; i < SCHOOL; i++) {
-      const a = t * (0.5 + (i % 5) * 0.08) + i * 2.4;
-      const rr = this.r * (0.35 + ((i * 37) % 65) / 100);
-      this.p.set(this.c.x + Math.cos(a) * rr, Math.min(-0.4, this.c.y + Math.sin(i * 1.7 + t * 0.7) * this.r * 0.32), this.c.z + Math.sin(a) * rr);
-      this.q.setFromAxisAngle(this.up, -a - Math.PI / 2);
-      this.mesh.setMatrixAt(i, this.m.compose(this.p, this.q, this.s));
-    }
-    this.mesh.instanceMatrix.needsUpdate = true;
-  }
-}
-
-function buildBoat(hullColor = 0x1f5f8b) {
-  const g = new THREE.Group();
-  const white = new THREE.MeshStandardMaterial({ color: 0xf1f3f2, roughness: 0.5 });
-  const hullShape = new THREE.Shape();
-  hullShape.moveTo(-5, 1.3);
-  hullShape.lineTo(-5, -1.3);
-  hullShape.lineTo(3, -1.5);
-  hullShape.quadraticCurveTo(6, -0.6, 6.6, 0);
-  hullShape.quadraticCurveTo(6, 0.6, 3, 1.5);
-  hullShape.closePath();
-  const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(hullShape, { depth: 1.6, bevelEnabled: false }).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: hullColor, roughness: 0.5 }));
-  hull.position.y = -0.5;
-  const house = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.8, 2), white);
-  house.position.set(-1.6, 2, 0);
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 1.8), new THREE.MeshStandardMaterial({ color: 0x24404f, roughness: 0.2 }));
-  bridge.position.set(-1.6, 3.3, 0);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 4, 6), white);
-  mast.position.set(1.5, 2.8, 0);
-  g.add(hull, house, bridge, mast);
-  return g;
-}
+// 作業ごとのカメラ（位置, 注視点）が無い漁法の既定
+const SHOT = { sea: [-34, 19, 42, 0, -5, 0], river: [-22, 11, 32, 0, -1, 0] };
 
 /** 漁法の作業を3Dで再現し、解説を表示する全画面シーン */
 export class FishingScene {
@@ -83,9 +20,11 @@ export class FishingScene {
     this.$('skip').addEventListener('click', () => this._finish());
   }
 
-  /** 作業の再現を再生し、終わると解決する。lastText は最後に表示する結果 */
-  play(methodId, lastText = '') {
-    const method = getMethod(methodId);
+  /** 作業の再現を再生し、終わると解決する。lastText は最後に表示する結果、water は採取地の水域（fishingData.js の waterOf） */
+  play(methodId, lastText = '', water = 'sea') {
+    if (this.renderer) this._close();
+    const method = getMethod(methodId, water);
+    this.water = water;
     this.el.hidden = false;
     this.method = method;
     this.lastText = lastText;
@@ -102,38 +41,13 @@ export class FishingScene {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x9fd8ef);
-    scene.add(new THREE.HemisphereLight(0xf2fbff, 0x35617a, 1.7));
-    const sun = new THREE.DirectionalLight(0xfff4dc, 1.5);
-    sun.position.set(-20, 40, 20);
-    scene.add(sun);
-    const group = new THREE.Group();
-    scene.add(group);
-    // 水中が見える断面の海
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(130, 90, 48, 32).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2f8fb8, transparent: true, opacity: 0.42, roughness: 0.2, depthWrite: false, side: THREE.DoubleSide }));
-    const water = new THREE.Mesh(new THREE.BoxGeometry(130, -BED, 90), new THREE.MeshBasicMaterial({ color: 0x1c6f96, transparent: true, opacity: 0.2, depthWrite: false }));
-    water.position.y = BED / 2;
-    const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 110, 34, 22).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xb9a878, roughness: 1, flatShading: true }));
-    const pos = bed.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i++) pos.setY(i, Math.sin(pos.getX(i) * 0.4) * 0.3 + Math.cos(pos.getZ(i) * 0.5) * 0.3);
-    bed.geometry.computeVertexNormals();
-    bed.position.y = BED;
-    group.add(bed, water, sea);
-    const makeBoat = (hull) => {
-      const b = buildBoat(hull);
-      group.add(b);
-      b.place = (x, z, yaw) => {
-        b.position.x = x;
-        b.position.z = z;
-        b.rotation.y = yaw;
-      };
-      return b;
-    };
-    const boat = makeBoat();
-    const school = new School(group);
-    const update = GEAR[method.id]({ group, boat, makeBoat, school, bed, scene });
-    const camera = new THREE.PerspectiveCamera(46, 1, 0.5, 300);
-    this.view = { scene, camera, sea, boat, school, update };
+    const river = !!method.river;
+    const stage = buildStage(scene, { river, still: this.water === 'lake' });
+    const boat = stage.makeBoat();
+    const school = new School(stage.group, river ? { count: 60, len: 0.6, color: 0xe6eed2, floor: stage.bedY } : {});
+    const update = (river ? RIVER_GEAR : GEAR)[method.id]({ group: stage.group, scene, boat, school, makeBoat: stage.makeBoat, bedY: stage.bedY, flow: stage.flow, time: stage.setTime, scroll: stage.scroll });
+    const camera = new THREE.PerspectiveCamera(46, 1, 0.5, 500);
+    this.view = { scene, camera, stage, school, update, shots: update.shots ?? [], base: river ? SHOT.river : SHOT.sea, pos: new THREE.Vector3(), look: new THREE.Vector3(), cut: true };
     this.stepIndex = 0;
     this.stepTime = 0;
     this.time = 0;
@@ -149,10 +63,24 @@ export class FishingScene {
     this.renderer.setSize(w, h, false);
     const { camera } = this.view;
     camera.aspect = w / h;
-    const k = Math.max(1, 1.05 / camera.aspect);
-    camera.position.set(-34 * k, 19 * k, 42 * k);
-    camera.lookAt(0, -5, 0);
+    // 下の説明カードに隠れないよう、景色を少し上へ寄せる
+    camera.setViewOffset(w, h, 0, h * 0.1, w, h);
+    this.view.far = Math.max(1, 1.05 / camera.aspect); // 縦長の画面では引いて全体を入れる
     camera.updateProjectionMatrix();
+  }
+
+  /** 作業ごとの見せ場へカメラをなめらかに移す */
+  _aim(dt) {
+    const v = this.view;
+    const s = v.shots[this.stepIndex] ?? v.base;
+    const look = new THREE.Vector3(s[3], s[4], s[5]);
+    const pos = new THREE.Vector3(s[0], s[1], s[2]).sub(look).multiplyScalar(v.far).add(look);
+    const k = v.cut ? 1 : 1 - Math.exp(-dt * 1.6);
+    v.cut = false;
+    v.pos.lerp(pos, k);
+    v.look.lerp(look, k);
+    v.camera.position.copy(v.pos);
+    v.camera.lookAt(v.look);
   }
 
   _showStep() {
@@ -174,11 +102,8 @@ export class FishingScene {
     const v = this.view;
     v.update(this.stepIndex, p, this.time);
     v.school.update(dt, this.time);
-    v.boat.position.y = Math.sin(this.time * 1.3) * 0.12;
-    v.boat.rotation.z = Math.sin(this.time * 0.9) * 0.025;
-    const pos = v.sea.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i++) pos.setY(i, Math.sin(pos.getX(i) * 0.35 + this.time * 1.4) * 0.14 + Math.cos(pos.getZ(i) * 0.4 + this.time) * 0.1);
-    pos.needsUpdate = true;
+    v.stage.tick(dt, this.time);
+    this._aim(dt);
     this.$('bar').style.width = `${((this.stepIndex + p) / steps.length) * 100}%`;
     this.renderer.render(v.scene, v.camera);
     if (p < 1) return;
@@ -201,19 +126,28 @@ export class FishingScene {
 
   _finish() {
     if (this.lastText) return this._complete();
+    this._close();
+    this.el.hidden = true;
+    this.resolve?.();
+    this.resolve = null;
+  }
+
+  /** 描画を止めて後片付けする */
+  _close() {
+    if (!this.renderer) return;
     this.renderer.setAnimationLoop(null);
+    this.view.scene.background?.dispose?.();
     this.view.scene.traverse((o) => {
       o.geometry?.dispose();
+      o.material?.map?.dispose();
       o.material?.dispose();
     });
     this.renderer.dispose();
     this.renderer.forceContextLoss();
+    this.renderer = null;
     // 使い終えた canvas は作り直す（失われた描画コンテキストを再利用しない）
     const old = this.$('canvas');
     const fresh = old.cloneNode();
     old.replaceWith(fresh);
-    this.el.hidden = true;
-    this.resolve?.();
-    this.resolve = null;
   }
 }
