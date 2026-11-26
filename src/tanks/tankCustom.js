@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ROCK_SHAPES } from './interiorBuilder.js';
 import { CATEGORY, CATEGORY_LABELS } from './tankData.js';
 import { EMBED_RATIO_MIN, EMBED_RATIO_MAX } from '../room/embed.js';
 import { normalizeLook, PALETTE, FRAME_COLORS } from './tankLook.js';
@@ -35,8 +36,8 @@ export function format(fmt, v) {
  * パネルの追加セクション：岩肌ブラシ（ライブロック）、成長（サンゴ・流木・海藻）、壁埋め込み（水槽・館内編集時）
  */
 export class TankCustomizer {
-  constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode, getFloraRadius, stairsTo }) {
-    Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getBrush, getGrowMode, getFloraRadius, stairsTo });
+  constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getGrowMode, getFloraRadius, stairsTo }) {
+    Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getGrowMode, getFloraRadius, stairsTo });
     this.selected = null;
     this.helper = null;
     this.allowEmbed = false;
@@ -148,7 +149,7 @@ export class TankCustomizer {
       ${def.stairs ? this._stairsSection(obj) : ''}
       ${isTank && this.allowEmbed && !def.atrium ? this._embedSection(obj) : ''}
       ${obj.userData.interiorItem && obj.userData.locked ? '<p class="note">ロック中です。「ロック解除」で移動・回転・編集ができます（解除できるのは1つだけ。ほかの物は自動でロックされます）</p>' : `
-      ${def.shape === 'liveRock' && this.getBrush ? this._sculptSection(def) : ''}
+      ${def.shape === 'liveRock' && obj.userData.interiorItem && !obj.userData.locked ? this._rockShapeSection(obj) : ''}
       ${def.flora && this.getGrowMode ? this._floraSection(obj, def) : def.growth && this.getGrowMode ? this._growthSection(obj) : ''}`}
       ${def.bubbles ? `<div class="section"><h4>泡の量</h4>${slider('bubbles', '泡', 0, 1, 0.05, obj.userData.bubbles ?? 0.5, '%')}</div>` : ''}`;
   }
@@ -223,15 +224,12 @@ export class TankCustomizer {
       <div class="actions"><button data-action="unembed">壁から外す</button></div></div>`;
   }
 
-  _sculptSection(def) {
-    const b = this.getBrush();
-    const maxR = Math.max(0.03, Math.min(def.size.w, def.size.d) * 0.5);
-    const radius = Math.min(b.radius, maxR);
-    const btn = (mode, label) => `<button data-action="brush-${mode ?? 'off'}" class="${b.mode === mode ? 'active' : ''}">${label}</button>`;
-    return `<div class="section"><h4>岩肌ブラシ</h4>
-      <div class="seg">${btn(null, 'オフ')}${btn('inflate', '⬆ 盛る')}${btn('deflate', '⬇ 削る')}</div>
-      ${slider('brush-radius', '半径', 0.01, maxR.toFixed(3), 0.005, radius, 'cm')}
-      ${slider('brush-strength', '強さ', 0.1, 1, 0.05, b.strength, '%')}</div>`;
+  /** 岩の形（数種類から選ぶ・くじで変える） */
+  _rockShapeSection(obj) {
+    const cur = obj.userData.shape ?? 0;
+    const btns = ROCK_SHAPES.map((sh, i) => `<button data-action="rockshape-${i}" class="${i === cur ? 'active' : ''}">${sh.label}</button>`).join('');
+    return `<div class="section"><h4>岩の形</h4><div class="seg wrap">${btns}</div>
+      <div class="actions"><button data-action="rockshape-random">🎲 別の形にする</button></div></div>`;
   }
 
   /** 流木の編集（枝を増やす・伸ばす・太くする） */

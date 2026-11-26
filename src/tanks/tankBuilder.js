@@ -22,7 +22,7 @@ function addSurface(parent, geometry, y, x = 0) {
  * 戻り値の root は底面が y=0、中心が x=z=0 のローカル座標系。
  * root.children: 'body'（見た目）と 'contents'（水槽内オブジェ用の子グループ）。
  */
-export function buildObject(def, { seed = 1, growth } = {}) {
+export function buildObject(def, { seed = 1, growth, shape } = {}) {
   const flora = def.flora ? normalizeFlora(def, growth) : null;
   const g = flora ? flora.growth : def.growth ? normalizeGrowth(growth) : undefined;
   const root = new THREE.Group();
@@ -33,6 +33,7 @@ export function buildObject(def, { seed = 1, growth } = {}) {
     root.userData.interiorItem = true;
     root.userData.seed = seed;
     if (g) root.userData.growth = g;
+    if (def.shape === 'liveRock') root.userData.shape = shape ?? 0; // 岩の形（ROCK_SHAPES の番号）
     if (flora?.legacy) root.userData.conform = true; // 以前の形式から読み替えた：置いたあと地形に沿わせ直す
   } else {
     root.userData.placeable = true;
@@ -44,7 +45,7 @@ export function buildObject(def, { seed = 1, growth } = {}) {
 
   const builder = BUILDERS[def.shape];
   if (!builder) throw new Error(`No builder for shape: ${def.shape}`);
-  builder(body, def, { seed, growth: g });
+  builder(body, def, { seed, growth: g, shape: shape ?? 0 });
 
   if (def.category === CATEGORY.TANK) {
     // 水槽内レイアウト用の情報（ローカル座標）と子要素グループ
