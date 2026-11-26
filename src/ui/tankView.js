@@ -18,8 +18,8 @@ const span = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}時間${Math.floor((s %
  * エサと掃除の処理は既存の CareView / CleanView に任せる。
  */
 export class TankView {
-  constructor({ manager, expeditions, economy, previews, toast, careView, cleanView, onInterior, onGrow, onChanged, lookHtml }) {
-    Object.assign(this, { manager, expeditions, economy, previews, toast, careView, cleanView, onInterior, onGrow, onChanged, lookHtml });
+  constructor({ manager, expeditions, economy, previews, toast, careView, cleanView, onInterior, onGrow, onChanged, lookHtml, onShare }) {
+    Object.assign(this, { manager, expeditions, economy, previews, toast, careView, cleanView, onInterior, onGrow, onChanged, lookHtml, onShare });
     this.tab = 'manage';
     this.tank = null;
     this.adding = false;
@@ -49,7 +49,8 @@ export class TankView {
     const tab = (id, label) => `<button data-act="tv-tab" data-id="${id}" class="${this.tab === id ? 'active' : ''}">${label}</button>`;
     const body = this.tab === 'look' ? `<div class="tv-look">${this.lookHtml(t)}</div>` : this._main(t);
     return `<div class="seg tv-tabs">${tab('manage', '🐟 生物・飼育')}${tab('look', '🎨 見た目')}</div>${body}
-      <button data-act="tank-interior" class="tv-wide">✎ 水槽内レイアウトを編集</button>`;
+      <button data-act="tank-interior" class="tv-wide">✎ 水槽内レイアウトを編集</button>
+      ${this.onShare ? '<button data-act="tank-share" class="tv-wide">🔗 この水槽を共有（LINE・インスタなど）</button>' : ''}`;
   }
 
   _main(t) {
@@ -150,6 +151,7 @@ export class TankView {
     else if (act === 'tank-show') this._show(t, id);
     else if (act === 'tank-unshow') this._unshow(t, id);
     else if (act === 'tank-interior') this.onInterior(t);
+    else if (act === 'tank-share') this.onShare?.(t);
     else if (act === 'tank-grow') this.onGrow?.(id);
     else return false;
     return true;

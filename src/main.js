@@ -1166,6 +1166,7 @@ async function boot() {
     // 館内レイアウト編集から開いたときは、水槽内の編集を終えたら館内レイアウト編集へ戻る
     onInterior: (tank) => enterInteriorEdit(tank, mode === 'hall-edit' ? 'hall' : 'tank'),
     lookHtml: (tank) => customizer.lookHtml(tank),
+    onShare: (tank) => shareTank(tank),
     onGrow: (id) => {
       life.panels.zukan.view.focus(id); // 図鑑の育成カードを開く
       gameSheet.openPanel('zukan');
