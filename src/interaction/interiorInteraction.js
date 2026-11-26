@@ -6,7 +6,8 @@ import { specOf, fitToDepth } from '../flora/floraBuilder.js';
 import { floorAt } from '../tanks/tankClip.js';
 import { getDef } from '../tanks/tankData.js';
 import { REFUND_RATE } from '../management/stageData.js';
-import { BRUSH_DEFAULTS, sculptAt, createBrushCursor } from '../interior/sculpt.js';
+import { createBrushCursor } from '../interior/brushCursor.js';
+import { ROCK_SHAPES } from '../tanks/interiorBuilder.js';
 
 const CLICK_TOLERANCE = 5; // px
 const ROTATE_STEP = Math.PI / 4;
@@ -19,8 +20,8 @@ const EMBED = 0.12; // 岩などを他のオブジェの上に積むとき、少
  * - 高さ（Y）は制限しない
  */
 export class InteriorInteraction {
-  constructor({ sceneMgr, cameraCtl, manager, economy, customizer, toast, onPlacementChange, onChanged, onExitRequest, onBrushChange, onGrowChange, onHistory }) {
-    Object.assign(this, { sceneMgr, cameraCtl, manager, economy, customizer, toast, onPlacementChange, onChanged, onExitRequest, onBrushChange, onGrowChange });
+  constructor({ sceneMgr, cameraCtl, manager, economy, customizer, toast, onPlacementChange, onChanged, onExitRequest, onGrowChange, onHistory }) {
+    Object.assign(this, { sceneMgr, cameraCtl, manager, economy, customizer, toast, onPlacementChange, onChanged, onExitRequest, onGrowChange });
     // 巻き戻し（最大10手）
     this.history = new InteriorHistory({ manager, economy, onChange: (h) => onHistory?.(h) });
     this.dom = sceneMgr.renderer.domElement;
@@ -32,9 +33,7 @@ export class InteriorInteraction {
     this.drag = null;
     this.down = null;
 
-    // 岩肌ブラシ
-    this.brush = { ...BRUSH_DEFAULTS };
-    this.sculpting = null; // { item }
+    // 生き物オブジェのブラシの輪
     this.cursor = createBrushCursor();
     sceneMgr.scene.add(this.cursor);
     this._n = new THREE.Vector3();
@@ -66,7 +65,6 @@ export class InteriorInteraction {
   }
 
   detach() {
-    this.setBrush('mode', null);
     this.setGrowMode(null);
     this.cancelPlacement();
     this.customizer.deselect();
@@ -82,8 +80,7 @@ export class InteriorInteraction {
     if (!locked) for (const o of this.manager.interiorItems(this.tank ?? item.parent?.parent)) if (o !== item) o.userData.locked = true;
     item.userData.locked = locked;
     if (locked) {
-      this.setBrush('mode', null);
-      this.setGrowMode(null);
+        this.setGrowMode(null);
     }
     this.customizer.syncLock();
     this.customizer.renderPanel();
@@ -96,7 +93,6 @@ export class InteriorInteraction {
     const refund = items.reduce((s, it) => s + Math.floor(getDef(it.userData.defId).price * REFUND_RATE), 0);
     if (!confirm(`水槽内のオブジェ ${items.length} 個をすべて撤去します（払い戻し ¥${refund.toLocaleString('ja-JP')}）。\n「↶ 戻す」で元に戻せます。よろしいですか？`)) return;
     this.cancelPlacement();
-    this.setBrush('mode', null);
     this.setGrowMode(null);
     this.customizer.deselect();
     this.history.record('レイアウトのクリア');
@@ -109,9 +105,8 @@ export class InteriorInteraction {
 
   /** 1手戻す（ボタン・Ctrl+Z） */
   undo() {
-    if (!this.enabled || this.drag || this.sculpting || this.growing) return;
+    if (!this.enabled || this.drag || this.growing) return;
     this.cancelPlacement();
-    this.setBrush('mode', null);
     this.setGrowMode(null);
     this.customizer.deselect();
     const label = this.history.undo();
@@ -188,60 +183,24 @@ export class InteriorInteraction {
     return locked;
   }
 
-  // ---- 岩肌スカルプト -------------------------------------------------------
+  // ---- 岩の形 ---------------------------------------------------------------
 
-  setBrush(key, value) {
-    if (this.brush[key] === value) return;
-    this.brush[key] = value;
-    if (key === 'mode') {
-      if (value) {
-        this.cancelPlacement();
-        this.growMode = null;
-      }
-      this.cursor.visible = false;
-      this.onBrushChange?.(value);
-      this.customizer.renderPanel();
+  /** 岩の形を変える（shape：ROCK_SHAPES の番号。'random' なら今と違う形をくじで選ぶ） */
+  setRockShape(item, shape) {
+    if (!item?.userData.interiorItem || item.userData.locked || getDef(item.userData.defId).shape !== 'liveRock') return;
+    const cur = item.userData.shape ?? 0;
+    let next = shape;
+    if (shape === 'random') {
+      do next = Math.floor(Math.random() * ROCK_SHAPES.length);
+      while (next === cur && ROCK_SHAPES.length > 1);
     }
-  }
-
-  /** 選択中のライブロックで、そのサイズに収まるブラシ半径 */
-  _brushRadius(item) {
-    const { w, d } = getDef(item.userData.defId).size;
-    return Math.min(this.brush.radius, Math.max(0.03, Math.min(w, d) * 0.5));
-  }
-
-  /** ブラシ有効時、選択中のライブロック表面へのヒット */
-  _rockHit() {
-    const sel = this.customizer.selected;
-    if (!this.brush.mode || !sel?.userData.interiorItem || sel.userData.locked) return null;
-    const rock = sel.getObjectByName('rock');
-    if (!rock) return null;
-    return this.raycaster.intersectObject(rock, false)[0] ?? null;
-  }
-
-  _updateCursor(hit) {
-    if (!hit) {
-      this.cursor.visible = false;
-      return;
-    }
-    const n = this._n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
-    this.cursor.position.copy(hit.point).addScaledVector(n, 0.002);
-    this.cursor.lookAt(hit.point.clone().add(n));
-    this.cursor.scale.setScalar(this._brushRadius(this.customizer.selected));
-    this.cursor.material.color.set(this.brush.mode === 'deflate' ? 0xff8a8a : 0x8affc1);
-    this.cursor.visible = true;
-  }
-
-  _stroke(hit) {
-    const mesh = hit.object;
-    const center = mesh.worldToLocal(hit.point.clone());
-    const normal = hit.face.normal.clone(); // ジオメトリ（メッシュローカル）空間の法線
-    sculptAt(mesh, center, normal, {
-      mode: this.brush.mode,
-      radius: this._brushRadius(this.customizer.selected),
-      strength: this.brush.strength,
-    });
-    this._updateCursor(hit);
+    if (next === cur && shape !== 'random') return;
+    this.history.record('岩の形');
+    this.manager.reshapeRock(item, next, shape === 'random');
+    // 岩に付いていたサンゴ・海藻を、新しい岩肌に沿わせ直す
+    for (const o of this.manager.interiorItems(this.tank)) if (o !== item) this._conform(o);
+    this.customizer.renderPanel();
+    this.onChanged?.();
   }
 
   // ---- 成長 -----------------------------------------------------------------
@@ -250,7 +209,6 @@ export class InteriorInteraction {
     if (this.growMode === mode) return;
     this.growMode = mode;
     this.cursor.visible = false;
-    if (mode) this.setBrush('mode', null);
     this.onGrowChange?.(mode);
     this.customizer.renderPanel();
   }
@@ -352,14 +310,9 @@ export class InteriorInteraction {
     return true;
   }
 
-  /** 毎フレーム：ボタンを押している間はポインタ位置を盛り続ける／削り続ける */
+  /** 毎フレーム：成長の作り直し */
   update() {
     this._updateGrowth();
-    if (!this.sculpting) return;
-    this._setPointer(this.sculpting.event);
-    const hit = this._rockHit();
-    if (hit) this._stroke(hit);
-    else this.cursor.visible = false;
   }
 
   // ---- 新規配置 -------------------------------------------------------------
@@ -444,7 +397,6 @@ export class InteriorInteraction {
   }
 
   remove(item) {
-    this.setBrush('mode', null);
     this.setGrowMode(null);
     const def = getDef(item.userData.defId);
     this.customizer.deselect();
@@ -459,9 +411,8 @@ export class InteriorInteraction {
   // ---- イベント -------------------------------------------------------------
 
   _abortGesture() {
-    if (this.drag || this.sculpting || this.growing) this.cameraCtl.setEnabled(true);
+    if (this.drag || this.growing) this.cameraCtl.setEnabled(true);
     this.drag = null;
-    this.sculpting = null;
     this.growing = null;
     this.down = null;
   }
@@ -497,14 +448,6 @@ export class InteriorInteraction {
       return;
     }
 
-    const rockHit = this._rockHit();
-    if (rockHit) {
-      this.cameraCtl.setEnabled(false);
-      this.history.record('岩肌の編集');
-      this.sculpting = { item: this.customizer.selected, event: e };
-      return;
-    }
-
     const item = this._pick();
     if (!item) return;
     this.customizer.select(item);
@@ -533,21 +476,11 @@ export class InteriorInteraction {
       this._updateGhost();
       return;
     }
-    if (this.sculpting) {
-      this.sculpting.event = e; // 実際の変形は update() で毎フレーム
-      return;
-    }
     if (e.buttons === 0 && e.target === this.dom && this._floraTarget()) {
       // ブラシの輪をポインタの下の面に出す
       this._setPointer(e);
       resetFloraTargets(this);
       this._floraCursor(this._floraTarget(), floraHit(this, this._floraTarget()));
-      this.dom.style.cursor = this.cursor.visible ? 'crosshair' : '';
-      return;
-    }
-    if (this.brush.mode && e.buttons === 0 && e.target === this.dom) {
-      this._setPointer(e);
-      this._updateCursor(this._rockHit());
       this.dom.style.cursor = this.cursor.visible ? 'crosshair' : '';
       return;
     }
@@ -596,12 +529,6 @@ export class InteriorInteraction {
       }
       return;
     }
-    if (this.sculpting) {
-      this.sculpting.item.userData.sculpted = true;
-      this.sculpting = null;
-      this.cameraCtl.setEnabled(true);
-      return;
-    }
     if (this.drag) {
       const moved = this.drag.obj;
       this.drag = null;
@@ -613,8 +540,7 @@ export class InteriorInteraction {
     }
     // 何も無い所をタップしたら選択を外す
     if (clicked && !down.item) {
-      this.setBrush('mode', null);
-      this.setGrowMode(null);
+        this.setGrowMode(null);
       this.customizer.deselect();
     }
   };
@@ -626,8 +552,7 @@ export class InteriorInteraction {
       e.preventDefault();
       this.undo();
     } else if (e.key === 'Escape') {
-      if (this.brush.mode) this.setBrush('mode', null);
-      else if (this.growMode) this.setGrowMode(null);
+      if (this.growMode) this.setGrowMode(null);
       else if (this.placing) this.cancelPlacement();
       else if (sel) this.customizer.deselect();
       else this.onExitRequest?.();

@@ -100,7 +100,6 @@ const HINT = {
   hall: 'タップで選択・ドラッグで移動 ・ 何もない所のドラッグで画面を移動 / 2本指でズーム',
   place: '床をタップして設置 ・ もう一度カードを押すとキャンセル',
   interior: 'ドラッグで移動（岩の上にも積める）・ はみ出した部分はガラス面でカット',
-  sculpt: '岩肌をなぞって{mode} ・ 2本指で視点操作',
   grow: 'パネルの説明どおりに本体をドラッグ ・ 2本指で視点操作',
 };
 
@@ -321,17 +320,14 @@ async function boot() {
     panelEl: $('detail-panel'),
     gizmoEl: $('gizmo'),
     getDef,
-    getBrush: () => interior.brush,
     stairsTo,
     getGrowMode: () => interior.growMode,
     getFloraRadius: () => interior.floraRadius,
     onAction: (action, obj, value) => {
-      if (action.startsWith('brush-')) return interior.setBrush('mode', action === 'brush-off' ? null : action.slice(6));
+      if (action.startsWith('rockshape-')) return interior.setRockShape(obj, action === 'rockshape-random' ? 'random' : +action.slice(10));
       if (action.startsWith('grow-')) return interior.setGrowMode(action === 'grow-off' ? null : action.slice(5));
       if (action === 'param-flora-size') return interior.setFloraSize(obj, value);
       if (action === 'param-flora-radius') return (interior.floraRadius = value);
-      if (action === 'param-brush-radius') return interior.setBrush('radius', value);
-      if (action === 'param-brush-strength') return interior.setBrush('strength', value);
       if (action === 'param-embed-ratio') return hall.setEmbedParam(obj, 'ratio', value);
       if (action === 'param-embed-bottom') return hall.setEmbedParam(obj, 'bottom', value);
       if (action === 'embed') return hall.embed(obj);
@@ -520,7 +516,6 @@ async function boot() {
     },
     onChanged: () => shell.update(),
     onExitRequest: () => onDone(),
-    onBrushChange: (m) => shell.setHint(m ? HINT.sculpt.replace('{mode}', m === 'inflate' ? '盛る' : '削る') : HINT.interior),
     onGrowChange: (m) => shell.setHint(m ? HINT.grow : HINT.interior),
     // 元に戻すボタン：水槽内編集の間だけ出し、戻せる操作が無ければ押せない
     onHistory: (h) => {

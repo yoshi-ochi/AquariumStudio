@@ -3,7 +3,7 @@ import { getDef, hasDef, CATEGORY } from './tankData.js';
 import { buildObject, disposeObject } from './tankBuilder.js';
 import { createClipUniforms, updateClipUniforms, applyClip, floorAt } from './tankClip.js';
 import { conformFlora } from '../flora/floraSurface.js';
-import { encodePositions, applyEncodedPositions, rememberBase } from '../interior/sculpt.js';
+import { ROCK_SHAPES } from './interiorBuilder.js';
 import { applyTankLook, normalizeLook } from './tankLook.js';
 import { applySand } from './sandLook.js';
 import { updateBubbles } from './aeration.js';
@@ -88,20 +88,35 @@ export class TankManager {
   }
 
   /** 水槽内オブジェを生成してクリップを適用する（座標は水槽ローカル） */
-  createInterior(tank, defId, { x = 0, y, z = 0, rotY = 0, seed, sculpt, growth, bubbles, locked } = {}) {
+  createInterior(tank, defId, { x = 0, y, z = 0, rotY = 0, seed, shape, growth, bubbles, locked } = {}) {
     y ??= floorAt(tank.userData.interior, x); // 高さの指定が無ければ床（底砂を敷いていれば砂の上面）
     const def = getDef(defId);
-    const item = buildObject(def, { seed: seed ?? Math.floor(Math.random() * 2 ** 31), growth });
+    // 新しく置く岩は形の種類をくじで選ぶ。保存から読む岩で形の指定が無いもの（以前の版）は丸い岩
+    // （岩肌のスカルプトは廃止。以前の保存の sculpt は読まない）
+    if (def.shape === 'liveRock' && shape === undefined && seed === undefined) shape = Math.floor(Math.random() * ROCK_SHAPES.length);
+    const item = buildObject(def, { seed: seed ?? Math.floor(Math.random() * 2 ** 31), growth, shape });
     if (bubbles !== undefined) item.userData.bubbles = bubbles;
     if (locked) item.userData.locked = true;
-    const rock = item.getObjectByName('rock');
-    if (rock) rememberBase(rock.geometry);
-    if (sculpt && rock && applyEncodedPositions(rock.geometry, sculpt)) item.userData.sculpted = true;
     item.position.set(x, y, z);
     item.rotation.y = rotY;
     applyClip(item, tank.userData.clip);
     this.contentsOf(tank).add(item);
     return item;
+  }
+
+  /** 岩の形の種類を変えて作り直す。reroll なら凹凸の模様（seed）も変える */
+  reshapeRock(item, shape, reroll = false) {
+    const def = getDef(item.userData.defId);
+    if (reroll) item.userData.seed = Math.floor(Math.random() * 2 ** 31);
+    const fresh = buildObject(def, { seed: item.userData.seed, shape });
+    const oldBody = item.getObjectByName('body');
+    const newBody = fresh.getObjectByName('body');
+    item.remove(oldBody);
+    disposeObject(oldBody);
+    item.add(newBody);
+    item.userData.shape = shape;
+    const tank = item.parent?.parent;
+    if (tank?.userData.clip) applyClip(newBody, tank.userData.clip);
   }
 
   /** 成長パラメータを変えて水槽内オブジェの形を作り直す（seed は同じ） */
@@ -130,7 +145,7 @@ export class TankManager {
       ...(c.userData.growth && { growth: roundGrowth(c.userData.growth) }),
       ...(c.userData.locked && { locked: true }),
       ...(c.userData.bubbles !== undefined && { bubbles: c.userData.bubbles }),
-      ...(c.userData.sculpted && { sculpt: encodePositions(c.getObjectByName('rock').geometry) }),
+      ...(c.userData.shape && { shape: c.userData.shape }),
     }));
   }
 
