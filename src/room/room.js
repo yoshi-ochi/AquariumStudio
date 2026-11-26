@@ -538,13 +538,15 @@ export class Room {
     mesh.receiveShadow = true;
     mesh.castShadow = true;
     // カメラと注視点の間に入ったら低くする（updateOcclusion）
-    if (height > 1) mesh.userData.wall = { axis: run.axis, line: run.line, from: run.from, to: run.to, H };
+    if (height > 1) mesh.userData.wall = { axis: run.axis, line: run.line, from: run.from, to: run.to, H, key: run.key, normal: run.normal };
     return mesh;
   }
 
   /**
    * カメラと注視点（水槽など）の間をさえぎる壁を、床すれすれまで下げる（足元の線だけ残す）。離れたら元に戻す。
    * 上から見下ろして壁の上を越える視線のときは下げない。
+   * 壁に埋め込んだ水槽を正面（部屋の側）から見ているときは、その水槽の壁は下げない（水槽の中心は壁の奥にあるため、
+   * 近づくと視線が壁を横切る。下げると埋め込んだ姿が見えなくなる）
    */
   updateOcclusion(cam, target, dt) {
     const LOW = 0.06;
@@ -561,11 +563,23 @@ export class Room {
         const along = w.axis === 'x' ? cam.x + dx * t : cam.z + dz * t;
         const y = cam.y + (target.y - cam.y) * t;
         block = along >= w.from - 0.3 && along <= w.to + 0.3 && y < w.H + 0.2;
+        if (block && this._framesTarget(w, cam, target)) block = false;
       }
       const want = block ? Math.min(1, LOW / w.H) : 1;
       const s = m.scale.y + (want - m.scale.y) * k;
       m.scale.y = Math.abs(s - want) < 0.002 ? want : s;
     }
+  }
+
+  /** 注視点が、この壁に埋め込んだ水槽（壁の穴とその奥）にあり、カメラが水槽の正面の側にいるか */
+  _framesTarget(w, cam, target) {
+    if (!w.key || !w.normal) return false;
+    const [nx, nz] = w.normal;
+    const side = (p) => (w.axis === 'x' ? (p.z - w.line) * nz : (p.x - w.line) * nx); // 部屋の側（正面）が正
+    if (side(cam) <= 0) return false;
+    const at = w.axis === 'x' ? target.x : target.z;
+    const off = side(target);
+    return this.holes.some((h) => h.key === w.key && Math.abs(at - h.along) <= h.width / 2 + 0.3 && off <= 0.8 && off >= -((h.depth ?? 0.6) + 0.6));
   }
 
   /** 外壁の外側に、埋め込み水槽を囲うコンクリートの箱（前面は壁の穴）を作る */
