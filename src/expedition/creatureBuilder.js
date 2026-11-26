@@ -504,10 +504,12 @@ function shapeOf(c) {
       return geo;
     };
     const clear = parts.filter((g) => g.userData.clear); // ひれの透ける膜
-    const geo = merge(parts.filter((g) => !g.userData.clear));
+    const glow = parts.filter((g) => g.userData.glow); // 発光器
+    const geo = merge(parts.filter((g) => !g.userData.clear && !g.userData.glow));
     const clearGeo = clear.length ? merge(clear) : null;
+    const glowGeo = glow.length ? merge(glow) : null;
     parts.forEach((g) => g.dispose());
-    return { geo, clearGeo, mode, opacity };
+    return { geo, clearGeo, glowGeo, mode, opacity };
   };
   s = make(ANATOMY[c.id]);
   const lite = ANATOMY[`${c.id}__lite`];
@@ -525,10 +527,10 @@ export function buildCreature(c) {
   const root = new THREE.Group();
   root.userData.creature = c.id;
   const shape = shapeOf(c);
-  const { geo, clearGeo, mode, opacity } = shape;
+  const { geo, clearGeo, glowGeo, mode, opacity } = shape;
   const sw = swimOf(c);
   // 水紋の uniform（uCauOn など）：水槽に入れたら、その水槽のものに差し替える（tankLife.js）
-  const uni = { uTime: { value: 0 }, uMode: { value: mode }, uWave: { value: shape.wave }, uSwimA: { value: new THREE.Vector4(...sw.a) }, uSwimB: { value: new THREE.Vector4(...sw.b) }, uSwimC: { value: new THREE.Vector4(...sw.c) }, ...causticUniforms(0) };
+  const uni = { uTime: { value: 0 }, uGlow: { value: 1 }, uMode: { value: mode }, uWave: { value: shape.wave }, uSwimA: { value: new THREE.Vector4(...sw.a) }, uSwimB: { value: new THREE.Vector4(...sw.b) }, uSwimC: { value: new THREE.Vector4(...sw.c) }, ...causticUniforms(0) };
   // 色は焼き込み済みなので、館内の照明に左右されない
   const addMesh = (g, alpha, parent = root) => {
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide, transparent: alpha < 1, opacity: alpha, depthWrite: alpha >= 1 });
@@ -560,6 +562,22 @@ export function buildCreature(c) {
   } else {
     addMesh(geo, opacity);
     if (clearGeo) addMesh(clearGeo, 0.38);
+  }
+  if (glowGeo) {
+    // 発光器：体と一緒に泳ぎ（同じ頂点シェーダー）、色を足して光らせる。uGlow（0〜1）で明るさを変える
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uni);
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', VERT_DECL).replace('#include <begin_vertex>', VERT_BODY);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', 'uniform float uGlow;\n#include <common>').replace('#include <dithering_fragment>', 'gl_FragColor.rgb *= uGlow;\n#include <dithering_fragment>');
+    };
+    mat.customProgramCacheKey = () => 'creature-glow';
+    const mesh = new THREE.Mesh(glowGeo, mat);
+    mesh.scale.setScalar(c.len);
+    mesh.raycast = () => {};
+    mesh.renderOrder = 2;
+    root.add(mesh);
+    root.userData.glows = true;
   }
   root.userData.uni = uni;
   return root;

@@ -308,6 +308,19 @@ export function tracedParts(c, a) {
     }
   }
   parts.push(face.build());
+  // 発光器（ホタルイカなど）：体表の点を別の形にする。加算合成で光らせ、明るさは水槽の明るさで変える（tankLife.js）
+  if (a.glow) {
+    const glow = new Mesh();
+    for (const [x, y, r] of a.glow.pts) {
+      for (const s of [-1, 1]) {
+        flatSpot(glow, a, P, [x, y], r * 2.4, 8, a.glow.halo, s);
+        flatSpot(glow, a, P, [x, y], r, 6, a.glow.hex, s);
+      }
+    }
+    const g = glow.build();
+    g.userData.glow = true;
+    parts.push(g);
+  }
   // 画像に写っている面（-Z 側）を背側へ向ける。逆に回すと左右が反転する
   if (a.topView) parts.forEach((g) => g.rotateX(Math.PI / 2));
   return parts;
