@@ -395,6 +395,7 @@ body.map-open #side-actions, body.map-open #hint { display: none; }
 #goal-card[hidden], body:not([data-mode=home]) #goal-card, body.map-open #goal-card, body.visiting #goal-card { display: none; }
 #goal-card small { color: #a9d3e6; font-size: 10px; }
 #goal-card button { min-height: 32px; padding: 3px 8px; font-size: 12px; }
+#goal-card .goal-prog { color: #fff; font-size: 11px; font-weight: 600; }
 #offline-report { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 70; display: flex; flex-direction: column; gap: 8px; width: min(320px, calc(100vw - 32px)); padding: 16px; background: #fff; border: 3px solid var(--bar-line); border-radius: 14px; }
 #offline-report[hidden] { display: none; }
 #offline-report h3, #offline-report p { margin: 0; }
