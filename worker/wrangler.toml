@@ -1,0 +1,9 @@
+# 水槽の共有 URL（リンクの絵）を返す Cloudflare Worker。公開は npm run share:deploy（Supabase の URL と公開キーは .env.local から渡す）
+name = "aquastu-share"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+VIEWER_URL = "https://yoshi-ochi.github.io/AquariumStudio/share.html"
+APP_URL = "https://yoshi-ochi.github.io/AquariumStudio/"
+DEFAULT_IMAGE = "https://yoshi-ochi.github.io/AquariumStudio/og.png"

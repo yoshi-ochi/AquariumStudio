@@ -724,3 +724,13 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 /* 水槽内編集の「元に戻す」 */
 #btn-undo { margin-right: 6px; background: #fff; color: #1d3a52; }
 #btn-undo:disabled { opacity: 0.45; cursor: default; }
+
+/* 水槽の共有（src/share/shareSheet.js） */
+.sh-back { position: fixed; inset: 0; z-index: 3000; background: rgba(6, 16, 24, 0.55); display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+.sh-sheet { width: 100%; max-width: 420px; background: #fff; color: #16303f; border-radius: 14px; padding: 16px; margin-bottom: env(safe-area-inset-bottom); }
+.sh-sheet b { font-size: 16px; }
+.sh-sheet p { margin: 6px 0 12px; font-size: 13px; color: #4a6372; white-space: pre-line; }
+.sh-btns { display: grid; gap: 8px; }
+.sh-btns button { padding: 10px; border-radius: 10px; border: 1px solid #cfdde6; background: #fff; font: inherit; color: inherit; }
+.sh-btns button.primary { background: #2b8fd6; border-color: #2b8fd6; color: #fff; }
+.sh-btns button.danger { color: #c8412f; border-color: #c8412f; }
