@@ -1,4 +1,5 @@
 import { TAU, clamp, smooth, bell, env, span, layerY, keepInside, sprintFactor, kickFactor, tailOf } from './lifeKit.js';
+import { canLeap, stepLeap } from './lifeLeap.js';
 
 // ---- 周回（外洋性・群れ） ------------------------------------------------
 
@@ -53,37 +54,15 @@ export function forceEvent(m, ctx, type) {
 }
 
 /**
- * 跳躍（イルカ・マンタ・シイラ・サケ・アロワナ）：水中で加速して水面を破り、弧を描いて頭から戻る。空中は約1秒
- * 滑空（トビウオ）：水面直下で尾を速く振って加速し、胸びれを広げて水面すれすれを長く滑る（実物は数十秒・数百 m）
+ * 滑空（トビウオ）：水面直下で尾を速く振って加速し、胸びれを広げて水面すれすれを長く滑る（実物は数十秒・数百 m）。
+ * 跳躍は lifeLeap.js
  */
-function airEvent(m, ctx, p, type) {
-  const { box } = ctx;
-  const top = box.y1 + 0.03;
-  if (type === 'glide') {
-    const h = m.L * 0.8;
-    const lift = smooth((p - 0.15) / 0.15) * smooth((0.95 - p) / 0.1);
-    m.air = lift > 0.02;
-    return { y: top + h * lift - m.L * 0.2 * (1 - lift), w: smooth(p / 0.15) * smooth((1 - p) / 0.05), speed: 1 + 3 * smooth(p / 0.2) * smooth((1 - p) / 0.15), pitch: lift > 0.5 ? 0.05 : p < 0.3 ? 0.3 : -0.3, tail: p < 0.3 ? 3 : lift > 0.5 ? 0.2 : 1 };
-  }
-  const H = m.L * (m.beh.leapH ?? 0.8);
-  const a = 0.3;
-  const b = 0.75;
-  let y;
-  let pitch;
-  if (p < a) {
-    y = top - m.L * 0.6 * (1 - smooth(p / a));
-    pitch = 0.7 * smooth(p / 0.1);
-  } else if (p < b) {
-    const q = (p - a) / (b - a);
-    y = top + H * Math.sin(Math.PI * q);
-    pitch = 1.1 * Math.cos(Math.PI * q);
-  } else {
-    const q = (p - b) / (1 - b);
-    y = top - m.L * 0.8 * smooth(q);
-    pitch = -0.9 * (1 - smooth(q));
-  }
-  m.air = y > top - m.L * 0.3;
-  return { y, w: smooth(p / 0.15) * smooth((1 - p) / 0.1), speed: 1.6, pitchSet: pitch };
+function glideEvent(m, ctx, p) {
+  const top = ctx.box.y1 + 0.03;
+  const h = m.L * 0.8;
+  const lift = smooth((p - 0.15) / 0.15) * smooth((0.95 - p) / 0.1);
+  m.air = lift > 0.02;
+  return { y: top + h * lift - m.L * 0.2 * (1 - lift), w: smooth(p / 0.15) * smooth((1 - p) / 0.05), speed: 1 + 3 * smooth(p / 0.2) * smooth((1 - p) / 0.15), pitch: lift > 0.5 ? 0.05 : p < 0.3 ? 0.3 : -0.3, tail: p < 0.3 ? 3 : lift > 0.5 ? 0.2 : 1 };
 }
 
 /** 周回中の特別な行動。速さの倍率と、姿勢・高さの上書きを返す */
@@ -96,6 +75,7 @@ function cruiseEvent(m, ctx, dt) {
     m.ev = { type, t: 0, dur: span(m.r, EVENTS[type][0]) };
   }
   const ev = m.ev;
+  if (ev.type === 'leap') return ev; // 進め方は cruise() の stepLeap
   ev.t += dt;
   const p = ev.t / ev.dur;
   if (p >= 1) {
@@ -123,9 +103,8 @@ function cruiseEvent(m, ctx, dt) {
       return { y: box.y1 - (m.L / 2) * Math.sin(Math.min(1.2, maxP)), w: e, speed: 1 - 0.9 * e, pitchSet: Math.min(1.2, maxP) * e };
     case 'loop':
       return { loop: TAU * smooth((p - 0.1) / 0.8), speed: 1 - 0.7 * e };
-    case 'leap':
     case 'glide':
-      return airEvent(m, ctx, p, ev.type);
+      return glideEvent(m, ctx, p);
     default:
       return null;
   }
@@ -143,12 +122,16 @@ function stepPath(P, m, dt, time, speedMul) {
 
 export function cruise(m, ctx, dt, time) {
   const P = m.path;
-  const ev = cruiseEvent(m, ctx, dt);
+  let ev = cruiseEvent(m, ctx, dt);
+  const leap = ev?.type === 'leap' ? ev : null;
+  if (leap) ev = null;
   let speedMul = ev?.speed ?? 1;
   if (m.beh.hover) speedMul *= 0.55 + 0.45 * Math.sin(time * 0.07 + m.ph);
   stepPath(P, m, dt, time, speedMul);
-  pathPos(P, P.phi, ctx.box.cx, A);
-  pathPos(P, P.phi + 0.02 * P.dir, ctx.box.cx, N);
+  // m.lphi：跳躍で群れより先へ出たぶん（道の角度）
+  const phi = P.phi + (m.lphi ?? 0) * P.dir;
+  pathPos(P, phi, ctx.box.cx, A);
+  pathPos(P, phi + 0.02 * P.dir, ctx.box.cx, N);
   const hx = N.x - A.x;
   const hz = N.z - A.z;
   const hl = Math.hypot(hx, hz) || 1;
@@ -161,10 +144,22 @@ export function cruise(m, ctx, dt, time) {
   m.yaw = Math.atan2(-hz, hx);
   let pitch = clamp(Math.atan2(N.y - A.y, hl), -0.5, 0.5);
   let roll = 0;
+  let v = P.v;
+  let tail = 1;
+  // 跳躍は表層〜中層の上部にいるときだけ始める。低いときは少し待って選び直す
+  if (leap && !leap.plan && !canLeap(ctx, y)) {
+    m.ev = null;
+    m.evT = span(m.r, [2, 5]);
+  } else if (leap) ({ y, pitch, v, tail } = leapStep(m, ctx, leap, dt, y, pitch, hl));
+  else if (m.lphi) {
+    // 跳んだあとは少しゆっくり泳いで群れの位置へ戻る
+    const back = ((0.35 * P.v) / P.R) * dt;
+    m.lphi -= Math.sign(m.lphi) * Math.min(Math.abs(m.lphi), back);
+  }
   if (ev) {
     if (ev.y !== undefined) y += (ev.y - y) * ev.w;
     if (ev.pitch) pitch += ev.pitch;
-    if (ev.pitchSet !== undefined) pitch = ev.type === 'leap' ? pitch + (ev.pitchSet - pitch) * ev.w : Math.max(pitch, ev.pitchSet);
+    if (ev.pitchSet !== undefined) pitch = Math.max(pitch, ev.pitchSet);
     if (ev.roll) roll = ev.roll;
     if (ev.loop) {
       // 後方宙返り：頭を上げながら縦の円を描く
@@ -174,12 +169,33 @@ export function cruise(m, ctx, dt, time) {
       m.z += (hz / hl) * Math.sin(ev.loop) * R;
       y += (1 - Math.cos(ev.loop)) * R;
     }
+    tail = ev.tail ?? 1;
   }
   m.y = y;
   m.pitch = pitch;
   m.roll = roll;
-  m.v = P.v;
+  m.v = v;
   m.kickTail = P.kickTail;
-  m.tail = tailOf(m, P.v) * (ev?.tail ?? 1);
+  m.tail = tailOf(m, v) * tail;
   keepInside(m, ctx);
+}
+
+/**
+ * 跳躍を1フレーム進める（lifeLeap.js）。水平の速さは道を余分に進めて出す。
+ * 群れの魚は共有の道を動かせないので、自分だけ先へ出たぶんを m.lphi に持つ
+ */
+function leapStep(m, ctx, ev, dt, y, pitch, hl) {
+  const P = m.path;
+  const J = hl / 0.02; // 道の角度1あたりの水平の長さ（m）
+  const v0 = (P.v * J) / P.R; // 今の水平の速さ
+  const st = stepLeap(m, ctx, ev, dt, y, pitch, v0);
+  const extra = ((st.vh - v0) / J) * dt;
+  if (m.beh.school) m.lphi = (m.lphi ?? 0) + extra;
+  else P.phi += extra * P.dir;
+  if (st.done) {
+    m.ev = null;
+    m.evT = span(m.r, EVENTS.leap[1]);
+    m.air = false;
+  }
+  return { y: st.y, pitch: st.pitch, v: st.vh, tail: st.tail };
 }

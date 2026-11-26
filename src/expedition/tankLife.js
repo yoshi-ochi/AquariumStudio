@@ -6,9 +6,11 @@ import { buildCreature } from './creatureBuilder.js';
 import { createMotion, stepMotion, reanchor } from './lifeMotion.js';
 import { lifeAnchors, anchorSig } from './lifeAnchors.js';
 import { speciesPieces, sizeOf, appealOf } from './growth.js';
+import { LeapFx } from './leapFx.js';
 
 /** 水槽内の展示生物：収容枠の計算、モデルの同期、遊泳アニメーション */
 const LIFE = 'life';
+const FX = 'lifeFx';
 
 /** 水量（m³）。描いた水槽は def.volume を持つ */
 export function tankVolume(def) {
@@ -37,15 +39,17 @@ const MAX_MODELS = 120;
 function swimBox(I) {
   const k = I.shape === 'cylinder' ? 0.68 : 0.86;
   const y0 = I.tunnel ? I.tunnel.straightH + I.tunnel.r + 0.08 : I.floorY + 0.03;
-  return { cx: I.swim?.cx ?? 0, hx: (I.swim?.halfW ?? I.halfW) * k, hz: I.halfD * k, y0, y1: Math.max(y0 + 0.01, I.waterTop - 0.03), round: I.shape === 'cylinder' };
+  return { cx: I.swim?.cx ?? 0, hx: (I.swim?.halfW ?? I.halfW) * k, hz: I.halfD * k, y0, y1: Math.max(y0 + 0.01, I.waterTop - 0.03), surf: I.waterTop, round: I.shape === 'cylinder' };
 }
 
 /** tank.userData.creatures に合わせてモデルを作り直す。動きは種ごとの行動（lifeMotion.js）で決める */
 export function syncLife(tank) {
-  const old = tank.getObjectByName(LIFE);
-  if (old) {
-    tank.remove(old);
-    disposeObject(old);
+  for (const name of [LIFE, FX]) {
+    const old = tank.getObjectByName(name);
+    if (old) {
+      tank.remove(old);
+      disposeObject(old);
+    }
   }
   const group = new THREE.Group();
   group.name = LIFE;
@@ -91,7 +95,11 @@ export function updateLife(tank, time) {
       for (const fish of group.children) reanchor(fish.userData.motion, ctx);
     }
   }
-  for (const fish of group.children) stepMotion(fish, fish.userData.motion, ctx, dt, time);
+  for (const fish of group.children) {
+    stepMotion(fish, fish.userData.motion, ctx, dt, time);
+    surfaceSplash(tank, ctx, fish.userData.motion, dt);
+  }
+  ctx.fx?.update(dt);
   // 発光する生き物：水槽のライトが消えている・暗いほど強く光る（光量は 0.2〜4.0）
   const light = tank.userData.look?.light;
   const dark = !light?.on ? 1 : Math.min(1, Math.max(0.12, (4.2 - light.intensity) / 4));
@@ -100,4 +108,19 @@ export function updateLife(tank, time) {
     const ph = fish.userData.motion?.phase ?? fish.id;
     fish.userData.uni.uGlow.value = dark * (0.78 + 0.22 * Math.sin(time * 1.6 + ph));
   }
+}
+
+/** 魚が水面を抜けた・落ちたら、しぶきと波紋を出す（跳躍・滑空）。部品は最初に要るときに作る */
+function surfaceSplash(tank, ctx, m, dt) {
+  const { surf } = ctx.box;
+  if (dt <= 0 || !m.visible || (m.py - surf) * (m.ry - surf) >= 0) return;
+  if (!ctx.fx) {
+    ctx.fx = new LeapFx(surf, Math.min(ctx.box.hx, ctx.box.hz) * 1.1);
+    ctx.fx.group.name = FX;
+    tank.add(ctx.fx.group);
+  }
+  const dx = m.rx - m.px;
+  const dz = m.rz - m.pz;
+  const l = Math.hypot(dx, dz) || 1;
+  ctx.fx.splash(m.rx, m.rz, m.L, Math.abs(m.ry - m.py) / dt, m.ry > surf, dx / l, dz / l);
 }
