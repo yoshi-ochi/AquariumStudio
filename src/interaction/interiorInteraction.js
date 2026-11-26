@@ -8,6 +8,7 @@ import { getDef } from '../tanks/tankData.js';
 import { REFUND_RATE } from '../management/stageData.js';
 import { createBrushCursor } from '../interior/brushCursor.js';
 import { ROCK_SHAPES } from '../tanks/interiorBuilder.js';
+import { askConfirm } from '../ui/dialog.js';
 
 const CLICK_TOLERANCE = 5; // px
 const ROTATE_STEP = Math.PI / 4;
@@ -87,11 +88,12 @@ export class InteriorInteraction {
   }
 
   /** 水槽内レイアウトをクリアする（全部撤去。払い戻しあり、元に戻せる） */
-  clearLayout() {
+  async clearLayout() {
     const items = this.manager.interiorItems(this.tank);
     if (!items.length) return this.toast('水槽内に物がありません');
     const refund = items.reduce((s, it) => s + Math.floor(getDef(it.userData.defId).price * REFUND_RATE), 0);
-    if (!confirm(`水槽内のオブジェ ${items.length} 個をすべて撤去します（払い戻し ¥${refund.toLocaleString('ja-JP')}）。\n「↶ 戻す」で元に戻せます。よろしいですか？`)) return;
+    const ok = await askConfirm({ title: '水槽内レイアウトをクリア', text: `水槽内のオブジェ ${items.length} 個をすべて撤去します（払い戻し ¥${refund.toLocaleString('ja-JP')}）。\n「↶ 戻す」で元に戻せます。`, ok: 'すべて撤去する', danger: true });
+    if (!ok || !this.tank) return;
     this.cancelPlacement();
     this.setGrowMode(null);
     this.customizer.deselect();

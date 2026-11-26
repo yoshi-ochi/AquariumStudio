@@ -34,7 +34,7 @@ import { LAYOUT_VERSION } from './io/layoutIO.js';
 import { writeJournal, markJournalSynced, pendingJournal } from './online/localJournal.js';
 import { ShareApi, sendUrl } from './share/shareTank.js';
 import { shareUrl } from './share/shareData.js';
-import { chooseShare } from './share/shareSheet.js';
+import { choose, askConfirm } from './ui/dialog.js';
 import { Online } from './online/online.js';
 import { AutoSave } from './online/autoSave.js';
 import { FriendPanel } from './ui/friendPanel.js';
@@ -74,7 +74,7 @@ import { FishingScene } from './expedition/fishingScene.js';
 import { zoneOf } from './expedition/husbandry.js';
 import { isHungry } from './expedition/husbandry.js';
 import { allianceBonus, allianceLevel } from './expedition/creatureData.js';
-import { CREATURES, DEFAULT_HOME, relocateCost } from './expedition/creatureData.js';
+import { CREATURES, DESTINATIONS, DEFAULT_HOME, relocateCost } from './expedition/creatureData.js';
 import { setGrowthSource } from './expedition/growth.js';
 import { buildCreature } from './expedition/creatureBuilder.js';
 import { loadCreatureConfig } from './expedition/creatureConfig.js';
@@ -84,6 +84,7 @@ import { TankView } from './ui/tankView.js';
 import { BuildView } from './ui/buildView.js';
 import { MailView } from './ui/mailView.js';
 import { Tutorial } from './ui/tutorial.js';
+import { Guide } from './ui/guide.js';
 import { RankingView } from './ui/rankingView.js';
 import { BuildInPlace } from './interaction/buildInPlace.js';
 import { setCustomHandler, registerCustomIds } from './tanks/customTanks.js';
@@ -495,7 +496,11 @@ async function boot() {
       for (const [id, n] of Object.entries(tank.userData.creatures ?? {})) expeditions.give(id, n);
     },
     // コピーした水槽があれば、館内レイアウト編集の間だけ「貼り付け」を出す
-    onClipboard: (show) => ($('btn-paste').hidden = !show),
+    onClipboard: (show) => {
+      const b = $('btn-paste');
+      b.hidden = !show;
+      b.textContent = hall.pasting ? '✓ 貼り付け終了' : hall.clipboards.length > 1 ? `📋 貼り付け（${hall.clipboards.length}）` : '📋 貼り付け';
+    },
   });
   afterApplyRoom = () => hall.refreshCenters();
   const inPlace = new BuildInPlace({
@@ -527,7 +532,13 @@ async function boot() {
   });
   $('btn-undo').addEventListener('click', () => interior.undo());
   $('btn-clear').addEventListener('click', () => interior.clearLayout());
-  $('btn-paste').addEventListener('click', () => hall.paste());
+  // 貼り付け：コピーが複数あれば選んでから置く。置いている間は「貼り付け終了」
+  $('btn-paste').addEventListener('click', async () => {
+    if (hall.pasting) return hall.cancelPlacement();
+    if (hall.clipboards.length < 2) return hall.paste();
+    const k = await choose({ title: 'どのレイアウトを貼り付けますか', text: '新しくコピーした順です（5件まで）。置いたあとも続けて置けます', buttons: hall.clipboards.map((c, i) => ({ key: String(i), label: c.label, kind: i === 0 ? 'primary' : '' })) });
+    if (k !== null) hall.paste(hall.clipboards[+k]);
+  });
 
   // ---- モード ---------------------------------------------------------------
   //   home（館内の閲覧）→ 水槽タップ → tank（水槽の閲覧）→ ✎ → interior-edit
@@ -667,7 +678,11 @@ async function boot() {
     onEdit: () => {
       if (visiting) return;
       if (mode === 'home') enterHallEdit();
-      else if (mode === 'tank') enterInteriorEdit(focusTank, 'tank');
+      // 水槽に注目している間：水槽の編集シート（生物・飼育／見た目／水槽内レイアウト）を開く。✕で閉じてもここから開き直せる
+      else if (mode === 'tank') openTankSheet(focusTank);
+    },
+    onShare: () => {
+      if (mode === 'tank' && focusTank) shareTank(focusTank);
     },
     onDone,
     onFloorChange: (floor) => views.goFloor(floor),
@@ -940,7 +955,7 @@ async function boot() {
       const old = await shareApi.find(obj.userData.uid);
       let pick = 'update';
       if (old) {
-        pick = await chooseShare({
+        pick = await choose({
           title: 'この水槽は共有中です',
           text: `これまでに ${old.views} 回見られました。
 共有した時点の姿が表示されています。`,
@@ -1069,7 +1084,59 @@ async function boot() {
   const rankingView = new RankingView({ manager, expeditions, online, previews, isVisiting: () => !!visiting, onLoaded: () => gameSheet.view === 'event' && gameSheet.render() });
   life.panels.event.view.ranking = rankingView;
   setInterval(() => document.visibilityState === 'visible' && rankingView.submit().catch((err) => console.warn(err.message)), 300000);
-  const tutorial = new Tutorial({ getState: () => life.state, getStats: () => life.stats(), economy, toast });
+  // 操作の案内（チュートリアル・目標の進め方）：押す場所を指のマークで示す
+  const guide = new Guide();
+  if (import.meta.env.DEV) Object.assign(window, { __guide: guide, __hall: hall, __manager: manager }); // 開発用：動作を調べる
+  const _box = new THREE.Box3();
+  const _v = new THREE.Vector3();
+  const guideEnv = {
+    /** 画面に映っている水槽（生き物のいる水槽・画面の中央に近い水槽を優先）の画面上の位置 */
+    tankRect() {
+      if (mode !== 'home' || mapPage.isOpen || gameSheet.view) return null;
+      const cam = sceneMgr.camera;
+      const W = innerWidth;
+      const H = innerHeight;
+      let best = null;
+      for (const t of manager.tanks) {
+        if (!t.visible) continue;
+        _box.setFromObject(t);
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let k = 0; k < 8; k++) {
+          _v.set(k & 1 ? _box.max.x : _box.min.x, k & 2 ? _box.max.y : _box.min.y, k & 4 ? _box.max.z : _box.min.z).project(cam);
+          if (_v.z > 1) continue;
+          const sx = ((_v.x + 1) / 2) * W;
+          const sy = ((1 - _v.y) / 2) * H;
+          x0 = Math.min(x0, sx); y0 = Math.min(y0, sy); x1 = Math.max(x1, sx); y1 = Math.max(y1, sy);
+        }
+        const cx = (x0 + x1) / 2;
+        const cy = (y0 + y1) / 2;
+        if (!(x1 > x0) || cx < 40 || cx > W - 40 || cy < 120 || cy > H - 140) continue;
+        const life_ = Object.values(t.userData.creatures ?? {}).some((n) => n > 0) ? 0 : 1;
+        const score = life_ * 1e6 + Math.hypot(cx - W / 2, cy - H / 2);
+        if (!best || score < best.score) best = { score, x0, y0, x1, y1 };
+      }
+      if (!best) return null;
+      // 小さい水槽はタップしやすい大きさで示し、大きすぎる水槽は中央の一部だけを示す（周りを暗くしすぎない）
+      const w = Math.min(Math.max(best.x1 - best.x0, 56), W * 0.6);
+      const h = Math.min(Math.max(best.y1 - best.y0, 56), H * 0.4);
+      return new DOMRect((best.x0 + best.x1) / 2 - w / 2, (best.y0 + best.y1) / 2 - h / 2, w, h);
+    },
+    pinRect: (id) => mapPage.pinRect(id),
+    firstDest: () => (DESTINATIONS.find((d) => d.stage <= economy.stage.level) ?? DESTINATIONS[0]).id,
+  };
+  const tutorial = new Tutorial({ guide, env: guideEnv, getState: () => life.state, getStats: () => life.stats(), economy, toast });
+  // 目標カードをタップ：達成済みなら報酬、まだなら進め方を案内する
+  life.onGoalTap = (g) => tutorial.guideGoal(g);
+  // 案内の判定に使う数（4回/秒だけ計算する）
+  let guideCtx = null;
+  let guideCtxAt = 0;
+  const guideState = (time) => {
+    if (!guideCtx || time - guideCtxAt > 0.25) {
+      guideCtx = { ...life.stats(), mode, mapOpen: mapPage.isOpen, sheet: gameSheet.view ?? null };
+      guideCtxAt = time;
+    }
+    return guideCtx;
+  };
   $('btn-tutorial').addEventListener('click', () => {
     shell.toggleMenu(false);
     tutorial.restart();
@@ -1144,7 +1211,7 @@ async function boot() {
         // 移転は高額。確認してから支払う
         const cost = relocateCost(economy.stage.level);
         if (!economy.canAfford(cost)) return toast(`移転には ¥${cost.toLocaleString('ja-JP')} が必要です`, { error: true });
-        if (!confirm(`水族館の立地を移転しますか？\n費用 ¥${cost.toLocaleString('ja-JP')}\n航海中の調査隊の残り時間も、新しい距離に合わせて変わります。`)) return;
+        if (!(await askConfirm({ title: '水族館の立地を移転', text: `費用 ¥${cost.toLocaleString('ja-JP')}\n航海中の調査隊の残り時間も、新しい距離に合わせて変わります。`, ok: '移転する' }))) return;
         economy.spend(cost);
       }
       home = p;
@@ -1428,10 +1495,8 @@ async function boot() {
     room.updateCut(sceneMgr.camera.position.distanceTo(cameraCtl.controls.target), dt);
     room.updateOcclusion(sceneMgr.camera.position, cameraCtl.controls.target, dt);
     life.crowd.setVisible(showVisitors && views.mode === 'floor' && mode !== 'interior-edit' && mode !== 'tank' && !mapPage.isOpen);
-    if (!visiting && splashDone) {
-      tutorial.check();
-      tutorial.update(!mapPage.isOpen && (!gameSheet.view || gameSheet.view === 'tank') && mode !== 'interior-edit' && mode !== 'hall-edit');
-    } else tutorial.update(false);
+    if (!visiting && splashDone) tutorial.check();
+    if (guide.active) guide.update(guideState(time), !visiting && splashDone);
     life.crowd.update(dt, economy.visitors, visiting ? 80 : ops.satisfaction);
     if (!visiting) ops.update(dt, opsContext, economy);
     customizer.update();

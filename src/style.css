@@ -622,22 +622,8 @@ body.sheet-full #view-rail, body.sheet-full #side-actions, body.sheet-full #goal
 .mo-badges { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 2px; font-size: 12px; color: var(--muted); }
 .mo-badges span { padding: 2px 8px; color: var(--text); background: #fff4d6; border-radius: 10px; }
 
-/* ---- チュートリアル（光る枠と吹き出し。画面の操作はそのままできる） ---- */
-#tutorial { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
-#tutorial[hidden] { display: none; }
-.tt-ring { position: fixed; border: 3px solid var(--gold); border-radius: 12px; animation: tt-pulse 1.2s ease-in-out infinite; }
+/* ---- 操作の案内の枠の点滅（guide.js の .gd-ring） ---- */
 @keyframes tt-pulse { 50% { border-color: #fff; transform: scale(1.06); } }
-.tt-card { position: fixed; left: 12px; right: 12px; top: 50%; transform: translateY(-50%); max-width: 420px; margin: 0 auto; padding: 14px; color: var(--text); background: #fff; border: 2px solid var(--gold); border-radius: 14px; pointer-events: auto; }
-.tt-card.above { top: auto; bottom: calc(var(--nav-h) + var(--safe-bottom) + 18px); transform: none; }
-.tt-card.below { top: calc(var(--hud-h) + var(--safe-top) + 18px); transform: none; }
-.tt-card small { color: var(--muted); font-size: 11px; }
-.tt-card b { display: block; margin: 2px 0 4px; font-size: 17px; }
-.tt-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.6; }
-.tt-acts { display: flex; align-items: center; gap: 8px; }
-.tt-acts em { flex: 1; font-size: 11px; font-style: normal; color: var(--muted); }
-.tt-acts .tt-skip { margin-right: auto; color: var(--muted); background: none; border: none; }
-.tt-acts em + button, .tt-acts .tt-skip + button { margin-left: auto; }
-body.tutorial-on #goal-card { display: none; }
 
 /* ---- 成長（魚種ごとのレベル） ---- */
 .cg-grow { display: grid; grid-template-columns: 1fr; align-items: center; gap: 4px; margin: 6px 0; }
@@ -735,3 +721,25 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 .sh-btns button { padding: 10px; border-radius: 10px; border: 1px solid #cfdde6; background: #fff; font: inherit; color: inherit; }
 .sh-btns button.primary { background: #2b8fd6; border-color: #2b8fd6; color: #fff; }
 .sh-btns button.danger { color: #c8412f; border-color: #c8412f; }
+.sh-input { width: 100%; padding: 10px; margin: 0 0 10px; border: 1px solid #cfdde6; border-radius: 10px; font: inherit; color: inherit; background: #f4f8fb; }
+
+/* 操作の案内（src/ui/guide.js）：押す場所の周りを暗くし、指のマークで示す。影は使わない */
+#guide { position: fixed; inset: 0; z-index: 2000; pointer-events: none; }
+#guide[hidden], #guide [hidden] { display: none; }
+.gd-dim { position: fixed; background: rgba(2, 8, 14, .66); pointer-events: auto; }
+.gd-ring { position: fixed; border: 3px solid var(--gold); border-radius: 12px; animation: tt-pulse 1.2s ease-in-out infinite; }
+.gd-finger { position: fixed; width: 36px; font-size: 34px; line-height: 1; text-align: center; animation: gd-up .8s ease-in-out infinite; }
+.gd-finger.down { animation-name: gd-down; }
+@keyframes gd-up { 0%, 100% { transform: translateY(6px); } 50% { transform: translateY(-4px); } }
+@keyframes gd-down { 0%, 100% { transform: translateY(-6px); } 50% { transform: translateY(4px); } }
+.gd-card { position: fixed; left: 12px; right: 12px; top: 50%; transform: translateY(-50%); max-width: 420px; margin: 0 auto; padding: 12px 14px; color: var(--text); background: #fff; border: 2px solid var(--gold); border-radius: 14px; pointer-events: auto; }
+.gd-card.top { top: calc(var(--hud-h) + var(--safe-top) + 12px); transform: none; }
+.gd-card.bottom { top: auto; bottom: calc(var(--nav-h) + var(--safe-bottom) + 12px); transform: none; }
+.gd-card small { color: var(--muted); font-size: 11px; }
+.gd-card b { display: block; margin: 2px 0 4px; font-size: 16px; }
+.gd-card p { margin: 0 0 8px; font-size: 13px; line-height: 1.6; }
+.gd-acts { display: flex; align-items: center; gap: 8px; }
+.gd-acts .gd-stop { margin-right: auto; color: var(--muted); background: none; border: none; }
+.gd-shake { animation: gd-shake .35s; }
+@keyframes gd-shake { 25% { margin-left: -8px; } 75% { margin-left: 8px; } }
+#goal-card { cursor: pointer; } #goal-card .goal-how { color: #ffe08a; font-weight: 700; }
