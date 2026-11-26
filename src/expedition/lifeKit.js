@@ -96,6 +96,49 @@ export function solidTop(solids, x, z, pad = 0) {
   return top;
 }
 
+/**
+ * 当たり判定：位置 (x, y, z) が硬い物の中にあれば、水平に押し出す先と外向きの向きを返す（無ければ null）。
+ * 上から越えるのではなく横へよけるために使う。dome は楕円の真横へ、球（流木）はその高さの断面の外へ押し出す
+ */
+export function solidPush(solids, x, y, z, pad = 0) {
+  let best = null;
+  for (const s of solids) {
+    let cx;
+    let cz;
+    let rx;
+    let rz;
+    if (s.t === 'dome') {
+      rx = s.rx + pad;
+      rz = s.rz + pad;
+      const u = (x - s.x) / rx;
+      const v = (z - s.z) / rz;
+      const d = u * u + v * v;
+      if (d >= 1 || y >= s.y0 + (s.h + pad) * Math.sqrt(1 - d * d) || y < s.y0 - pad) continue;
+      cx = s.x;
+      cz = s.z;
+    } else {
+      const R = s.r + pad;
+      const dy = y - s.y;
+      if (Math.abs(dy) >= R) continue;
+      const r = Math.sqrt(R * R - dy * dy);
+      if ((x - s.x) ** 2 + (z - s.z) ** 2 >= r * r) continue;
+      cx = s.x;
+      cz = s.z;
+      rx = rz = r;
+    }
+    let ux = (x - cx) / rx;
+    let uz = (z - cz) / rz;
+    let l = Math.hypot(ux, uz);
+    if (l < 1e-4) (ux = 1), (uz = 0), (l = 1);
+    const depth = 1 - l;
+    if (best && best.depth >= depth) continue;
+    const nx = ux / l;
+    const nz = uz / l;
+    best = { depth, nx, nz, tx: cx + nx * rx * 1.02, tz: cz + nz * rz * 1.02 };
+  }
+  return best;
+}
+
 // ---- 速さの緩急 ----------------------------------------------------------
 
 /** 突進（バースト）。o は個体または群れの共有状態。突進が始まったフレームで o.darted = true */
