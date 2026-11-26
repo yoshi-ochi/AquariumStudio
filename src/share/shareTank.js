@@ -91,7 +91,7 @@ export class ShareApi {
 export async function sendUrl(url, title) {
   if (navigator.share) {
     try {
-      await navigator.share({ title: `${title} | Aquarium Studio`, text: 'アクスタで作った水槽を見てね', url });
+      await navigator.share({ title: `${title} | Aquarium Studio`, text: 'ﾟ｡･ﾟ･｡･｡ﾟ｡ アクスタで作った水槽を見てね ｡ﾟ｡･｡･ﾟ･｡ﾟ', url });
       return 'shared';
     } catch (e) {
       if (e?.name === 'AbortError') return 'cancel';
