@@ -1,4 +1,4 @@
-import { TAU, clamp, ease, turnTo, span, clampXZ, randXZ, layerY, bottomY, keepInside, sprintFactor, kickFactor, steer } from './lifeKit.js';
+import { TAU, clamp, ease, turnTo, span, clampXZ, randXZ, layerY, bottomY, keepInside, sprintFactor, kickFactor, steer, solidPush } from './lifeKit.js';
 
 // ---- 目標へ泳いでは止まる（サンゴ礁・沿岸の魚） ---------------------------
 
@@ -13,11 +13,14 @@ export function homeOf(m, ctx) {
 export function pickWander(m, ctx) {
   const { box } = ctx;
   const radius = m.home ? Math.max(m.L * 3, m.beh.home * Math.max(box.hx, box.hz)) : 0;
-  const p = randXZ(ctx, m, m.home, radius);
+  let p = randXZ(ctx, m, m.home, radius);
   m.peck = (m.beh.events ?? []).includes('peck') && m.r() < 0.3;
   let y = layerY(ctx, m);
   if (m.home) y = clamp(m.home.top + m.L * span(m.r, [-0.5, 2]), box.y0 + m.L * 0.3, box.y1 - m.L * 0.2);
   if (m.peck) y = box.y0 + m.L * 0.35;
+  // 目的地が岩・硬いサンゴの中なら選び直す（横へよける当たり判定と合わせ、岩を突き抜けようとしない）
+  const solids = ctx.anchors?.solids;
+  for (let i = 0; i < 8 && solids?.length && solidPush(solids, p.x, y, p.z, m.L * 0.3); i++) p = randXZ(ctx, m, m.home, radius);
   m.tx = p.x;
   m.ty = y;
   m.tz = p.z;

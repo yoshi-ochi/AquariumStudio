@@ -1,4 +1,5 @@
-import { clamp, span, turnTo, wrap, clampXZ, ease, solidTop } from './lifeKit.js';
+import { clamp, span, turnTo, wrap, clampXZ, ease, solidTop, solidPush } from './lifeKit.js';
+import { pickWander } from './lifeRoam.js';
 import { forceEvent } from './lifeCruise.js';
 import { hideInHost } from './lifeHost.js';
 
@@ -173,9 +174,64 @@ function evade(m, ctx, dt, time) {
 /** 当たり判定を付けない動き方：岩穴にすむ・砂に潜る・海藻に掴まる（岩・海藻に入り込むのが本来の姿） */
 const PASS = new Set(['crevice', 'burrow', 'cling']);
 
+/** 底で休む・海底を歩く生き物は、岩の上に乗る（岩を越えて歩く）。泳ぐ生き物は横へよける（avoidSolids） */
+const CLIMB = new Set(['rest', 'walk']);
+
 /**
- * 当たり判定：岩・硬いサンゴ・流木の中へ入らないよう、上面より上へ持ち上げる量。
- * 急に跳ね上がらないよう、上がるときは速く・下がるときはゆっくりならす。底で休む・歩く生き物は岩の上に乗る
+ * 当たり判定（泳ぐ生き物）：岩・硬いサンゴ・流木の中へ入りそうになったら、上へ持ち上げずに横へよける。
+ *   ・体の少し先が硬い物に入るときは、ぶつかる前に向きを接線の側（今の向きに近い方）へ曲げる
+ *   ・入ってしまったら、行動の位置を硬い物の外（同じ高さの断面の外）へ押し出す。押し出しはなめらかにする
+ *   ・ふらふら泳ぐ魚の目的地が硬い物の向こうで、押し返されてばかりなら、目的地を選び直す
+ */
+function avoidSolids(m, ctx, y, dt) {
+  const solids = ctx.anchors?.solids;
+  const off = m.mode === 'cruise' || !!m.partner;
+  if (!solids?.length || !m.visible || m.air || PASS.has(m.mode)) {
+    if (off) (m.ax = ease(m.ax ?? 0, 0, 4, dt)), (m.az = ease(m.az ?? 0, 0, 4, dt));
+    return;
+  }
+  const pad = m.L * 0.25;
+  if (off) {
+    // 周回する魚・並走する魚は、決まった道筋の上を泳ぐ（位置は毎フレーム道筋から決まる）。
+    // 道筋が硬い物を通るあいだだけ、よける向きのずれ（ax, az）を重ねて岩の外側を回り込む。早めに曲がり始めるよう少し広めに判定する
+    const bx = m.x + m.ox;
+    const bz = m.z + m.oz;
+    const hit = solidPush(solids, bx, y, bz, pad + m.L * 0.5);
+    m.ax = ease(m.ax ?? 0, hit ? hit.tx - bx : 0, 6, dt);
+    m.az = ease(m.az ?? 0, hit ? hit.tz - bz : 0, 6, dt);
+    return;
+  }
+  // 先読み：体の少し先（体長＋速さ0.5秒ぶん）が硬い物の中なら、外向きの側へ曲がる
+  const fx = Math.cos(m.yaw);
+  const fz = -Math.sin(m.yaw);
+  const look = m.L * 0.8 + (m.v ?? 0) * 0.5;
+  const ahead = solidPush(solids, m.x + m.ox + fx * look, y, m.z + m.oz + fz * look, pad);
+  if (ahead) {
+    // 接線のうち、今の向きに近いほう
+    const tx = -ahead.nz;
+    const tz = ahead.nx;
+    const s = tx * fx + tz * fz >= 0 ? 1 : -1;
+    m.yaw = turnTo(m.yaw, Math.atan2(-(tz * s + ahead.nz * 0.4), tx * s + ahead.nx * 0.4), (2 + 4 * (1 - ahead.depth)) * dt);
+  }
+  const hit = solidPush(solids, m.x + m.ox, y, m.z + m.oz, pad);
+  if (!hit) {
+    m.blockT = Math.max(0, (m.blockT ?? 0) - dt);
+    return;
+  }
+  const k = Math.min(1, 10 * dt);
+  m.x += (hit.tx - (m.x + m.ox)) * k;
+  m.z += (hit.tz - (m.z + m.oz)) * k;
+  m.blockT = (m.blockT ?? 0) + dt;
+  if (m.blockT > 1.2 && m.mode === 'wander') {
+    m.blockT = 0;
+    const lead = m.lead ?? m;
+    if (lead.st === 'go') pickWander(lead, ctx);
+  }
+}
+
+/**
+ * 当たり判定（底の生き物）：岩・硬いサンゴ・流木の上面より上へ持ち上げる量。
+ * 急に跳ね上がらないよう、上がるときは速く・下がるときはゆっくりならす
  */
 function bodyLift(m, ctx, x, z, y, dt) {
   const solids = ctx.anchors?.solids;
@@ -207,13 +263,17 @@ export function social(m, ctx, dt, time) {
   // ずれで水面より上へは出ない（跳躍・滑空は行動の位置 m.y が水面より上になる）
   let y = clamp(m.y + m.oy, Math.min(m.y, box.y0 + m.L * 0.2), Math.max(m.y, box.y1));
   if (y !== m.y + m.oy) (m.oy = y - m.y), (m.ovy *= 0.3);
-  y += bodyLift(m, ctx, m.x + m.ox, m.z + m.oz, y, dt);
+  if (CLIMB.has(m.mode)) y += bodyLift(m, ctx, m.x + m.ox, m.z + m.oz, y, dt);
+  else avoidSolids(m, ctx, y, dt);
   m.px = m.rx;
   m.py = m.ry;
   m.pz = m.rz;
-  m.rx = m.x + m.ox;
+  // よけるずれ（周回・並走の魚）も水槽の中に収める
+  const r = { x: m.x + m.ox + (m.ax ?? 0), z: m.z + m.oz + (m.az ?? 0) };
+  if (m.ax || m.az) clampXZ(box, r, m.margin);
+  m.rx = r.x;
   m.ry = y;
-  m.rz = m.z + m.oz;
+  m.rz = r.z;
   // ずれが速いあいだは、その向きへ体を向ける（尾びれも速く振る）
   const ov = Math.hypot(m.ovx, m.ovz);
   const w = clamp(ov / Math.max(m.cs, 1e-4) / 1.5, 0, 1);
