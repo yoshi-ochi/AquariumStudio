@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { TankStage } from './tankStage.js';
-import { snapshotTank, packSnapshot, newShareId, shareUrl, MAX_BYTES } from './shareData.js';
+import { snapshotTank, gzipSnapshot, gzToB64, newShareId, shareUrl, MAX_BYTES, MAX_FILE } from './shareData.js';
 
 /**
  * 水槽を共有する（館内の水槽パネルの「共有」）。
@@ -57,11 +57,20 @@ export class ShareApi {
   /** 共有する（すでに共有していれば写しと画像を更新）。共有ページの URL を返す */
   async share(manager, tank) {
     const snap = snapshotTank(manager, tank);
-    const data = packSnapshot(snap);
-    if (data.length > MAX_BYTES) throw new Error('水槽のレイアウトが大きすぎて共有できません（生き物オブジェを減らしてください）');
+    const gz = gzipSnapshot(snap);
+    if (gz.length > MAX_FILE) throw new Error('水槽のレイアウトが大きすぎて共有できません（削った岩や生き物オブジェを減らしてください）');
     const old = await this.find(tank.userData.uid);
     const id = old?.id ?? newShareId();
     const user = this.online.user;
+    // 小さい写しは表に入れ、大きい写し（岩を削った水槽など）はファイルに置く
+    let data = gzToB64(gz);
+    let dataPath = null;
+    if (data.length > MAX_BYTES) {
+      dataPath = `${user.id}/${id}.dat`;
+      const up = await this.sb.storage.from('share-img').upload(dataPath, new Blob([gz], { type: 'application/octet-stream' }), { contentType: 'application/octet-stream', upsert: true, cacheControl: '60' });
+      if (up.error) throw new Error(message(up.error));
+      data = null;
+    } else await this.sb.storage.from('share-img').remove([`${user.id}/${id}.dat`]);
     let hasImage = false;
     try {
       const blob = await shootTank(snap);
@@ -70,7 +79,7 @@ export class ShareApi {
     } catch (e) {
       console.warn('share image', e); // 画像が撮れなくても共有はする（リンクの絵はアプリ共通のものになる）
     }
-    const row = { id, owner: user.id, tank_uid: tank.userData.uid, title: (tank.userData.name ?? '').slice(0, 40), owner_name: (this.online.profile?.name ?? '').slice(0, 40), data, has_image: hasImage };
+    const row = { id, owner: user.id, tank_uid: tank.userData.uid, title: (tank.userData.name ?? '').slice(0, 40), owner_name: (this.online.profile?.name ?? '').slice(0, 40), data, data_path: dataPath, has_image: hasImage };
     const res = await this.sb.from('shared_tanks').upsert(row, { onConflict: 'owner,tank_uid' });
     if (res.error) throw new Error(message(res.error));
     return shareUrl(id);
@@ -80,7 +89,7 @@ export class ShareApi {
   async unshare(tankUid) {
     const old = await this.find(tankUid);
     if (!old) return;
-    await this.sb.storage.from('share-img').remove([`${this.online.user.id}/${old.id}.jpg`]);
+    await this.sb.storage.from('share-img').remove([`${this.online.user.id}/${old.id}.jpg`, `${this.online.user.id}/${old.id}.dat`]);
     const res = await this.sb.from('shared_tanks').delete().eq('id', old.id);
     if (res.error) throw new Error(message(res.error));
   }

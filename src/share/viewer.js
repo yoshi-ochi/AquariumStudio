@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createClient } from '@supabase/supabase-js';
 import './viewer.css';
 import { TankStage } from './tankStage.js';
-import { unpackSnapshot } from './shareData.js';
+import { unpackSnapshot, unpackBytes } from './shareData.js';
 import { getCreature } from '../expedition/creatureData.js';
 import { WAVE_PARAMS, bakeWaves, waveCacheKey } from '../water/waveBaker.js';
 import { loadCached, saveCached } from '../water/waveCache.js';
@@ -33,13 +33,19 @@ async function load() {
   if (res.error) return fail(`読み込めませんでした：${res.error.message}`);
   const row = res.data?.[0];
   if (!row) return fail('この共有は見つかりません（共有がやめられたか、期限が切れました）。');
-  return show(row);
+  return show(row, URL_);
 }
 
-async function show(row) {
+async function show(row, base) {
   let snap;
   try {
-    snap = unpackSnapshot(row.data);
+    if (row.data) snap = unpackSnapshot(row.data);
+    else {
+      // 大きな写しはストレージのファイル（share-img/<owner>/<id>.dat）
+      const res = await fetch(`${base}/storage/v1/object/public/share-img/${row.data_path}`, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(res.status);
+      snap = unpackBytes(await res.arrayBuffer());
+    }
   } catch {
     return fail('水槽のデータを読めませんでした。');
   }
