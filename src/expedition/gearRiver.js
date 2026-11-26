@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { box, clamp01, diver, ease, fishSet, flagBuoy, lerp, makeLine, makeNet, mat, particles, prog, scoopNet, span, tags } from './gearKit.js';
+import { box, clamp01, diver, ease, fishSet, flagBuoy, lerp, makeLine, makeNet, mat, particles, prog, scoopNet, span } from './gearKit.js';
 
 /**
  * 川（と湖）の漁の動き。水深は浅く（bedY）、下流は -X。flow が 0 なら流れのない湖。
@@ -12,15 +12,6 @@ function stake(group, x, z, bedY, top = 1.3) {
   group.add(m);
   return m;
 }
-/** 上流・下流の名札 */
-function flowTags(group, flow) {
-  const tag = tags(group, { up: '上流', down: '下流' });
-  return (show) => {
-    tag.up.at(30, 3.4, -14, show && flow > 0);
-    tag.down.at(-30, 3.4, -14, show && flow > 0);
-  };
-}
-
 /** 川の刺し網：流れを斜めに横切って張り、上流から追った魚を網目にかける */
 function gill({ group, boat, school, bedY, flow }) {
   const A = [-4, -17];
@@ -35,8 +26,6 @@ function gill({ group, boat, school, bedY, flow }) {
   const caught = fishSet(group, 10, 0xe6eed2, 0.75);
   const splash = particles(group, 18, 0xffffff, 0.25);
   const beater = makeLine(group, 0x4a3524, 2);
-  const flowTag = flowTags(group, flow);
-  const tag = tags(group, { net: '刺し網', drive: '竿で水面をたたく' });
   school.set(17, bedY + 1.2, -1, 6, 0.25);
   const onNet = (u, end) => [lerp(A[0], end[0], u) - Math.sin(u * Math.PI) * (flow ? 1.5 : 0), lerp(A[1], end[1], u)]; // 流れで下流へふくらむ
   const update = (step, p, t) => {
@@ -81,9 +70,6 @@ function gill({ group, boat, school, bedY, flow }) {
       caught.put(i, x, bedY * (0.25 + (i % 3) * 0.25), z, Math.PI + Math.sin(t * 9 + i) * 0.3);
     }
     caught.flush();
-    flowTag(step === 0);
-    tag.net.at(2, 1.6, -1, step === 0 && p > 0.5);
-    tag.drive.at(bx - 3, 4, bz, k > 0 && k < 0.6);
   };
   update.shots = [[-22, 12, 34, 2, -1, 0], [-16, 10, 34, 10, -1, 0], [-20, 9, 32, 2, -1, 2]];
   return update;
@@ -103,8 +89,6 @@ function diving({ group, boat, school, bedY, flow }) {
   const men = [diver(group, { tank: false, suit: 0x26323c }), diver(group, { tank: false, suit: 0x35506e })];
   const scoop = scoopNet(group, 0.6);
   box(boat, 0.9, 0.6, 0.7, 0x2a9bd6).position.set(0.3, 0.75, 0);
-  const flowTag = flowTags(group, flow);
-  const tag = tags(group, { bow: '舳先は上流へ', net: 'たも網', keeper: '活かし容器' });
   school.hold = true;
   school.set(9.4, bedY + 0.9, 0, 2.4, 0.2);
   const update = (step, p, t) => {
@@ -133,10 +117,6 @@ function diving({ group, boat, school, bedY, flow }) {
     scoop.position.set(lerp(m0.x + (step === 3 ? -1.7 : 1.7), bx + 0.3, stow), lerp(m0.y - 0.15, 1.5, stow), lerp(m0.z, 6, stow));
     scoop.rotation.z = step === 3 ? 0 : -Math.PI / 2;
     scoop.load.visible = dart > 0.9 && stow < 0.95;
-    flowTag(step <= 1);
-    tag.bow.at(bx + 3, 3.4, 6, step === 0 && p > 0.6);
-    tag.net.at(m0.x + 1.7, m0.y + 1.6, m0.z, step === 2 && p < 0.5);
-    tag.keeper.at(bx + 0.3, 3, 6, step === 3 && p > 0.5);
   };
   update.shots = [[-24, 9, 30, -4, -1, 4], [-16, 7, 26, 3, -1.5, 2], [-6, 5.5, 22, 8, -2, 0], [-20, 7, 26, -3, -1, 4]];
   return update;
@@ -159,8 +139,6 @@ function longline({ group, boat, school, bedY, flow, time }) {
   });
   const bite = [2, 5, 8];
   const cats = fishSet(group, 3, 0xa39770, 1.6, 0.6);
-  const flowTag = flowTags(group, flow);
-  const tag = tags(group, { stone: '石の錘', hook: '針と餌' });
   school.hold = flow > 0;
   school.set(-4, bedY + 1, -14, 4, 0.2);
   const at = (f) => [lerp(A[0], B[0], f), lerp(A[1], B[1], f)];
@@ -194,9 +172,6 @@ function longline({ group, boat, school, bedY, flow, time }) {
     if (step === 1) pts.push([B[0], 0.1, B[1]]);
     main(pts);
     cats.flush();
-    flowTag(step === 0);
-    tag.stone.at(A[0], bedY + 1.8, A[1], step === 0 && p < 0.5);
-    tag.hook.at(0, bedY + 1.8, 0, step === 1 && p < 0.5);
   };
   update.shots = [[-24, 12, 34, 0, -1, 0], [-14, 6, 28, -2, -2.5, 0], [-24, 9, 32, 0, -1, 0]];
   return update;
@@ -215,8 +190,6 @@ function pots({ group, boat, school, bedY, flow, time }) {
   });
   const eels = fishSet(group, N, 0x8d9a62, 1.4, 0.35);
   const scent = particles(group, 36, 0xe9d9a8, 0.14);
-  const flowTag = flowTags(group, flow);
-  const tag = tags(group, { tube: '筒（口は下流向き）', scent: '餌のにおい' });
   school.hold = flow > 0;
   school.set(6, bedY + 1.2, 4, 5, 0.2);
   const update = (step, p, t) => {
@@ -245,9 +218,6 @@ function pots({ group, boat, school, bedY, flow, time }) {
       scent.setAt(i, traps[i % N].x - 0.8 - k * (flow ? 8 : 2.5), bedY + 0.4 + k * 0.7, Z + Math.sin(i * 2.1) * k * (flow ? 0.8 : 2.5));
     }
     scent.flush();
-    flowTag(step <= 1);
-    tag.tube.at(traps[2].x, bedY + 1.8, Z, step === 2 && p < 0.5);
-    tag.scent.at(traps[3].x - 4.5, bedY + 2.2, Z, step === 2 && p > 0.15 && p < 0.6);
   };
   update.shots = [[-32, 8, 22, -22, 0, -10], [-22, 10, 32, 0, -1, -10], [-12, 5.5, 22, 0, -2.5, -13], [-22, 9, 30, 0, -1, -10]];
   return update;
@@ -264,8 +234,6 @@ function setnet({ group, boat, school, bedY, flow }) {
     group.add(m);
     return m;
   });
-  const flowTag = flowTags(group, flow);
-  const tag = tags(group, { wing: '袖網', bag: '袋網' });
   school.hold = flow > 0;
   const route = [[-24, -6], [-9, -6.5], [3, MZ], [10, MZ]];
   const update = (step, p, t) => {
@@ -307,9 +275,6 @@ function setnet({ group, boat, school, bedY, flow }) {
       school.set(lerp(route[i][0], route[i + 1][0], s - i), bedY + 1.3, lerp(route[i][1], route[i + 1][1], s - i), lerp(4, 1.5, p), 0.2);
     } else if (step === 2) school.set(lerp(10, 12.6, lift), lerp(bedY + 1.5, 0.7, lift), MZ + lift * 2.2, 1.2, 0.2);
     else school.set(-24, bedY + 1.3, -6, 4, 0.2);
-    flowTag(step === 0);
-    tag.wing.at(-4, 1.6, -11.5, step === 0 && p > 0.7);
-    tag.bag.at(9, 1.8, MZ, step === 0 && p > 0.9 || (step === 1 && p < 0.4));
   };
   update.shots = [[-22, 12, 32, 0, -1, -5], [-26, 8, 30, -4, -1.5, -5], [-4, 7, 24, 10, -1, -5]];
   return update;

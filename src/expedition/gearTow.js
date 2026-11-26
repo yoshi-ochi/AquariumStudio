@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BED, box, clamp01, crew, diver, ease, fishSet, flagBuoy, lerp, makeLine, makeNet, mat, particles, prog, span, tags } from './gearKit.js';
+import { BED, box, clamp01, crew, diver, ease, fishSet, flagBuoy, lerp, makeLine, makeNet, mat, particles, prog, span } from './gearKit.js';
 import { birds } from './fishingFx.js';
 
 /** 曳く網・追い込む網の動き。各関数は update(step, p, t) を返す */
@@ -12,7 +12,6 @@ function trawl({ group, boat, school, scroll }) {
   const boards = [0, 1].map(() => box(group, 2.2, 1.6, 0.22, 0x4a5560));
   const mud = particles(group, 50, 0xcdb98a, 0.45);
   const flock = birds(group, 10);
-  const tag = tags(group, { board: '開口板', warp: 'ワープ', cod: '袋網（コッドエンド）' });
   const BX = 16;
   boat.place(BX, 0, 0);
   school.set(BX - 20, BED + 1.6, 0, 6, 0.1);
@@ -48,9 +47,6 @@ function trawl({ group, boat, school, scroll }) {
     if (step === 2) school.set(lerp(mx + 12, mx - 7.5, ease(p)), low + 1.4, 0, lerp(6, 1.5, p), 0.1);
     else if (step === 3) school.set(mx - 8.8, low + 1, 0, 1.3, 0.2);
     flock(t, mx - 7, 0, step === 3 ? span(p, 0.4, 1) : 0, 4);
-    tag.board.at(mx + 4, low + 3, open + 1.7, step === 1 || (step === 2 && p < 0.5));
-    tag.warp.at((BX + mx) / 2, low / 2 + 2, 0, step === 1);
-    tag.cod.at(mx - 4, low + 5.4, 0, step === 2 && p > 0.5);
   };
   update.shots = [[0, 12, 40, 8, -2, 0], [-8, 11, 56, -5, -7, 0], [-12, 7, 56, -7, -9, 0], [0, 10, 36, 8, -2, 0]];
   return update;
@@ -62,7 +58,6 @@ function kakemawashi({ group, boat, school }) {
   const net = makeNet(group, 14, 10);
   const mark = flagBuoy(group);
   const mud = particles(group, 60, 0xcdb98a, 0.4);
-  const tag = tags(group, { mark: '浮標（樽）', rope: '引き綱', net: '網' });
   const W = 14;
   const AX = -22;
   const NX = 20;
@@ -114,9 +109,6 @@ function kakemawashi({ group, boat, school }) {
     }
     mud.flush();
     school.set(lift > 0 ? netX + 4 : lerp(4, netX + 3, pull), lerp(BED + 0.8, netY + 1, lift), 0, lerp(9, 1.8, pull), 0.04 + lift * 0.2);
-    tag.mark.at(AX, 3.6, 0, step < 2);
-    tag.rope.at(-11, BED + 2, -W / 2, step === 1 && run > 0.3);
-    tag.net.at(NX, BED + 4.4, 0, step === 1 && run > 0.5);
   };
   update.shots = [[-42, 12, 30, -18, -3, 0], [-10, 50, 38, -4, -6, 0], [-44, 13, 28, -14, -4, 0], [-12, 36, 42, -2, -8, 0], [-42, 9, 28, -14, -3, 0]];
   return update;
@@ -128,7 +120,6 @@ function boatseine({ group, boat, makeBoat, school, scroll }) {
   const net = makeNet(group, 18, 12, { cell: 2.2 });
   const ropes = [0, 1].map(() => makeLine(group, 0xf4e9c8, 2));
   const flock = birds(group, 8);
-  const tag = tags(group, { main: '網船', mate: '手船', bag: '袋網' });
   school.style(0xe8eef0, 0.55);
   school.set(-4, -4, 0, 8, 0.2);
   const update = (step, p, t) => {
@@ -153,9 +144,6 @@ function boatseine({ group, boat, makeBoat, school, scroll }) {
     else if (step === 1) school.set(lerp(nx + 6, nx - 9, ease(p)), ny, 0, lerp(7, 1.8, p), 0.2);
     else school.set(nx - 10, ny, 0, 1.5, 0.2);
     flock(t, nx - 9, 0, step === 2 ? p : 0, 4);
-    tag.main.at(14, 6, -gap, step === 0);
-    tag.mate.at(14, 6, gap, step === 0);
-    tag.bag.at(nx - 11, ny + 3.6, 0, step === 1 && p > 0.4);
   };
   update.shots = [[-6, 16, 42, 4, -2, 0], [-10, 20, 56, -4, -4, 0], [-4, 9, 30, 10, -1, 0]];
   return update;
@@ -174,7 +162,6 @@ function beachseine({ group, boat, school }) {
   const teams = [-1, 1].map((s) => [0, 1, 2, 3].map((j) => crew(group, s * 18, 0.4, 23 + j * 1.2, j % 2 ? 0x35506e : 0xd9822b)));
   const flop = fishSet(group, 14, 0xc9dbe6, 0.6);
   const flock = birds(group, 10);
-  const tag = tags(group, { rope: '曳き綱', bag: '袋網' });
   school.set(0, -3, 2, 7, 0.15);
   const update = (step, p, t) => {
     const lay = prog(step, p, 1);
@@ -217,8 +204,6 @@ function beachseine({ group, boat, school }) {
     school.set(0, lerp(-3, -0.9, pull), lerp(2, lerp(16, 19.5, land), pull), lerp(7, lerp(3, 1.6, land), pull), 0.15);
     school.mesh.visible = land < 0.6;
     flock(t, 0, 19, step === 3 ? p : step === 2 ? pull * 0.5 : 0, 5);
-    tag.rope.at(-17, 3, 16, step === 0 || step === 2);
-    tag.bag.at(0, 2.2, cz - AZ, step === 2 && p > 0.3);
   };
   update.shots = [[-30, 12, 46, -8, 0, 14], [-10, 30, 54, 0, -2, 6], [-26, 14, 52, 0, -1, 12], [-13, 8, 40, 0, 0.5, 19]];
   return update;
@@ -242,7 +227,6 @@ function oikomi({ group, boat, school }) {
   const strips = particles(group, 36, 0xffffff, 0.3);
   const bubbles = particles(group, 32, 0xdff4fb, 0.2);
   const hoist = makeLine(group, 0xf4e9c8, 2);
-  const tag = tags(group, { wing: '袖網', bag: '袋網', scare: '脅し縄' });
   boat.place(17, -9, 0);
   school.style(0xf2a03a);
   school.set(-18, BED + 4, 0, 6);
@@ -288,9 +272,6 @@ function oikomi({ group, boat, school }) {
     strips.flush();
     bubbles.flush();
     school.set(lift > 0 ? bx + 4.5 : lerp(-18, 15, ease(chase)), lift > 0 ? by : BED + 4, bz, lerp(6, 2, chase), 0.3);
-    tag.wing.at(0, BED + 8.2, 8.5, step === 0 && p > 0.6);
-    tag.bag.at(15, BED + 7.6, 0, step === 0 && p > 0.6);
-    tag.scare.at(dx, BED + 8, 0, step === 1);
   };
   update.shots = [[-20, 22, 36, 2, -9, 0], [-30, 26, 32, -2, -10, 0], [-6, 10, 32, 12, -4, -3]];
   return update;

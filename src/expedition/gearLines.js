@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BED, box, buoy, clamp01, crew, ease, fishMesh, fishSet, glow, lamp, lerp, makeLine, particles, prog, span, tags } from './gearKit.js';
+import { BED, box, buoy, clamp01, crew, ease, fishMesh, fishSet, glow, lamp, lerp, makeLine, particles, prog, span } from './gearKit.js';
 import { birds, nabura } from './fishingFx.js';
 
 /** 釣りの動き。各関数は update(step, p, t) を返す */
@@ -14,7 +14,6 @@ function pole({ group, boat, school }) {
   const flying = fishSet(group, xs.length, 0x3f5f86, 1.3);
   const spray = particles(group, 60, 0xffffff, 0.2);
   const bait = particles(group, 26, 0xcfe6f2, 0.3);
-  const tag = tags(group, { tori: '鳥山', boil: 'ナブラ', bait: '活き餌（イワシ）', spray: '散水' });
   school.style(0x4f6f96, 1.3);
   const update = (step, p, t) => {
     const bx = step === 0 ? lerp(-40, 0, ease(p)) : 0;
@@ -57,10 +56,6 @@ function pole({ group, boat, school }) {
       else flying.hide(i);
     });
     flying.flush();
-    tag.tori.at(nx, 12, nz, step === 0);
-    tag.boil.at(nx + 6, 1.2, nz, step === 0);
-    tag.bait.at(4, 4.2, 5, step === 1);
-    tag.spray.at(-3, 4.4, 5, step === 2);
   };
   update.shots = [[-38, 13, 38, -4, 1, 8], [-22, 9, 32, 1, 0, 6], [-18, 8, 30, 1, 0.5, 5], [-13, 6.5, 25, 1, 1.6, 3]];
   return update;
@@ -80,7 +75,6 @@ function longline({ group, boat, school }) {
   const flock = birds(group, 8);
   const tori = makeLine(group, 0xe5412d, 2);
   const streamers = particles(group, 10, 0xff5a3a, 0.35);
-  const tag = tags(group, { main: '幹縄', branch: '枝縄', float: '浮標', tori: 'トリライン（鳥よけ）' });
   school.mesh.visible = false;
   const update = (step, p, t) => {
     const head = step === 0 ? lerp(X0 - 2, X0 + L + 14, p) : X0 + L + 14; // 縄を繰り出す位置（船尾）
@@ -127,10 +121,6 @@ function longline({ group, boat, school }) {
     streamers.visible = step === 0;
     for (let i = 0; i < 10; i++) streamers.setAt(i, head - 1 - i * 1.6, lerp(4.4, 0.3, (2.5 + i * 1.6) / 18.5) - 0.3 - Math.abs(Math.sin(t * 6 + i)) * 0.4, 0);
     streamers.flush();
-    tag.tori.at(head - 7, 5.4, 0, step === 0 && p > 0.15);
-    tag.float.at(sets[4].x, 2, 0, step === 1 && p < 0.6);
-    tag.main.at(sets[6].x, MAIN + 0.4, 3, step === 1 && p < 0.6);
-    tag.branch.at(sets[9].x + 3.4, -7.5, 0, step === 1 && p < 0.6);
   };
   update.shots = [[-34, 12, 42, 0, -4, 0], [-22, 6, 38, 0, -6, 0], [-30, 10, 38, -2, -4, 0]];
   return update;
@@ -145,7 +135,6 @@ function tatenawa({ group, boat, school }) {
   const caught = fishSet(group, N, 0xd8352a, 1);
   const weight = box(group, 0.5, 0.7, 0.5, 0x4a5560);
   const tide = particles(group, 50, 0xdff4fb, 0.16);
-  const tag = tags(group, { up: '潮上', tide: '潮の流れ', weight: '錘' });
   school.style(0xd8352a, 1.2);
   school.set(-3, BED + 2.5, 1.3, 6, 0.12);
   const update = (step, p, t) => {
@@ -171,9 +160,6 @@ function tatenawa({ group, boat, school }) {
     caught.flush();
     for (let i = 0; i < 50; i++) tide.setAt(i, ((((i * 7.3 - t * 1.8) % 60) + 60) % 60) - 30, BED + 0.6 + ((i * 3.1) % 13), ((i * 13.7) % 30) - 15);
     tide.flush();
-    tag.up.at(BX, 6.5, 0, step === 0 && p > 0.7);
-    tag.tide.at(-14, -6, 8, step <= 1);
-    tag.weight.at(end[0] - 2.6, end[1] + 0.4, 1.3, step === 1 && p > 0.5);
   };
   update.shots = [[-30, 12, 40, 0, -5, 0], [-26, 6, 38, 1, -8, 0], [-24, 7, 34, 2, -7, 0]];
   return update;
@@ -189,7 +175,6 @@ function troll({ group, boat, school, scroll }) {
   const boil = nabura(group, 60);
   const flock = birds(group, 12);
   const splash = particles(group, 16, 0xffffff, 0.3);
-  const tag = tags(group, { tori: '鳥山', planer: '潜行板', lure: '擬似餌' });
   boat.place(BX, 0, 0);
   school.style(0x4f6f96, 1.2);
   const update = (step, p, t) => {
@@ -228,9 +213,6 @@ function troll({ group, boat, school, scroll }) {
       splash.flush();
     });
     poles.forEach((l, i) => l([[BX - 1, 1.2, (i ? 1 : -1) * 1.2], [BX - 1, 3.3, (i ? 1 : -1) * 6.2]]));
-    tag.tori.at(nx, 11, NZ, step <= 1 && nx < 52);
-    tag.planer.at(rigs[2].planer.position.x, 1.6, 6.2, step === 0 && p > 0.5);
-    tag.lure.at(rigs[2].lure.position.x - 1, -4.2, 6.2, step === 0 && p > 0.5);
   };
   update.shots = [[-24, 10, 36, 4, -1, 0], [-30, 15, 38, 2, -1, 3], [22, 9, 34, 2, 0, 3]];
   return update;
@@ -246,7 +228,6 @@ function squid({ group, boat, school, time }) {
   const reels = [-4.5, -2.5, -0.5, 1.5, 3.5].flatMap((x, i) => [-1, 1].map((s) => ({ x, s, ph: i * 0.23 + (s > 0 ? 0.5 : 0), line: makeLine(group, 0xbfe9ff, 3) })));
   const jigs = fishSet(group, reels.length * 3, 0xf3dccc, 0.75, 0.9);
   const drips = particles(group, 20, 0xcfe9f5, 0.18);
-  const tag = tags(group, { chute: 'シーアンカー', lamp: '集魚灯', reel: '自動いか釣り機' });
   boat.place(0, 0, 0);
   school.style(0xf0d8c8, 0.9);
   school.set(0, BED + 3, 6, 9);
@@ -279,9 +260,6 @@ function squid({ group, boat, school, time }) {
       drips.setAt(i, -4.5 + (i % 5) * 2, 1.9 - k * 1.9, (i % 2 ? 1 : -1) * (2.6 + k * 0.3));
     }
     drips.flush();
-    tag.chute.at(chute.position.x, 1.4, 0, step === 0 && p > 0.5);
-    tag.lamp.at(0, 6.6, 0, step === 1);
-    tag.reel.at(3.5, 3.4, 2.6, step === 2 && p < 0.5);
   };
   update.shots = [[-22, 10, 38, 6, -2, 0], [-30, 10, 36, 0, -3, 0], [-20, 6, 30, 0, -3, 0]];
   return update;

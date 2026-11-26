@@ -225,37 +225,3 @@ export function scoopNet(group, r = 0.9) {
   return g;
 }
 
-/** 画面上で大きさが変わらない名札。at(x, y, z, 表示するか) */
-export function label(group, text) {
-  const c = document.createElement('canvas');
-  const g = c.getContext('2d');
-  const font = '700 40px sans-serif';
-  g.font = font;
-  c.width = Math.ceil(g.measureText(text).width) + 40;
-  c.height = 64;
-  g.font = font;
-  g.fillStyle = 'rgba(255,255,255,.93)';
-  g.beginPath();
-  g.roundRect(2, 2, c.width - 4, 60, 18);
-  g.fill();
-  g.fillStyle = '#0f3550';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText(text, c.width / 2, 34);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true, sizeAttenuation: false, fog: false }));
-  const h = 0.036;
-  s.scale.set((h * c.width) / c.height, h, 1);
-  s.renderOrder = 20;
-  s.visible = false;
-  s.at = (x, y, z, show = true) => {
-    s.position.set(x, y, z);
-    s.visible = show;
-  };
-  group.add(s);
-  return s;
-}
-
-/** 名札をまとめて作る。{ key: '文字' } → { key: 名札 } */
-export const tags = (group, names) => Object.fromEntries(Object.entries(names).map(([k, v]) => [k, label(group, v)]));
