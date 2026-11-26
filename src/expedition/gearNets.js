@@ -1,4 +1,4 @@
-import { BED, box, clamp01, ease, fishSet, flagBuoy, glow, lamp, lerp, makeLine, makeNet, particles, prog, scoopNet, span, tags } from './gearKit.js';
+import { BED, box, clamp01, ease, fishSet, flagBuoy, glow, lamp, lerp, makeLine, makeNet, particles, prog, scoopNet, span } from './gearKit.js';
 import { birds, nabura } from './fishingFx.js';
 
 /** 囲む網・待つ網の動き。各関数は update(step, p, t) を返す。update.shots は作業ごとのカメラ [位置, 注視点] */
@@ -22,7 +22,6 @@ function purse({ group, boat, makeBoat, school }) {
   const boil = nabura(group);
   const flock = birds(group, 14);
   const scoop = scoopNet(group, 1.1);
-  const tag = tags(group, { tori: '鳥山', boil: 'ナブラ', skiff: 'レッコ艇', wire: '環ワイヤー', bag: '魚捕り', carrier: '運搬船' });
   const R = 14;
   const CX = 2;
   const PX = CX - R; // 網の両端が集まる位置（網船）
@@ -62,12 +61,6 @@ function purse({ group, boat, makeBoat, school }) {
     carrier.place(carX, lerp(-36, 0, ease(span(p, 0, 0.3))), -Math.PI / 2);
     scoop.visible = step === 4 && p > 0.3;
     carry(scoop, (span(p, 0.3, 1) * 2.999) % 1, [cx, -0.5, 0], [carX, 0, 0]);
-    tag.tori.at(CX, 11, 0, step === 0);
-    tag.boil.at(CX, 1.2, 7, step === 0);
-    tag.skiff.at(skiff.position.x, 3.4, skiff.position.z, step === 1);
-    tag.wire.at(PX + 4, -8, 0, step === 2);
-    tag.bag.at(cx, 3, 0, step === 3);
-    tag.carrier.at(carX, 6.5, 0, step === 4 && p > 0.3);
   };
   update.shots = [[-42, 15, 34, -2, 1, 0], [-14, 42, 36, 0, -3, 0], [-36, 8, 30, -4, -5, 0], [-36, 14, 28, -6, -2, 0], [-30, 10, 24, -6, 0, 0]];
   return update;
@@ -85,7 +78,6 @@ function setnet({ group, boat, makeBoat, school, time }) {
   const boil = nabura(group, 40);
   const flock = birds(group, 10);
   const scoop = scoopNet(group, 1);
-  const tag = tags(group, { coast: '岸', leader: '垣網', yard: '運動場', ramp: '登り網', pocket: '箱網' });
   const LX = -41;
   const route = [[-28, 30], [-28, 4], [-16, 2.5], [-5, 0], [-5, 0], [7, 0], [17, 0]];
   const update = (step, p, t) => {
@@ -130,11 +122,6 @@ function setnet({ group, boat, makeBoat, school, time }) {
     flock(t, 21, 0, step === 3 ? 1 : step === 2 ? span(haul, 0.5, 1) : 0);
     scoop.visible = step === 3;
     carry(scoop, (p * 2.999) % 1, [21, -0.4, 0], [21, 0, -6.8], 4);
-    tag.coast.at(-52, 6, 0, step <= 1);
-    tag.leader.at(LX + 13, 2.2, 0, step <= 1 && a1 >= 1);
-    tag.yard.at(-5, 2.2, 0, step <= 1 && a2 >= 1);
-    tag.ramp.at(7.5, 2.2, 5, step <= 1 && a3 >= 1);
-    tag.pocket.at(17, 2.2, -4, a4 >= 1 && step <= 2);
   };
   update.shots = [[-28, 46, 46, -14, -4, 0], [-42, 24, 42, -8, -5, 2], [2, 15, 32, 16, -2, 0], [8, 9, 22, 20, 0, -1]];
   return update;
@@ -151,7 +138,6 @@ function gill({ group, boat, school, time }) {
   const risers = [makeLine(group, 0xf4e9c8, 2), makeLine(group, 0xf4e9c8, 2)];
   const caught = fishSet(group, 14, 0xe0b98a, 1.25);
   const tide = particles(group, 46, 0xdff4fb, 0.16);
-  const tag = tags(group, { flag: 'ボンデン（旗）', float: '浮子綱', sink: '沈子綱', tide: '潮の流れ' });
   school.style(0xc9a37a);
   school.set(0, BED + 2, 26, 7, 0.1);
   const spot = (i) => [X0 + 5 + ((i * 5) % 14) * 3.1, BED + 0.6 + ((i * 3) % 7) * 0.4];
@@ -188,10 +174,6 @@ function gill({ group, boat, school, time }) {
     school.set(0, BED + 2, step === 0 ? 26 : step === 1 ? lerp(26, -24, p) : -30, 7, 0.1);
     for (let i = 0; i < 46; i++) tide.setAt(i, ((i * 13.7) % 60) - 30, BED + 1 + ((i * 3.1) % 12), ((((i * 7.3 - t * 2.2) % 50) + 50) % 50) - 25);
     tide.flush();
-    tag.flag.at(X0 + 3, 3.8, 0, step === 0);
-    tag.float.at(-6, TOP + 1, 0, step === 1 && p < 0.5);
-    tag.sink.at(8, BED - 0.9, 0, step === 1 && p < 0.5);
-    tag.tide.at(16, -5, 12, step === 1);
   };
   update.shots = [[-30, 13, 42, 2, -6, 0], [-20, 5, 34, 0, -10, 0], [-30, 10, 36, 0, -6, 0]];
   return update;
@@ -212,7 +194,6 @@ function bouke({ group, boat, school, time }) {
   const poles = [-7, 7].map(() => makeLine(group, 0xd9c9a0));
   const hose = makeLine(group, 0x2a7fb5, 12);
   const pumped = particles(group, 26, 0xdcebf2, 0.3);
-  const tag = tags(group, { lamp: '集魚灯', red: '赤色灯', net: '棒受け網', pump: 'フィッシュポンプ' });
   boat.place(0, 0, 0);
   school.style(0x9fc4de);
   school.set(0, -8, 26, 9);
@@ -251,10 +232,6 @@ function bouke({ group, boat, school, time }) {
     } else if (step === 3) school.set(0, -2, PORT, 4, 0.15);
     else if (step === 4) school.set(0, lerp(-2, -0.9, p), lerp(PORT, -5, p), lerp(4, 2, p), 0.15);
     else school.set(0, -0.8, -5, lerp(2, 0.6, p), 0.15);
-    tag.lamp.at(0, 6, 2.4, step <= 1);
-    tag.net.at(0, 2, PORT - 4, step === 1 || step === 2);
-    tag.red.at(0, 5.4, -2.6, step === 3);
-    tag.pump.at(0, 3.4, -3.4, step === 5);
   };
   update.shots = [[-30, 13, 38, 0, -2, 4], [-30, 15, 30, 0, -2, -4], [-34, 11, 24, 0, -3, -2], [-28, 13, -30, 0, -1, -8], [-26, 11, -28, 0, -1, -6], [-18, 8, -22, 0, 0, -4]];
   return update;

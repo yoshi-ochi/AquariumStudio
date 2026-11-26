@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { BED, box, clamp01, diver, ease, fishSet, flagBuoy, lerp, makeLine, makeNet, mat, particles, prog, scoopNet, span, tags } from './gearKit.js';
+import { BED, box, clamp01, diver, ease, fishSet, flagBuoy, lerp, makeLine, makeNet, mat, particles, prog, scoopNet, span } from './gearKit.js';
 
 /** かご・つぼ・潜水の動き。各関数は update(step, p, t) を返す */
 
 /** かご漁とたこつぼの共通の動き。幹縄につないだ入れ物を順に沈め、一晩おいて順に揚げる */
-function groundLine({ group, boat, school, time }, { count, makeTrap, castStep, prey, names }) {
+function groundLine({ group, boat, school, time }, { count, makeTrap, castStep, prey }) {
   const waitStep = castStep + 1;
   const haulStep = castStep + 2;
   const X0 = -24;
@@ -13,7 +13,6 @@ function groundLine({ group, boat, school, time }, { count, makeTrap, castStep, 
   const ground = makeLine(group, 0xf4e9c8, count + 6);
   const flags = [flagBuoy(group), flagBuoy(group)];
   const animals = fishSet(group, count, prey, 0.75, 0.9);
-  const tag = tags(group, names);
   school.mesh.visible = false;
   const update = (step, p, t) => {
     time(step < castStep ? 0 : step === castStep ? lerp(0, 0.35, p) : step === waitStep ? lerp(0.35, 1, span(p, 0, 0.5)) : lerp(0.7, 0.1, p));
@@ -51,9 +50,6 @@ function groundLine({ group, boat, school, time }, { count, makeTrap, castStep, 
     else if (flags[1].visible) pts.push([ends[1], BED + 0.3, 0], [ends[1], 0.2, 0]);
     ground(pts);
     animals.flush();
-    tag.trap.at(traps[2].x, BED + 3, 0, step === waitStep && p < 0.6);
-    tag.line.at(traps[5].x + 3, BED + 2.2, 0, step === waitStep && p < 0.6);
-    tag.flag.at(ends[0], 3.6, 0, step === castStep && p < 0.6);
   };
   const shots = [[-34, 9, 30, -24, 1, 0], [-32, 12, 42, 0, -5, 0], [-18, 4, 32, 0, -12, 0], [-30, 10, 38, 0, -5, 0]];
   update.shots = shots.slice(1 - castStep);
@@ -62,7 +58,7 @@ function groundLine({ group, boat, school, time }, { count, makeTrap, castStep, 
 
 function pots(ctx) {
   return groundLine(ctx, {
-    count: 8, castStep: 1, prey: 0xb5482f, names: { trap: 'かご（中に餌）', line: '幹縄', flag: '浮標' },
+    count: 8, castStep: 1, prey: 0xb5482f,
     makeTrap: () => {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.95, 0.75, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0xd8c77f, wireframe: true }));
       m.add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), mat(0x7a3b2a)));
@@ -74,7 +70,7 @@ function pots(ctx) {
 
 function takotsubo(ctx) {
   return groundLine(ctx, {
-    count: 12, castStep: 0, prey: 0xa8503c, names: { trap: 'たこつぼ', line: '幹縄', flag: '浮標' },
+    count: 12, castStep: 0, prey: 0xa8503c,
     makeTrap: () => {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 0.9, 10).rotateZ(Math.PI / 2), mat(0x9a5a3a));
       ctx.group.add(m);
@@ -101,7 +97,6 @@ function diving({ group, boat, school }) {
   const bubbles = particles(group, 36, 0xdff4fb, 0.2);
   const keeper = box(group, 0.7, 0.9, 0.7, 0x2a9bd6);
   box(boat, 0.9, 0.6, 0.05, 0x2a6fd6).position.set(-0.6, 5.1, 0.5);
-  const tag = tags(group, { flag: '潜水旗', fence: '仕切り網', stop: '安全停止（水深5m）', keeper: '採集容器' });
   boat.place(-12, -6, 0);
   school.style(0xf2c53d, 0.8);
   school.set(9, BED + 3.2, 2, 4.5, 0.3);
@@ -139,10 +134,6 @@ function diving({ group, boat, school }) {
     bubbles.flush();
     // 魚は追い立てず、仕切り網の奥へゆっくり寄せる
     school.set(lerp(9, 11.2, reach), BED + 2.4, 2, lerp(4.5, lerp(2, 1.1, took), reach), 0.3);
-    tag.flag.at(-12.6, 6.6, -5.5, step === 0);
-    tag.fence.at(13.5, BED + 4.2, 2, step === 2 && p < 0.6);
-    tag.keeper.at(keeper.position.x, keeper.position.y - 1.2, keeper.position.z, step === 2 && p > 0.6);
-    tag.stop.at(divers[0].position.x, -2.6, divers[0].position.z, step === 3 && p > 0.3 && p < 0.72);
   };
   update.shots = [[-30, 10, 30, -10, 0, -5], [-28, 7, 36, -3, -7, -3], [-10, 4, 30, 7, -11, 1], [-28, 8, 34, -4, -5, -4]];
   return update;
