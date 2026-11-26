@@ -957,6 +957,7 @@ async function boot() {
         toast('共有の準備中…（水槽を撮影しています）', { duration: 4000 });
         url = await shareApi.share(manager, obj);
       }
+      life.state.flags.shared = true; // 目標「水槽を共有する」
       const r = await sendUrl(url, title);
       if (r === 'copied') toast('共有ページの URL をコピーしました。LINE やインスタに貼り付けて送れます', { duration: 4000 });
     } catch (e) {

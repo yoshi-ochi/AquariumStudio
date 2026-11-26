@@ -7,7 +7,8 @@ import { setCleanIntervalBoost } from '../tanks/tankCleaning.js';
 import { BackyardView } from '../building/buildingViews.js';
 import { Crowd } from '../visitors/crowd.js';
 import { CareView, EventView, ZukanView } from './lifeViews.js';
-import { EVENTS, GOALS, OFFLINE_MAX_HOURS, OFFLINE_RATE } from './gameData.js';
+import { EVENTS, GOALS, CHAPTERS, OFFLINE_MAX_HOURS, OFFLINE_RATE } from './gameData.js';
+import { goalStats } from './goalStats.js';
 import { Mailbox } from './mailbox.js';
 import { Monthly } from './monthly.js';
 
@@ -29,7 +30,7 @@ export class LifeSystems {
       backyard: { title: 'バックヤード', live: true, view: new BackyardView({ backyard: this.backyard, expeditions, economy, previews, toast }) },
       care: { title: '飼育', live: true, view: new CareView({ manager, economy, toast, onFed: () => (this.state.flags.fed = true) }) },
       zukan: { title: '生き物図鑑', view: new ZukanView({ expeditions, manager, previews, economy, state: this.state, toast }) },
-      event: { title: 'イベント', live: true, view: new EventView({ economy, state: this.state, monthly: this.monthly, previews, getStats: () => this.stats(), toast, onStart: () => { this.state.flags.event = true; this.monthly.countEvent(); } }) },
+      event: { title: 'イベント', live: true, view: new EventView({ economy, state: this.state, monthly: this.monthly, previews, getStats: () => this.stats(), toast, onStart: () => { this.state.flags.event = true; this.state.flags.events = (this.state.flags.events ?? 0) + 1; this.monthly.countEvent(); } }) },
     };
     goalEl.addEventListener('click', (e) => e.target.closest('button') && this._claimGoal());
     reportEl.addEventListener('click', (e) => e.target.closest('button') && (reportEl.hidden = true));
@@ -77,6 +78,9 @@ export class LifeSystems {
       hasHome: !!this.getHome(),
       trips: this.expeditions.trips.length,
       flags: this.state.flags,
+      stage: this.economy.stageIndex + 1,
+      events: this.state.flags.events ?? 0,
+      ...goalStats(this.manager, this.expeditions),
     };
   }
 
@@ -125,13 +129,17 @@ export class LifeSystems {
 
   _renderGoal(s) {
     const g = this._goal;
-    const key = g ? `${g.id}:${g.done(s)}` : 'none';
+    const prog = g?.progress?.(s);
+    const key = g ? `${g.id}:${g.done(s)}:${prog ?? ''}` : 'none';
     this.goalEl.hidden = !g;
     if (key === this._goalKey) return;
     this._goalKey = key;
     if (!g) return;
     const ready = g.done(s);
-    this.goalEl.innerHTML = `<small>目標 ${GOALS.indexOf(g) + 1}/${GOALS.length}</small><b>${g.text}</b>${ready ? `<button class="primary">報酬 ${yen(g.reward)}</button>` : `<small>報酬 ${yen(g.reward)}</small>`}`;
+    const inCh = GOALS.filter((x) => x.chapter === g.chapter);
+    const head = `第${g.chapter}章 ${CHAPTERS[g.chapter - 1]} ${inCh.indexOf(g) + 1}/${inCh.length}`;
+    const bar = prog && !ready ? `<small class="goal-prog">${prog[0]} / ${prog[1]}</small>` : '';
+    this.goalEl.innerHTML = `<small>${head}</small><b>${g.text}</b>${bar}${ready ? `<button class="primary">報酬 ${yen(g.reward)}</button>` : `<small>報酬 ${yen(g.reward)}</small>`}`;
   }
 
   _claimGoal() {
@@ -139,7 +147,9 @@ export class LifeSystems {
     if (!g || !g.done(this.stats())) return;
     this.state.goals.push(g.id);
     this.economy.earn(g.reward);
-    this.toast(`目標達成！ ${yen(g.reward)} を獲得`);
+    const next = this._goal;
+    const chapterDone = !next || next.chapter !== g.chapter;
+    this.toast(chapterDone ? `第${g.chapter}章「${CHAPTERS[g.chapter - 1]}」クリア！ ${yen(g.reward)} を獲得${next ? ` ・ 次は第${next.chapter}章「${CHAPTERS[next.chapter - 1]}」` : ''}` : `目標達成！ ${yen(g.reward)} を獲得`, { duration: chapterDone ? 4000 : 2400 });
     this._goalKey = null;
   }
 
