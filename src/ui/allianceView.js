@@ -74,8 +74,31 @@ export class AllianceView {
     } else {
       this.mailbox?.add({ key: `allyrun:${runId}`, kind: 'allyrun', title: `合同調査「${project.name}」の成果を受け取りました`, body: '合同調査で見つかった生き物を受け取りました。', data: { project: pid, run: runId, got: countIds(got) } });
     }
-    this.onChanged();
+    if (!quiet) this.onChanged();
     return got;
+  }
+
+  /** 複数の回をまとめて受け取る。サーバーへは数件ずつ並行で問い合わせ、最後に1回だけ読み直す。
+   *  返り値は回ごとの成果（失敗で中断した回は undefined）。失敗はトーストで知らせる */
+  async claimMany(items, parallel = 8) {
+    const out = new Array(items.length);
+    let next = 0;
+    let error = null;
+    const worker = async () => {
+      while (next < items.length && !error) {
+        const i = next++;
+        try {
+          out[i] = await this.claimRun(items[i].project, items[i].run, { quiet: true, refresh: false });
+        } catch (err) {
+          error = err;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(parallel, items.length) }, worker));
+    await this.api.refresh().catch(() => {});
+    this.onChanged();
+    if (error) this.toast(error.message, { error: true });
+    return out;
   }
 
   html() {
@@ -175,9 +198,7 @@ export class AllianceView {
     } else if (act === 'ally-claim') {
       // その調査の受け取れる回をまとめて受け取る
       const { claimable } = this._runsOf(id, api.state?.runs ?? []);
-      const got = [];
-      for (const r of claimable) got.push(...(await this.claimRun(id, r.id, { quiet: true, refresh: false })));
-      await api.refresh();
+      await this.claimMany(claimable.map((r) => ({ project: id, run: r.id })));
     }
   }
 }

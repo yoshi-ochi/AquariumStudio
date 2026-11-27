@@ -146,23 +146,22 @@ export class MailView {
     return `${result}<div class="st-sum gf-ready"><b>🎁 受け取れる合同調査の成果 ${runs.length}件</b><small>${esc(names)}</small><button data-act="mail-ally-all" class="primary tv-wide" ${this.busy ? 'disabled' : ''}>${this.busy ? '受け取り中…' : 'すべて受け取る'}</button></div>`;
   }
 
-  /** 合同調査の成果をまとめて受け取る（サーバーへ1件ずつ確認する） */
+  /** 合同調査の成果をまとめて受け取る（サーバーへ数件ずつ並行で確認し、最後に1回だけ読み直す） */
   async claimAllRuns(rerender) {
     if (this.busy) return;
     this.busy = true;
     rerender?.();
     const got = [];
     let runs = 0;
+    const mails = this.pendingRuns;
     try {
-      for (const m of this.pendingRuns) {
-        const list = await this.allianceView.claimRun(m.data.project, m.data.run, { quiet: true });
-        if (!list.length) {
-          this.mailbox.finish(m.id, '受け取り済みです');
-          continue;
-        }
+      const lists = await this.allianceView.claimMany(mails.map((m) => m.data));
+      lists.forEach((list, i) => {
+        if (!list) return;
+        if (!list.length) return this.mailbox.finish(mails[i].id, '受け取り済みです');
         got.push(...list);
         runs++;
-      }
+      });
     } catch (err) {
       this.toast(err.message, { error: true });
     } finally {
