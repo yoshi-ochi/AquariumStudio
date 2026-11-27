@@ -6,8 +6,8 @@ import { normalizeLook, PALETTE, FRAME_COLORS } from './tankLook.js';
 import { SAND_TYPES } from './sandLook.js';
 import { floorLabel } from '../building/blueprint.js';
 import { specOf, pointCount, LEVELS } from '../flora/floraBuilder.js';
+import { coin as yen } from '../ui/currency.js';
 
-const yen = (n) => `¥${Math.round(n).toLocaleString('ja-JP')}`;
 const cm = (v) => Math.round(v * 100);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 

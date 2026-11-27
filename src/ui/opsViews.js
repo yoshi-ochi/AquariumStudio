@@ -3,8 +3,8 @@ import { artIcon } from './artIcons.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 import { ROLES, GUIDE_MAX, PRODUCTS, PRICE_TIERS, LOT_SIZE, SALES_PER_STAFF } from '../management/opsData.js';
 import { cleanSpec, dirtLevel, isCleaning, needsCleaning, startCleaning, busyCleaners } from '../tanks/tankCleaning.js';
+import { coin as yen } from './currency.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const span = (s) => {
   if (s >= 3600) return `${Math.floor(s / 3600)}時間${Math.floor((s % 3600) / 60)}分`;
   return s >= 60 ? `${Math.floor(s / 60)}分` : `${Math.max(0, Math.ceil(s))}秒`;

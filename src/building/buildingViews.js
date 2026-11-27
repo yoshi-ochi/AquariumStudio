@@ -1,17 +1,20 @@
 import { creatureThumb } from '../ui/creatureThumb.js';
 import { PLAN_FLOORS, WING_FLOORS, isWing, ZONES, ZONE_TYPE, MAX_ZONE_NAME, defaultZoneName, floorLabel, getZone } from './blueprint.js';
+import { pickBoost } from '../ui/boostPicker.js';
+import { jobHtml, boostButton, timeNote } from './builder.js';
+import { zoneSeconds } from '../management/buildTimes.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 import { EXPAND_COST, EXPAND_SLOTS } from './backyardData.js';
 import { CREATURES, RARITY_NAME, getCreature } from '../expedition/creatureData.js';
 import { RESEARCH, BREED_HOURS, researchCost, breedHours } from './backyardData.js';
+import { coin as yen } from '../ui/currency.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 
 /** 館内エリアの解放と、解放済みエリアの名前・床と壁の色 */
 export class ZoneView {
-  constructor({ economy, getUnlocked, onUnlock, getLook, onLook, onRename }) {
-    Object.assign(this, { economy, getUnlocked, onUnlock, getLook, onLook, onRename });
+  constructor({ economy, getUnlocked, onUnlock, getLook, onLook, onRename, builder }) {
+    Object.assign(this, { economy, getUnlocked, onUnlock, getLook, onLook, onRename, builder });
     this.editing = null;
   }
 
@@ -37,8 +40,10 @@ export class ZoneView {
           return this.editing === z.id ? row + this._editor(z) : row;
         }
         const lack = z.stage > level ? (z.wing ? `レベル${z.stage}で建設できます` : `ステージ${z.stage}で解放`) : z.requires && !unlocked.has(z.requires) ? `先に${esc(getZone(z.requires).name)}を解放` : '';
+        const job = this.builder?.job('zone', z.id);
+        if (job) return `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small>${jobHtml(job)}</div>${boostButton(job)}</div>`;
         const ok = !lack && this.economy.canAfford(z.cost);
-        return `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small>${lack ? `<small>${lack}</small>` : ''}</div><button data-act="zone-open" data-id="${z.id}" class="primary" ${ok ? '' : 'disabled'}>${z.wing ? (z.requires ? '増築 ' : '建設 ') : ''}${yen(z.cost)}</button></div>`;
+        return `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small>${lack ? `<small>${lack}</small>` : ''}</div><button data-act="zone-open" data-id="${z.id}" class="primary" ${ok ? '' : 'disabled'}>${z.wing ? (z.requires ? '増築 ' : '建設 ') : ''}${yen(z.cost)}${timeNote(zoneSeconds(z))}</button></div>`;
       });
       return `<h4 class="gs-sub">${floorLabel(floor)}</h4>${items.join('')}`;
     });
@@ -58,17 +63,21 @@ export class ZoneView {
     else if (act === 'zone-rename') this.onRename(id, b?.closest('.gs-list')?.querySelector('#zn-name')?.value ?? '');
     else if (act === 'zone-color-reset') this.onLook(id, null);
     if (act.startsWith('zone-') && act !== 'zone-open') return true;
+    if (act === 'build-boost') {
+      const [kind, jid] = id.split('|');
+      this.builder?.boost(kind, jid);
+      return true;
+    }
     if (act !== 'zone-open') return false;
-    const z = getZone(id);
-    if (this.economy.spend(z.cost)) this.onUnlock(id);
+    this.onUnlock(id); // 払いと工事は builder（main.js）
     return true;
   }
 }
 
 /** バックヤード：研究と繁殖 */
 export class BackyardView {
-  constructor({ backyard, expeditions, economy, previews, toast }) {
-    Object.assign(this, { backyard, expeditions, economy, previews, toast });
+  constructor({ backyard, expeditions, economy, previews, toast, items, wallet }) {
+    Object.assign(this, { backyard, expeditions, economy, previews, toast, items, wallet });
   }
 
   html() {
@@ -98,7 +107,7 @@ export class BackyardView {
     const job = b.jobs[uid];
     if (job) {
       const c = getCreature(job.id);
-      return `<div class="gs-row">${creatureThumb(this.previews, job.id)}<div class="gs-info"><b>繁殖水槽${i + 1}：${c.name}</b><small>誕生まで <span data-until="${job.until}"></span></small></div></div>`;
+      return `<div class="gs-row">${creatureThumb(this.previews, job.id)}<div class="gs-info"><b>繁殖水槽${i + 1}：${c.name}</b><small>誕生まで <span data-until="${job.until}"></span></small></div>${this.items ? `<button data-act="breed-boost" data-id="${uid}">⚡加速</button>` : ''}</div>`;
     }
     const opts = CREATURES.filter((c) => this.expeditions.count(c.id) >= 2 && b.canBreed(c));
     const rows = opts.map((c) => `<button data-act="breed" data-id="${uid}:${c.id}">${c.name}（${RARITY_NAME[c.rarity]}・${breedHours(c.rarity, b.level('breeding'))}時間）</button>`);
@@ -110,7 +119,10 @@ export class BackyardView {
     if (act === 'hold-expand') {
       if (this.economy.spend(EXPAND_COST)) b.expand();
     } else if (act === 'lab-up') b.upgrade(id);
-    else if (act === 'breed') {
+    else if (act === 'breed-boost') {
+      const job = b.jobs[id];
+      if (job) pickBoost({ items: this.items, wallet: this.wallet, toast: this.toast, left: (job.until - Date.now()) / 1000, title: '繁殖の加速' }).then((sec) => sec && b.boostJob(id, sec));
+    } else if (act === 'breed') {
       const [uid, cid] = id.split(':');
       b.startBreeding(+uid, cid);
     } else return false;

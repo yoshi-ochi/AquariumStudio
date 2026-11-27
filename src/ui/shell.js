@@ -1,18 +1,20 @@
 import { CATEGORY } from '../tanks/tankData.js';
 import { floorLabel } from '../building/blueprint.js';
+import { coin as yen, coinText } from './currency.js';
+import { fmtLeft, stageSeconds } from '../management/buildTimes.js';
 
 /** 階の並びの中で隣の階 */
 const stepFloor = (order, floor, d) => order[order.indexOf(floor) + d];
 
 const $ = (id) => document.getElementById(id);
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 
 /**
  * 画面の外枠：上部ボタン（メニュー・戻る・編集・完了）、メニュー、編集シートの表示切替。
  * モード: 'home' | 'tank' | 'hall-edit' | 'interior-edit'
  */
 export class AppShell {
-  constructor({ economy, manager, getFloorOrder, onBack, onEdit, onShare, onDone, onFloorChange, onUpgrade }) {
+  constructor({ economy, manager, getFloorOrder, onBack, onEdit, onShare, onDone, onFloorChange, onUpgrade, getStageJob = () => null }) {
+    this.getStageJob = getStageJob;
     this.economy = economy;
     this.manager = manager;
     this.mode = 'home';
@@ -63,7 +65,7 @@ export class AppShell {
     const e = this.economy;
     const st = e.stage;
     $('menu-stats').textContent =
-      `資金 ${yen(e.money)} ・ 来館者 ${e.visitors.toLocaleString('ja-JP')}人 ・ 水槽 ${this.manager.countByCategory(CATEGORY.TANK)}基`;
+      `コイン ${coinText(e.money)} ・ 来館者 ${e.visitors.toLocaleString('ja-JP')}人 ・ 水槽 ${this.manager.countByCategory(CATEGORY.TANK)}基`;
     $('floor-label').textContent = floorLabel(e.floor);
     const order = this.getFloorOrder();
     $('floor-down').disabled = stepFloor(order, e.floor, -1) === undefined;
@@ -71,7 +73,13 @@ export class AppShell {
     $('menu-stage').textContent = `Lv${st.level} ${st.name}`;
     const next = e.nextStage;
     const up = $('btn-upgrade');
-    up.textContent = next ? `拡張 ${yen(next.upgradeCost)}` : '最大規模';
+    const job = this.getStageJob();
+    if (job) {
+      up.textContent = `昇格工事中 残り${fmtLeft((job.until - Date.now()) / 1000)} ⚡加速`;
+      up.disabled = false;
+      return;
+    }
+    up.textContent = next ? `拡張 ${coinText(next.upgradeCost)} ・ ${fmtLeft(stageSeconds(next.level))}` : '最大規模';
     up.disabled = !next || !e.canAfford(next.upgradeCost);
   }
 

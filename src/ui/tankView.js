@@ -5,9 +5,9 @@ import { MAX_PIECES } from '../expedition/growth.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
 import { WATER, ensureCare, feedCost, hasLife, isHungry, predatorConflict, tankHealth, waterMismatch, nextFeedIn, crowdFactor, FEED_INTERVAL } from '../expedition/husbandry.js';
 import { tankLabel, defaultTankLabel, cleanTankName } from '../tanks/tankLabel.js';
+import { coin as yen } from './currency.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const span = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}時間${Math.floor((s % 3600) / 60)}分` : `${Math.max(1, Math.ceil(s / 60))}分`);
 
 /**

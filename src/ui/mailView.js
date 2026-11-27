@@ -6,9 +6,9 @@ import { tankLabel } from '../tanks/tankLabel.js';
 import { icon } from './icons.js';
 import { catchBlocks, countIds } from './catchBlocks.js';
 import { TAB_OF, gradeOf } from '../game/mailbox.js';
+import { coin as yen, coinText } from './currency.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const num = (n) => Math.floor(n).toLocaleString('ja-JP');
 const when = (t) => {
   const d = new Date(t);
@@ -261,7 +261,7 @@ export class MailView {
       mb.remove(m.id);
     } else if (act === 'mail-take') {
       this.economy.earn(m.data.net);
-      mb.finish(m.id, `${yen(m.data.net)} を受け取りました`);
+      mb.finish(m.id, `${coinText(m.data.net)} を受け取りました`);
     } else if (act === 'mail-claim') {
       if (!this.claimTrips([m.data.seed]).trips) mb.finish(m.id, '受け取り済みです');
     } else if (act === 'mail-ally-claim') {

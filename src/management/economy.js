@@ -51,11 +51,19 @@ export class Economy extends EventTarget {
   upgradeStage() {
     const next = this.nextStage;
     if (!next) return { ok: false, reason: 'これ以上拡張できません' };
-    if (!this.canAfford(next.upgradeCost)) return { ok: false, reason: '資金が足りません' };
+    if (!this.canAfford(next.upgradeCost)) return { ok: false, reason: 'コインが足りません' };
     this.money -= next.upgradeCost;
     this.stageIndex++;
     this._emit();
     return { ok: true };
+  }
+
+  /** 昇格の工事が終わった（費用は工事を始めたときに払っている） */
+  completeUpgrade() {
+    if (!this.nextStage) return false;
+    this.stageIndex++;
+    this._emit();
+    return true;
   }
 
   setFloor(floor) {

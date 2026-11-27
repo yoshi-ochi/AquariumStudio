@@ -743,3 +743,23 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 .gd-shake { animation: gd-shake .35s; }
 @keyframes gd-shake { 25% { margin-left: -8px; } 75% { margin-left: 8px; } }
 #goal-card { cursor: pointer; } #goal-card .goal-how { color: #ffe08a; font-weight: 700; }
+
+/* 通貨の表示（コイン・ダイヤ） */
+.cur { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; vertical-align: -2px; }
+.cur svg { flex: none; }
+.cur-coin svg { color: #d9a400; }
+.cur-dia svg { color: #3fb6e8; }
+/* HUD のダイヤ（タップでショップ）。コインの下に並べる */
+#hud .hud-stat.gem { display: flex; grid-column: 3; grid-row: 2; margin: 0; min-height: 0; border: 0; color: inherit; font: inherit; cursor: pointer; }
+#hud .hud-stat.gem svg, #hud .hud-stat.gem b { color: #7fd8ff; }
+#hud .hud-stat.money { grid-column: 2; grid-row: 2; }
+@media (min-width: 340px) {
+  #hud .hud-stat.money { grid-column: 4; grid-row: 1; height: 22px; border-radius: 11px; }
+  #hud .hud-stat.money b { font-size: 13px; }
+  #hud .hud-stat.gem { grid-column: 4; grid-row: 2; }
+}
+body.editing #hud .hud-stat.gem, body[data-mode=tank] #hud .hud-stat.gem { display: none; }
+body.editing #hud .hud-stat.money, body[data-mode=tank] #hud .hud-stat.money { grid-row: 1; }
+.st-tasks { list-style: none; margin: 4px 0; padding: 0; font-size: 12px; }
+.st-tasks li.done { opacity: .6; }
+.bd-job { color: #e0a000; }

@@ -5,15 +5,16 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 import { CREATURES, SEASONS, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
 import { getMethod, methodsAt, waterOf } from '../expedition/fishingData.js';
+import { coin as yen, coinText } from './currency.js';
+import { pickBoost, pickCatchMult } from './boostPicker.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 export const fmtTime = (s) => (s >= 60 ? `${Math.floor(s / 60)}分${s % 60 ? `${s % 60}秒` : ''}` : `${s}秒`);
 const until = (t) => `<span data-until="${t}">${fmtTime(Math.max(0, Math.ceil((t - Date.now()) / 1000)))}</span>`;
 
 /** 採取遠征：調査隊の状況と行き先 */
 export class ExpeditionView {
-  constructor({ economy, expeditions, toast, getHome, previews, getDiscount, getCapacity, fishing }) {
-    Object.assign(this, { economy, expeditions, toast, getHome, previews, getDiscount, getCapacity, fishing });
+  constructor({ economy, expeditions, toast, getHome, previews, getDiscount, getCapacity, fishing, items, wallet, onChange }) {
+    Object.assign(this, { economy, expeditions, toast, getHome, previews, getDiscount, getCapacity, fishing, items, wallet, onChange });
     this.focus = null; // 地図で選んだ採取地
     this.methodId = null; // 選んだ漁法
   }
@@ -25,13 +26,13 @@ export class ExpeditionView {
       const d = getDestination(t.dest);
       return ex.isDone(t)
         ? `<div class="gs-row"><div class="gs-info"><b>${d.name}</b><small>調査隊が帰還しました</small></div><button data-act="claim" data-id="${i}" class="primary">受け取る</button></div>`
-        : `<div class="gs-row"><div class="gs-info"><b>${d.name}</b><small>採取中 ・ 残り ${until(t.doneAt)}</small></div></div>`;
+        : `<div class="gs-row"><div class="gs-info"><b>${d.name}</b><small>採取中 ・ 残り ${until(t.doneAt)}</small></div>${this.items ? `<button data-act="trip-boost" data-id="${i}">⚡加速</button>` : ''}</div>`;
     });
     const teamCost = ex.nextTeamCost;
     const addTeam = teamCost == null
       ? '<small>調査隊は上限まで追加済みです</small>'
       : `<button data-act="team-add" ${this.economy.canAfford(teamCost) ? '' : 'disabled'}>調査隊を追加 ${yen(teamCost)}</button>`;
-    const status = `<div class="st-sum"><div class="st-head"><b>調査隊 ${ex.trips.length}/${ex.teamLimit(level)}隊</b><small>追加 ${ex.extraTeams}隊</small></div>${addTeam}</div>${trips.join('')}`;
+    const status = `<div class="st-sum"><div class="st-head"><b>調査隊 ${ex.trips.length}/${ex.teamLimit(level)}隊</b><small>追加 ${ex.extraTeams}隊${ex.getBonusTeams() ? ` ・ 特典 ${ex.getBonusTeams()}隊` : ''}</small></div>${addTeam}</div>${trips.join('')}`;
     const d = this.focus && getDestination(this.focus);
     if (!d) return `${status}<p class="gs-empty">地図の採取地をタップして行き先を選びます。</p>`;
     const methods = methodsAt(d);
@@ -94,16 +95,37 @@ export class ExpeditionView {
       });
       return true;
     }
-    if (act === 'claim') {
+    if (act === 'trip-boost') {
       const trip = ex.trips[+id];
-      const caught = ex.claim(+id);
-      const label = (list) => [...new Set(list)].map((c) => `${getCreature(c).name}×${list.filter((x) => x === c).length}`).join('、');
-      const released = ex.released.length ? `／満杯のため放流：${label(ex.released)}` : '';
-      const text = `${label(caught) || '持ち帰れる生き物はいませんでした'}${released}`;
-      if (trip?.method) this.fishing.play(trip.method, text, waterOf(getDestination(trip.dest)));
+      if (!trip || ex.isDone(trip)) return true;
+      pickBoost({ items: this.items, wallet: this.wallet, toast: this.toast, left: (trip.doneAt - Date.now()) / 1000, title: '遠征の加速' }).then((sec) => {
+        const i = ex.trips.indexOf(trip);
+        if (sec && i >= 0) ex.boost(i, sec);
+        this.onChange?.();
+      });
+      return true;
+    }
+    if (act === 'claim') {
+      this._claim(+id);
       return true;
     }
     return false;
+  }
+
+  /** 成果を見せてから受け取る（採取倍のアイテムで2倍・4倍にできる） */
+  async _claim(index) {
+    const ex = this.expeditions;
+    const trip = ex.trips[index];
+    if (!trip || !ex.isDone(trip)) return;
+    const label = (list) => [...new Set(list)].map((c) => `${getCreature(c).name}×${list.filter((x) => x === c).length}`).join('、');
+    const mult = this.items ? await pickCatchMult({ items: this.items, toast: this.toast, caught: ex.preview(index), label }) : 1;
+    const i = ex.trips.indexOf(trip);
+    if (!mult || i < 0) return this.onChange?.();
+    const caught = ex.claim(i, Date.now(), mult);
+    const released = ex.released.length ? `／満杯のため放流：${label(ex.released)}` : '';
+    const text = `${label(caught) || '持ち帰れる生き物はいませんでした'}${released}`;
+    if (trip.method) this.fishing.play(trip.method, text, waterOf(getDestination(trip.dest)));
+    this.onChange?.();
   }
 }
 
@@ -205,7 +227,7 @@ export class CreatureView {
     this.expeditions.take(id, n);
     if (act === 'dish') {
       this.economy.earn(dishPrice(c) * n);
-      this.toast(`${c.name}を${n}匹、食堂で提供しました（+${yen(dishPrice(c) * n)}）`);
+      this.toast(`${c.name}を${n}匹、食堂で提供しました（+${coinText(dishPrice(c) * n)}）`);
     } else this.toast(`${c.name}を${n}匹、海へ放流しました`);
     this.onChanged();
   }

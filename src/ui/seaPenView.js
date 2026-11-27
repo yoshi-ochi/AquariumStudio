@@ -1,8 +1,10 @@
 import { CREATURES, getCreature } from '../expedition/creatureData.js';
-import { PEN, PEN_N, sectionSize } from '../building/seaPen.js';
+import { PEN, PEN_N, sectionSize, sectionCells } from '../building/seaPen.js';
 import { creatureThumb } from './creatureThumb.js';
+import { coin as yen } from './currency.js';
+import { jobHtml, boostButton, timeNote } from '../building/builder.js';
+import { PEN_UNLOCK_SECONDS, PEN_CELL_SECONDS } from '../management/buildTimes.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const num = (n) => Math.round(n).toLocaleString('ja-JP');
 const HUES = [150, 40, 280, 340, 90, 20, 200, 120, 60, 310];
 
@@ -10,8 +12,8 @@ const HUES = [150, 40, 280, 340, 90, 20, 200, 120, 60, 310];
  * 屋外生け簀の画面：解放、区画づくり（5m 格子の2点を選ぶ）、区画ごとの生き物の出し入れ。
  */
 export class SeaPenView {
-  constructor({ pen, economy, expeditions, previews, toast, onLook }) {
-    Object.assign(this, { pen, economy, expeditions, previews, toast, onLook });
+  constructor({ pen, economy, expeditions, previews, toast, onLook, builder }) {
+    Object.assign(this, { pen, economy, expeditions, previews, toast, onLook, builder });
     this.anchor = null; // 区画の1点目 [i, j]
     this.pending = null; // 作る前の長方形
     this.sel = null; // 選んでいる区画の id
@@ -19,16 +21,19 @@ export class SeaPenView {
 
   html() {
     const level = this.economy.stage.level;
+    const penJob = this.builder.job('pen', 'pen');
+    if (penJob) return `<div class="gs-row"><div class="gs-info"><b>屋外生け簀</b>${jobHtml(penJob)}</div>${boostButton(penJob)}</div>`;
     if (!this.pen.unlocked) {
       const ok = this.pen.canUnlock(level) && this.economy.canAfford(PEN.unlockCost);
       return `<p class="gs-empty">本館の右手の海に、${PEN.size}m×${PEN.size}m の生け簀を作ります。${PEN.cell}m 単位で自由に区切り、区画ごとに大型の生き物を展示できます。</p>
         ${level < PEN.unlockLevel ? `<p class="gs-empty">水族館レベル${PEN.unlockLevel}で解放できます（現在 Lv${level}）</p>` : ''}
-        <button data-act="pen-unlock" class="primary tv-wide" ${ok ? '' : 'disabled'}>生け簀を作る ${yen(PEN.unlockCost)}</button>`;
+        <button data-act="pen-unlock" class="primary tv-wide" ${ok ? '' : 'disabled'}>生け簀を作る ${yen(PEN.unlockCost)}${timeNote(PEN_UNLOCK_SECONDS)}</button>`;
     }
     const s = this.sel && this.pen.getSection(this.sel);
+    const cellJob = this.builder.job('penCell');
     return `<div class="gs-btns"><button data-act="pen-look" class="primary">生け簀を見る</button></div>
       <p class="gs-empty">空いているマスを2つタップすると、その2点を対角にした区画を作れます（1マス ${PEN.cell}m・費用 ${yen(PEN.cellCost)}/マス）。区画をタップすると生き物を出し入れできます。</p>
-      ${this._grid()}${this._pending()}${s ? this._section(s) : ''}`;
+      ${cellJob ? `<div class="gs-row"><div class="gs-info"><b>区画の工事</b>${jobHtml(cellJob)}</div>${boostButton(cellJob)}</div>` : ''}${this._grid()}${this._pending()}${s ? this._section(s) : ''}`;
   }
 
   _grid() {
@@ -54,7 +59,7 @@ export class SeaPenView {
     const { w, d } = sectionSize(this.pending);
     const cost = this.pen.buildCost(this.pending);
     return `<div class="gs-row wrap"><div class="gs-info"><b>新しい区画 ${w}m×${d}m</b><small>収容枠 ${num(w * d * PEN.slotsPerM2)} ・ 水深 ${PEN.depth}m</small></div>
-      <div class="gs-btns"><button data-act="pen-build" class="primary" ${this.economy.canAfford(cost) ? '' : 'disabled'}>作る ${yen(cost)}</button><button data-act="pen-cancel">やめる</button></div></div>`;
+      <div class="gs-btns"><button data-act="pen-build" class="primary" ${this.economy.canAfford(cost) ? '' : 'disabled'}>作る ${yen(cost)}${timeNote(sectionCells(this.pending) * PEN_CELL_SECONDS)}</button><button data-act="pen-cancel">やめる</button></div></div>`;
   }
 
   _section(s) {
@@ -75,16 +80,21 @@ export class SeaPenView {
   }
 
   act(act, id) {
+    if (act === 'build-boost') {
+      const [kind, jid] = id.split('|');
+      this.builder.boost(kind, jid);
+      return true;
+    }
     if (!act.startsWith('pen-')) return false;
     const pen = this.pen;
     if (act === 'pen-unlock') {
-      if (pen.canUnlock(this.economy.stage.level) && this.economy.spend(PEN.unlockCost)) pen.unlock();
+      this.builder.orderPen();
     } else if (act === 'pen-look') this.onLook();
     else if (act === 'pen-cancel') this.anchor = this.pending = null;
     else if (act === 'pen-close') this.sel = null;
     else if (act === 'pen-cell') this._cell(id.split(':').map(Number));
     else if (act === 'pen-build') {
-      if (this.pending && this.economy.spend(pen.buildCost(this.pending))) this.sel = pen.addSection(this.pending).id;
+      if (this.pending) this.builder.orderPenCell(this.pending);
       this.anchor = this.pending = null;
     } else if (act === 'pen-in') this._move(id, true);
     else if (act === 'pen-out') this._move(id, false);
