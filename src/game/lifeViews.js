@@ -80,7 +80,9 @@ export class ZukanView {
 
   get groups() {
     const joint = [...new Set(JOINT_PROJECTS.flatMap((p) => p.pool))];
-    return [...DESTINATIONS.map((d) => ({ id: d.id, name: d.name, ids: d.pool, reward: d.cost * 5 })), { id: 'joint', name: '合同調査', ids: joint, reward: 3000000 }];
+    // 卵ガチャ限定種は見るだけ（達成報酬なし：コンプガチャ規制のため）
+    const gacha = CREATURES.filter((c) => c.gacha).map((c) => c.id);
+    return [...DESTINATIONS.map((d) => ({ id: d.id, name: d.name, ids: d.pool, reward: d.cost * 5 })), { id: 'joint', name: '合同調査', ids: joint, reward: 3000000 }, ...(gacha.length ? [{ id: 'gacha', name: '卵ガチャ', ids: gacha, reward: 0 }] : [])];
   }
 
   /** 育成：在庫があるか展示している魚種を、ピースの多い順に */
@@ -101,7 +103,7 @@ export class ZukanView {
   html() {
     const ex = this.expeditions;
     const seen = (id) => ex.seenCount(id) > 0;
-    const total = CREATURES.filter((c) => seen(c.id) && !c.retired).length;
+    const total = CREATURES.filter((c) => seen(c.id) && !c.retired && !c.gacha).length; // 発見数にガチャ限定種は数えない
     if (this.pick && !seen(this.pick)) this.pick = null;
     const mode = this.mode;
     const tab = (id, label) => `<button data-act="zk-mode" data-id="${id}" class="${mode === id ? 'active' : ''}">${label}</button>`;
@@ -121,13 +123,13 @@ export class ZukanView {
           : '<div class="zk-cell unknown"><span>？</span><small>未発見</small></div>';
         return i === rowEnd ? cell + this._pop(this.pick, at % 4) : cell;
       }).join('');
-      const reward = done && !claimed ? `<button data-act="zk-claim" data-id="${g.id}" class="primary">達成報酬 ${yen(g.reward)} ＋ ${dia(EARN.place)}</button>` : '';
+      const reward = done && !claimed && g.reward ? `<button data-act="zk-claim" data-id="${g.id}" class="primary">達成報酬 ${yen(g.reward)} ＋ ${dia(EARN.place)}</button>` : '';
       const count = mode === 'grow' ? `${g.ids.length}種` : `${got}/${g.ids.length}`;
       return `<h4 class="gs-sub">${g.name} ${count}${mode === 'area' && claimed ? ' ・ 達成' : ''}</h4><div class="zk-grid">${cells || '<p class="gs-empty">在庫か展示中の生き物がいません。</p>'}</div>${reward}`;
     });
     const hint = '<p class="gs-empty">魚種をタップすると、在庫の同じ魚種を使って育てられます。育つほど体が大きくなり、集客とランキングの点数が上がります。</p>';
     const reward = [...RARITY_LIST].reverse().map((r) => `${RARITY_NAME[r]} ${yen(DISCOVERY_REWARD[r])}`).join(' ・ ');
-    return `<p class="gs-empty">発見 ${total}/${CREATURES.filter((c) => !c.retired).length}種 ・ 新種を発見すると報酬（${reward}）</p>${tabs}${mode === 'grow' ? hint : ''}${sections.join('')}`;
+    return `<p class="gs-empty">発見 ${total}/${CREATURES.filter((c) => !c.retired && !c.gacha).length}種 ・ 新種を発見すると報酬（${reward}）</p>${tabs}${mode === 'grow' ? hint : ''}${sections.join('')}`;
   }
 
   /** 数のスライダー（再描画しない） */
@@ -145,7 +147,7 @@ export class ZukanView {
       if (growSpecies(this, id)) this.qty = 1;
     } else if (act === 'zk-claim') {
       const g = this.groups.find((x) => x.id === id);
-      if (!this.state.zukan.includes(id)) {
+      if (g?.reward && !this.state.zukan.includes(id)) {
         this.state.zukan.push(id);
         this.economy.earn(g.reward);
         this.wallet?.grant(EARN.place, `${g.name} の図鑑を達成`);

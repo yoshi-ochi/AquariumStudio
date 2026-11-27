@@ -4,6 +4,8 @@ import { isModeled } from '../expedition/speciesRelease.js';
 import { RELEASES } from '../expedition/speciesReleases.js';
 import { esc, toast } from './adminUi.js';
 
+const GACHA_CAT = { fish: '魚類・古代魚', amphibian: '両生類', reptile: '爬虫類', bird: '鳥類' };
+
 /**
  * モデル待ちタブ：追加予定種（speciesRoster.js）とリスト外の種の一覧。参考画像（横・上・正面・その他）とメモを登録し、
  * 「モデル制作へ」で制作を依頼する。画像は Supabase の非公開ストレージ species-ref、状況は species_intake 表（supabase/species_intake.sql）。
@@ -56,7 +58,7 @@ export class ModelingTab {
   /** 一覧の項目 [{ id, name, places, planned, row, state }] */
   _list() {
     const rows = this.rows ?? {};
-    const out = PLANNED.map((p) => ({ id: p.id, name: p.name, planned: p, places: plannedPlaceIds(p).map(placeName) }));
+    const out = PLANNED.map((p) => ({ id: p.id, name: p.name, planned: p, places: p.gacha ? [`卵ガチャ（${GACHA_CAT[p.gacha]}）`] : plannedPlaceIds(p).map(placeName) }));
     for (const r of Object.values(rows)) if (!out.some((x) => x.id === r.id)) out.push({ id: r.id, name: r.name, places: [] });
     for (const x of out) {
       x.row = rows[x.id];

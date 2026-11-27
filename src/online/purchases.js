@@ -61,6 +61,21 @@ export class Purchases {
     if (error) throw new Error(error.message);
   }
 
+  /**
+   * 卵ガチャの乱数（1回に2つ）。有償ダイヤを使う回はサーバーで抽選の乱数を作り、有償ダイヤもサーバーで減らす（gacha.sql）。
+   * { rand, serverPaid } を返す。serverPaid なら wallet.spend は remote: false で呼ぶ
+   */
+  async gachaRandom(cat, count, paidPart) {
+    if (this.mode === 'dev' || paidPart <= 0) {
+      const a = new Uint32Array(count * 2);
+      crypto.getRandomValues(a);
+      return { rand: [...a].map((x) => x / 2 ** 32), serverPaid: false };
+    }
+    const { data, error } = await this.online.sb.rpc('gacha_draw', { p_machine: cat, p_count: count, p_paid: paidPart });
+    if (error) throw new Error(error.message);
+    return { rand: data, serverPaid: true };
+  }
+
   /** 商品を買う。開発中はその場で付与する */
   async buy(productId) {
     if (this.mode !== 'dev') throw new Error('App内課金は準備中です');
