@@ -1,6 +1,8 @@
 import { ITEMS, PACKS, PASS, TEAM_UNLOCK, EXCHANGE, EARN, getItem } from '../management/walletData.js';
 import { jobHtml, boostButton } from '../building/builder.js';
 import { coin, dia } from './currency.js';
+import { BIGWOOD_SET } from '../decor/decorData.js';
+import { INTERIOR_DEFS } from '../tanks/tankData.js';
 
 const date = (t) => new Date(t).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const kindName = { catch: '採取倍', boost: '加速', nurse: '保育管理', event: 'イベントカード' };
@@ -36,9 +38,12 @@ export class StoreView {
       <small>放置収入の上限${PASS.offlineHours}時間 ・ 調査隊+${PASS.teams}（期間中） ・ 採取倍${PASS.catchCards}枚 ・ ${PASS.dia.toLocaleString('ja-JP')}ダイヤ</small>
       <small>${w.hasPass() ? `有効：${date(w.passUntil)}まで（買い足すと${PASS.days}日延長）` : '未購入'}</small></div>${buy(PASS.id, PASS.yen)}</div>`;
     const teams = `<div class="gs-row"><div class="gs-info"><b>調査隊の永久解放</b><small>同時に出せる調査隊が1隊ずつ増えます（${TEAM_UNLOCK.max}隊まで） ・ 解放済み ${w.teams}/${TEAM_UNLOCK.max}</small></div>${buy(TEAM_UNLOCK.id, TEAM_UNLOCK.yen, w.teams < TEAM_UNLOCK.max)}</div>`;
+    const woodOwned = INTERIOR_DEFS.filter((d) => d.unlock === 'dia');
+    const woodLeft = woodOwned.filter((d) => !this.purchases.decor?.ownsDef(d)).length;
+    const wood = `<div class="gs-row"><div class="gs-info"><b>大型流木セット</b><small>大型流木5形（枝分かれ・根張り・アーチ・倒木・ねじれ）をまとめて解放。1形ずつならカタログから${BIGWOOD_SET.dia ?? 300}ダイヤ ・ 未解放 ${woodLeft}/${woodOwned.length}</small></div>${buy(BIGWOOD_SET.id, BIGWOOD_SET.yen, woodLeft > 0)}</div>`;
     const packs = PACKS.map((p) => `<div class="gs-row"><div class="gs-info"><b>${dia(p.dia)}</b></div>${buy(p.id, p.yen)}</div>`).join('');
     const note = dev ? '<p class="gs-empty">開発中のテスト購入です（この端末にだけ記録され、お金はかかりません）。</p>' : '<p class="gs-empty">App内課金は準備中です。</p>';
-    return `${wallet}${daily}${work}${groups}${pass}${teams}<h4 class="gs-sub">ダイヤ</h4>${note}${packs}`;
+    return `${wallet}${daily}${work}${groups}${pass}${teams}${wood}<h4 class="gs-sub">ダイヤ</h4>${note}${packs}`;
   }
 
   act(act, id) {

@@ -1,4 +1,6 @@
 import { PACKS, PASS, TEAM_UNLOCK } from '../management/walletData.js';
+import { BIGWOOD_SET, objKey } from '../decor/decorData.js';
+import { INTERIOR_DEFS } from '../tanks/tankData.js';
 
 /**
  * 購入の窓口。有償ダイヤ・館長パス・調査隊の永久解放はサーバー（supabase/wallet.sql）で管理する。
@@ -26,8 +28,8 @@ function writeDev(v) {
 }
 
 export class Purchases {
-  constructor({ wallet, items, online }) {
-    Object.assign(this, { wallet, items, online });
+  constructor({ wallet, items, online, decor }) {
+    Object.assign(this, { wallet, items, online, decor });
     wallet.spendPaidRemote = (n, reason) => this._spendPaid(n, reason);
   }
 
@@ -86,6 +88,8 @@ export class Purchases {
       w.passUntil = Math.max(Date.now(), w.passUntil) + PASS.days * DAY;
       w.paid += PASS.dia;
       this.items.add('catchX2', PASS.catchCards);
+    } else if (productId === BIGWOOD_SET.id) {
+      this.decor?.grant(INTERIOR_DEFS.filter((d) => d.unlock === 'dia').map((d) => objKey(d.id))); // 大型流木を全部解放
     } else if (productId === TEAM_UNLOCK.id) {
       if (w.teams >= TEAM_UNLOCK.max) throw new Error('これ以上解放できません');
       w.teams += 1;

@@ -29,9 +29,9 @@ export const TANK_DEFS = [
 ].map(withCategory(CATEGORY.TANK));
 
 export const STRUCTURE_DEFS = [
-  { id: 'stand60', name: '水槽台 60cm', shape: 'stand', size: { w: 0.6, h: 0.7, d: 0.32 }, price: 5000, supportsTanks: true },
-  { id: 'stand120', name: '水槽台 120cm', shape: 'stand', size: { w: 1.2, h: 0.7, d: 0.47 }, price: 12000, supportsTanks: true },
-  { id: 'stand180', name: '水槽台 180cm', shape: 'stand', size: { w: 1.8, h: 0.7, d: 0.62 }, price: 20000, supportsTanks: true },
+  { id: 'stand60', name: '水槽台 60cm', shape: 'stand', size: { w: 0.6, h: 0.7, d: 0.32 }, price: 5000, supportsTanks: true, skin: 'stand' },
+  { id: 'stand120', name: '水槽台 120cm', shape: 'stand', size: { w: 1.2, h: 0.7, d: 0.47 }, price: 12000, supportsTanks: true, skin: 'stand' },
+  { id: 'stand180', name: '水槽台 180cm', shape: 'stand', size: { w: 1.8, h: 0.7, d: 0.62 }, price: 20000, supportsTanks: true, skin: 'stand' },
   { id: 'wall', name: '仕切り壁', shape: 'wall', size: { w: 3, h: 2.4, d: 0.12 }, price: 8000 },
   { id: 'staffDoor', name: '飼育員用ドア', shape: 'staffDoor', size: { w: 0.9, h: 2.05, d: 0.14 }, price: 20000, wallMount: true },
   { id: 'researchLab', name: '研究室', shape: 'researchLab', size: { w: 1.8, h: 2, d: 1.2 }, price: 200000, yardOnly: true },
@@ -48,6 +48,16 @@ export const STRUCTURE_DEFS = [
   { id: 'entrance', name: '館内入口', shape: 'entrance', size: { w: 3, h: 2.8, d: 0.6 }, price: 30000 },
   // 階の移動用の階段：各階に1つずつ自動で置く（動かすのは自由、撤去はできない）
   { id: 'stairs', name: '階段', shape: 'stairs', size: { w: 1.4, h: 2.6, d: 3.2 }, price: 0, hidden: true, stairs: true },
+  // 説明プレート：水槽のそばに立てる解説板（デザインは内装ガチャで増える）
+  { id: 'infoPlate', name: '説明プレート', shape: 'infoPlate', size: { w: 0.5, h: 1.05, d: 0.3 }, price: 8000, skin: 'plate' },
+  // 内装ガチャで解放する館内オブジェ（unlock: 'gacha'。解放後はコインで何個でも置ける）。src/decor/
+  { id: 'monstera', name: 'モンステラ（大型観葉植物）', shape: 'monstera', size: { w: 0.9, h: 1.5, d: 0.9 }, price: 20000, unlock: 'gacha', group: 'decorHall' },
+  { id: 'kentia', name: 'ケンチャヤシ（大型観葉植物）', shape: 'kentia', size: { w: 1.1, h: 2.1, d: 1.1 }, price: 25000, unlock: 'gacha', group: 'decorHall' },
+  { id: 'umbellata', name: 'ウンベラータ（大型観葉植物）', shape: 'umbellata', size: { w: 0.9, h: 1.9, d: 0.9 }, price: 30000, unlock: 'gacha', group: 'decorHall' },
+  { id: 'tatami', name: '畳', shape: 'tatami', size: { w: 1.82, h: 0.06, d: 0.91 }, price: 10000, unlock: 'gacha', group: 'decorHall' },
+  { id: 'shoji', name: '障子', shape: 'shoji', size: { w: 1.8, h: 1.9, d: 0.06 }, price: 15000, unlock: 'gacha', group: 'decorHall' },
+  { id: 'takegaki', name: '竹垣', shape: 'takegaki', size: { w: 1.8, h: 1.2, d: 0.12 }, price: 15000, unlock: 'gacha', group: 'decorHall' },
+  { id: 'toro', name: '石灯籠', shape: 'toro', size: { w: 0.6, h: 1.4, d: 0.6 }, price: 40000, unlock: 'gacha', group: 'decorHall' },
 ].map(withCategory(CATEGORY.STRUCTURE));
 
 // ---- 水槽内オブジェ ----------------------------------------------------------
@@ -128,6 +138,12 @@ const DECOR_DEFS = [
   { id: 'driftwood', name: '流木', shape: 'driftwood', size: { w: 0.4, h: 0.25, d: 0.15 }, price: 3000, appeal: 0.8, growth: 'driftwood' },
   { id: 'aeration', name: 'エアレーション', shape: 'airstone', size: { w: 0.05, h: 0.03, d: 0.05 }, price: 1500, appeal: 0.3, bubbles: true },
   { id: 'plants', name: '水草の茂み', shape: 'flora', flora: true, size: { w: 0.12, h: 0.25, d: 0.12 }, price: 2500, appeal: 0.8 },
+  // 大型流木（ダイヤで1形ずつ解放。unlock: 'dia'）。形は src/decor/decorBuilders.js
+  { id: 'bigwood_branch', name: '大型流木：枝分かれ', shape: 'bigwood', wood: 'branch', size: { w: 0.9, h: 0.55, d: 0.4 }, price: 15000, appeal: 3, unlock: 'dia', diaPrice: 300 },
+  { id: 'bigwood_root', name: '大型流木：根張り', shape: 'bigwood', wood: 'root', size: { w: 0.8, h: 0.45, d: 0.5 }, price: 15000, appeal: 3, unlock: 'dia', diaPrice: 300 },
+  { id: 'bigwood_arch', name: '大型流木：アーチ', shape: 'bigwood', wood: 'arch', size: { w: 1.0, h: 0.5, d: 0.3 }, price: 15000, appeal: 3, unlock: 'dia', diaPrice: 300 },
+  { id: 'bigwood_log', name: '大型流木：倒木', shape: 'bigwood', wood: 'log', size: { w: 1.2, h: 0.3, d: 0.35 }, price: 15000, appeal: 3, unlock: 'dia', diaPrice: 300 },
+  { id: 'bigwood_twist', name: '大型流木：ねじれ', shape: 'bigwood', wood: 'twist', size: { w: 0.7, h: 0.7, d: 0.35 }, price: 15000, appeal: 3, unlock: 'dia', diaPrice: 300 },
 ].map((d) => ({ ...d, group: 'decor' }));
 
 // 海藻・海草（seaweedBuilder.js）。日本の水族館の藻場・海中林・沖縄の展示でよく見られる種類
@@ -163,6 +179,7 @@ export const GROUP_LABELS = {
   soft: 'ソフトコーラル・イソギンチャク',
   seaweed: '海藻',
   decor: '流木・水草',
+  decorHall: '内装',
 };
 export const groupOf = (def) => def.group ?? def.category;
 

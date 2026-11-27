@@ -7,8 +7,8 @@ import { coin as yen } from './currency.js';
  * extraTabs（例：部屋）を選ぶと onTab(id) を呼び、カードの代わりに別パネルを出す。
  */
 export class Catalog {
-  constructor({ tabsEl, cardsEl, previews, economy, onSelect, onTab, priceLabel }) {
-    Object.assign(this, { tabsEl, cardsEl, previews, economy, onSelect, onTab, priceLabel });
+  constructor({ tabsEl, cardsEl, previews, economy, onSelect, onTab, priceLabel, isOwned = () => true, onUnlock }) {
+    Object.assign(this, { tabsEl, cardsEl, previews, economy, onSelect, onTab, priceLabel, isOwned, onUnlock });
     this.defs = [];
     this.extraTabs = [];
     this.activeTab = null;
@@ -20,7 +20,10 @@ export class Catalog {
     });
     cardsEl.addEventListener('click', (e) => {
       const card = e.target.closest('.card');
-      if (card && !card.disabled) this.onSelect(card.dataset.id);
+      if (!card || card.disabled) return;
+      const def = this.defs.find((d) => d.id === card.dataset.id);
+      if (def?.unlock === 'dia' && !this.isOwned(def)) return this.onUnlock?.(def); // ダイヤで解放してから置ける
+      this.onSelect(card.dataset.id);
     });
     economy.addEventListener('change', () => this._refreshLocks());
   }
@@ -28,7 +31,7 @@ export class Catalog {
   setDefs(defs, extraTabs = []) {
     this.defs = defs;
     this.extraTabs = extraTabs;
-    this.groups = [...new Set(defs.map(groupOf))];
+    this.groups = [...new Set(this._shown(defs).map(groupOf))];
     this.activeId = null;
     this.selectTab(this.groups[0]);
   }
@@ -47,8 +50,18 @@ export class Catalog {
     this.onTab?.(id, !!extra);
   }
 
-  /** 価格・在庫の表示を更新 */
+  /** 内装ガチャで出ていない物は並べない */
+  _shown(defs) {
+    return defs.filter((d) => d.unlock !== 'gacha' || this.isOwned(d));
+  }
+
+  /** 価格・在庫の表示を更新（ガチャで内装が増えたらタブも作り直す） */
   refresh() {
+    const groups = [...new Set(this._shown(this.defs).map(groupOf))];
+    if (groups.join() !== (this.groups ?? []).join()) {
+      this.groups = groups;
+      if (this.activeTab && !this.extraTabs.some((t) => t.id === this.activeTab)) return this.selectTab(groups.includes(this.activeTab) ? this.activeTab : groups[0]);
+    }
     if (this.activeTab && !this.cardsEl.hidden) this._renderCards();
   }
 
@@ -59,7 +72,7 @@ export class Catalog {
 
   _renderCards() {
     this.cardsEl.innerHTML = '';
-    for (const def of this.defs.filter((d) => groupOf(d) === this.activeTab)) {
+    for (const def of this._shown(this.defs).filter((d) => groupOf(d) === this.activeTab)) {
       const card = document.createElement('button');
       card.className = 'card';
       card.dataset.id = def.id;
@@ -81,13 +94,17 @@ export class Catalog {
       const locked = def.requiredStage > level;
       card.classList.toggle('locked', locked);
       card.disabled = locked;
+      const dia = def.unlock === 'dia' && !this.isOwned(def); // ダイヤで解放する物（押すと解放の確認）
+      card.classList.toggle('dia-locked', dia);
       let badge = card.querySelector('.lock');
-      if (locked && !badge) {
+      const text = locked ? `🔒 ステージ${def.requiredStage}` : dia ? `💎${def.diaPrice}で解放` : '';
+      if (text && !badge) {
         badge = document.createElement('span');
         badge.className = 'lock';
-        badge.textContent = `🔒 ステージ${def.requiredStage}`;
         card.append(badge);
-      } else if (!locked && badge) badge.remove();
+      }
+      if (text) badge.textContent = text;
+      else badge?.remove();
     });
   }
 }

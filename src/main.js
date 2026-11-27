@@ -99,6 +99,7 @@ import { OFFLINE_MAX_HOURS } from './game/gameData.js';
 import { Purchases } from './online/purchases.js';
 import { StoreView } from './ui/storeView.js';
 import { Gacha } from './gacha/gacha.js';
+import { Decor } from './decor/decor.js';
 import { returnTankToStock } from './breeding/variants.js';
 import { GachaView } from './ui/gachaView.js';
 
@@ -139,6 +140,7 @@ async function boot() {
   const items = new Items({ wallet });
   const construction = new Construction();
   const gacha = new Gacha({ expeditions });
+  const decor = new Decor({ economy, wallet }); // 内装ガチャのデザイン・館内オブジェと大型流木
   expeditions.getBonusTeams = () => wallet.extraTeams();
   wallet.addEventListener('granted', (e) => toast(`💎 +${e.detail.n}ダイヤ（${e.detail.reason}）`));
   let home = null; // 自分の立地 { lat, lon }
@@ -343,7 +345,13 @@ async function boot() {
     stairsTo,
     getGrowMode: () => interior.growMode,
     getFloraRadius: () => interior.floraRadius,
+    getSkins: (kind) => decor.ownedSkins(kind),
     onAction: (action, obj, value) => {
+      if (action.startsWith('skin-')) {
+        manager.setSkin(obj, action.slice(5));
+        customizer.select(obj);
+        return;
+      }
       if (action.startsWith('rockshape-')) return interior.setRockShape(obj, action === 'rockshape-random' ? 'random' : +action.slice(10));
       if (action.startsWith('grow-')) return interior.setGrowMode(action === 'grow-off' ? null : action.slice(5));
       if (action === 'param-flora-size') return interior.setFloraSize(obj, value);
@@ -417,6 +425,7 @@ async function boot() {
   const roomPanel = new RoomPanel({
     el: $('room-panel'),
     getSettings: () => roomSettings,
+    getSkins: (kind) => decor.ownedSkins(kind),
     getPlan: () => room.plan,
     getLevel: () => economy.stage.level,
     onChange: (kind, value) => {
@@ -475,6 +484,14 @@ async function boot() {
       active.startPlacement(id);
     },
     priceLabel: (def) => (def.category === CATEGORY.TANK ? `所持 ${inventory.count(def.id)}` : null),
+    // 内装ガチャの物は出るまで並べない。大型流木はダイヤで解放してから置ける
+    isOwned: (def) => decor.ownsDef(def),
+    onUnlock: async (def) => {
+      if (!(await askConfirm({ title: `${def.name}を解放`, text: `${def.diaPrice}ダイヤで解放すると、以後はコインで何個でも置けます。`, ok: `${def.diaPrice}ダイヤで解放` }))) return;
+      if (decor.unlockWithDia(def)) toast(`${def.name}を解放しました`);
+      else toast('ダイヤが足りません', { error: true });
+      catalog.refresh();
+    },
     onTab: (id, extra) => {
       if (mode !== 'hall-edit') return;
       hall.cancelPlacement();
@@ -744,7 +761,7 @@ async function boot() {
 
   /** 現在の状態を保存用データにする */
   function snapshot() {
-    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), dolphinPool: pool.toJSON(), wallet: wallet.toJSON(), items: items.toJSON(), construction: construction.toJSON(), daily: daily.toJSON(), gacha: gacha.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
+    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), dolphinPool: pool.toJSON(), wallet: wallet.toJSON(), items: items.toJSON(), construction: construction.toJSON(), daily: daily.toJSON(), gacha: gacha.toJSON(), decor: decor.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
   }
 
   let pendingLayout = null; // 初期設定で選んだ間取り
@@ -945,6 +962,7 @@ async function boot() {
       items.fromJSON(data.items);
       construction.fromJSON(data.construction);
       gacha.fromJSON(data.gacha);
+      decor.fromJSON(data.decor);
     }
     if (!visiting) refundOldShops();
     if (!visiting) home = data.home ?? null;
@@ -1135,14 +1153,14 @@ async function boot() {
   const daily = new Daily({ wallet, mail: life.mail, toast });
   let dailyReady = false; // セーブを反映してスプラッシュを閉じてから（ログインボーナスなどを渡す）
   daily.isActive = () => !visiting && dailyReady;
-  const purchases = new Purchases({ wallet, items, online });
+  const purchases = new Purchases({ wallet, items, online, decor });
   // 総合レベルのランキング（イベント画面のタブ）。点数は5分ごとに送る
   const rankingView = new RankingView({ manager, expeditions, online, previews, isVisiting: () => !!visiting, onLoaded: () => gameSheet.view === 'event' && gameSheet.render() });
   life.panels.event.view.ranking = rankingView;
   setInterval(() => document.visibilityState === 'visible' && rankingView.submit().catch((err) => console.warn(err.message)), 300000);
   // 操作の案内（チュートリアル・目標の進め方）：押す場所を指のマークで示す
   const guide = new Guide();
-  if (import.meta.env.DEV) Object.assign(window, { __guide: guide, __hall: hall, __manager: manager, __life: life, __ex: expeditions }); // 開発用：動作を調べる
+  if (import.meta.env.DEV) Object.assign(window, { __guide: guide, __hall: hall, __manager: manager, __life: life, __ex: expeditions, __decor: decor }); // 開発用：動作を調べる
   const _box = new THREE.Box3();
   const _v = new THREE.Vector3();
   const guideEnv = {
@@ -1324,7 +1342,7 @@ async function boot() {
       staff: { title: 'スタッフ', live: true, view: new StaffView({ ops }) },
       shop: { title: '店舗運営', live: true, view: new ShopView({ ops, economy, inventory, onPlace: (id) => { gameSheet.close(); mapPage.close(); if (mode !== 'hall-edit') enterHallEdit(); hall.startPlacement(id); } }) },
       ...life.panels,
-      gacha: { title: '卵ガチャ', live: true, view: new GachaView({ gacha, wallet, items, purchases, toast, onChange: () => gameSheet.view === 'gacha' && gameSheet.render() }) },
+      gacha: { title: '卵ガチャ', live: true, view: new GachaView({ gacha, decor, wallet, items, purchases, toast, onChange: () => gameSheet.view === 'gacha' && gameSheet.render() }) },
       store: { title: 'ショップ', live: true, view: new StoreView({ wallet, items, daily, purchases, builder, toast, onChange: () => gameSheet.view && gameSheet.render() }) },
       mail: { title: 'メール', live: true, view: mailView },
       pool: { title: 'イルカプール', view: new PoolView({ pool, expeditions, previews, toast }) },
@@ -1428,6 +1446,7 @@ async function boot() {
     gameSheet.openPanel('event');
   });
   inventory.addEventListener('change', () => catalog.refresh());
+  decor.addEventListener('change', () => catalog.refresh());
   // 外注の完成チェック（閉じている間に完成した分も受け取る）
   setInterval(() => {
     if (visiting) return;

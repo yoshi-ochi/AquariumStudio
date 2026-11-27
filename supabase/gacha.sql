@@ -22,7 +22,7 @@ language plpgsql security definer set search_path = public as $$
 declare v_uid uuid := auth.uid(); v_left integer; v_rand double precision[];
 begin
   if v_uid is null then raise exception 'ログインが必要です'; end if;
-  if p_machine not in ('fish', 'amphibian', 'reptile', 'bird') then raise exception 'ガチャが見つかりません'; end if;
+  if p_machine not in ('fish', 'amphibian', 'reptile', 'bird', 'decor') then raise exception 'ガチャが見つかりません'; end if;
   if p_count not in (1, 10) then raise exception '回数が正しくありません'; end if;
   -- 1回100・10連900ダイヤのうち、有償で払う分（無償の残りは端末で減らす）
   if p_paid is null or p_paid <= 0 or p_paid > (case when p_count = 10 then 900 else 100 end) then raise exception '数が正しくありません'; end if;
