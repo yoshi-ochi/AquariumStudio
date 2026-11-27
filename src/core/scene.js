@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { QUALITY, isMobile, pixelRatio } from './quality.js';
 
 const SKY = 0xbfe6ff;
 
@@ -8,11 +9,27 @@ export class SceneManager {
     this.container = container;
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(pixelRatio()); // スマホは 1.5 まで（core/quality.js）
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+    // 影は毎コマではなく一定の間隔で計算し直す（render()。照明ごとに場面を描き直すので重い）
+    this.renderer.shadowMap.autoUpdate = false;
+    this._shadowAt = -Infinity;
+    this.shadowsLive = false; // true の間（物を動かしている間）は毎コマ影を計算する
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     container.appendChild(this.renderer.domElement);
+    // iPhone では裏に回している間に描画（WebGL）が切られることがある。戻ったときに真っ暗のままにならないよう、
+    // 切られたら復帰を待ち、戻ったら（または戻らなければ表に出たときに）読み込み直す。セーブは自動保存と端末内の控えで残る
+    const canvas = this.renderer.domElement;
+    let lost = false;
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      lost = true;
+    });
+    canvas.addEventListener('webglcontextrestored', () => location.reload());
+    document.addEventListener('visibilitychange', () => {
+      if (lost && document.visibilityState === 'visible') setTimeout(() => lost && location.reload(), 1500);
+    });
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(SKY);
@@ -56,7 +73,17 @@ export class SceneManager {
     this.camera.updateProjectionMatrix();
   }
 
+  /** 次のコマで影を計算し直す（物を置いた・照明を変えたときなど） */
+  refreshShadows() {
+    this._shadowAt = -Infinity;
+  }
+
   render() {
+    const now = performance.now() / 1000;
+    if (this.shadowsLive || now - this._shadowAt >= QUALITY.shadowInterval) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this._shadowAt = now;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 }

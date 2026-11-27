@@ -1,9 +1,10 @@
 import './style.css';
 import * as THREE from 'three';
 import { SceneManager } from './core/scene.js';
+import { QUALITY } from './core/quality.js';
 import { CameraController } from './core/controls.js';
 import { generatePreviews } from './core/previewRenderer.js';
-import { loadThumbManifest, splitThumbs } from './core/thumbCache.js';
+import { loadThumbManifest, splitThumbs, takeCachedShots, keepShots } from './core/thumbCache.js';
 import { Economy } from './management/economy.js';
 import { Inventory } from './management/inventory.js';
 import { HALL_DEFS, INTERIOR_DEFS, ALL_DEFS, CATEGORY, getDef } from './tanks/tankData.js';
@@ -28,7 +29,7 @@ import { AppShell } from './ui/shell.js';
 import { RoomPanel } from './ui/roomPanel.js';
 import { toast } from './ui/toast.js';
 import { WAVE_PARAMS, bakeWaves, waveCacheKey } from './water/waveBaker.js';
-import { loadCached, saveCached } from './water/waveCache.js';
+import { loadCached, saveCached, loadShipped } from './water/waveCache.js';
 import { setWaveData, updateWater } from './water/waterSurface.js';
 import { LAYOUT_VERSION } from './io/layoutIO.js';
 import { writeJournal, markJournalSynced, pendingJournal } from './online/localJournal.js';
@@ -161,15 +162,25 @@ async function boot() {
   const fishThumbs = splitThumbs('c', CREATURES, manifest);
   const previews = objThumbs.urls;
   for (const [id, url] of fishThumbs.urls) previews.set(`creature:${id}`, url);
-  const shoot = objThumbs.missing.length + fishThumbs.missing.length;
+  // 配信画像が無い物は、前に端末で撮って保存した画像を使う（2回目からの起動を速くする）
+  const objLocal = await takeCachedShots('d', objThumbs.missing);
+  const fishLocal = await takeCachedShots('c', fishThumbs.missing);
+  for (const [id, url] of objLocal.cached) previews.set(id, url);
+  for (const [id, url] of fishLocal.cached) previews.set(`creature:${id}`, url);
+  const shoot = objLocal.rest.length + fishLocal.rest.length;
   const progress = (off) => (i, n, def) => splash.setProgress((off + i) / shoot, `${def.name} を撮影中… (${off + i}/${shoot})`);
-  for (const [id, url] of await generatePreviews(objThumbs.missing, buildObject, { dispose: disposeObject, onProgress: progress(0) })) previews.set(id, url);
-  const creatureShots = await generatePreviews(fishThumbs.missing, buildCreature, { dispose: disposeObject, transparent: true, onProgress: progress(objThumbs.missing.length) });
+  const objShots = await generatePreviews(objLocal.rest, buildObject, { dispose: disposeObject, onProgress: progress(0) });
+  for (const [id, url] of objShots) previews.set(id, url);
+  const creatureShots = await generatePreviews(fishLocal.rest, buildCreature, { dispose: disposeObject, transparent: true, onProgress: progress(objLocal.rest.length) });
   for (const [id, url] of creatureShots) previews.set(`creature:${id}`, url);
+  keepShots('d', objLocal.rest, objShots);
+  keepShots('c', fishLocal.rest, creatureShots);
   const waveKey = waveCacheKey();
+  // 水面の動き：端末に保存した物 → 配信している計算済みの物（public/waves）→ 端末で計算、の順
   let waves = await loadCached(waveKey);
   if (!waves) {
-    waves = await bakeWaves(WAVE_PARAMS, (r) => splash.setProgress(r, `水面の動きを計算中… ${Math.round(r * 100)}%`));
+    waves = await loadShipped(waveKey);
+    if (!waves) waves = await bakeWaves(WAVE_PARAMS, (r) => splash.setProgress(r, `水面の動きを計算中… ${Math.round(r * 100)}%`));
     await saveCached(waveKey, waves);
   }
   setWaveData(waves);
@@ -1562,9 +1573,15 @@ async function boot() {
   const clock = new THREE.Clock();
   let splashDone = false; // スプラッシュを閉じてから（セーブ反映後に）チュートリアルを判定する
   let manual = false; // 開発用：録画中は時計を止め、frame() を外から1コマずつ呼ぶ
-  sceneMgr.renderer.setAnimationLoop(() => {
+  let lastFrame = 0;
+  sceneMgr.renderer.setAnimationLoop((t) => {
     // 間取りを選んでいる間は裏の館内を描画しない
     if (!$('layout-picker').hidden || manual) return;
+    // 120Hz の画面でも 60 コマ/秒まで（発熱を抑える。core/quality.js）
+    if (t - lastFrame < 1000 / QUALITY.maxFps - 2) return;
+    lastFrame = t;
+    // 館内・水槽内の編集で物を動かしている間は、影を毎コマ計算する
+    sceneMgr.shadowsLive = mode === 'hall-edit' || mode === 'interior-edit';
     frame(Math.min(clock.getDelta(), 0.1), clock.elapsedTime);
   });
   /** 1コマ分の更新と描画（dt: 前のコマからの秒、time: 経過秒） */
