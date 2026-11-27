@@ -7,6 +7,7 @@ import { createMotion, stepMotion, reanchor } from './lifeMotion.js';
 import { lifeAnchors, anchorSig } from './lifeAnchors.js';
 import { speciesPieces, sizeOf, appealOf } from './growth.js';
 import { LeapFx } from './leapFx.js';
+import { variantList } from '../breeding/variants.js';
 
 /** 水槽内の展示生物：収容枠の計算、モデルの同期、遊泳アニメーション */
 const LIFE = 'life';
@@ -66,8 +67,9 @@ export function syncLife(tank) {
     const c = getCreature(id);
     const shown = total <= MAX_MODELS ? n : Math.max(1, Math.round((n / total) * MAX_MODELS));
     const shared = { n: shown }; // 同じ種の群れ・コロニーで共有する状態
+    const looks = variantList(tank, id); // アルビノ・変色個体は先頭から（数を絞っても見えるように）
     for (let i = 0; i < shown; i++) {
-      const fish = buildCreature(c);
+      const fish = buildCreature(c, looks[i] ?? null);
       // 水槽の水紋（ON/OFF と、この水槽の真上をくり抜いた模様）を使う
       if (tank.userData.clip) for (const k of ['uCauOn', 'uCauTex', 'uCauOrigin', 'uCauSize', 'uCauTop', 'uCauVanish']) fish.userData.uni[k] = tank.userData.clip[k];
       const rand = mulberry32(tank.userData.uid * 131 + index++ * 977);

@@ -99,6 +99,7 @@ import { OFFLINE_MAX_HOURS } from './game/gameData.js';
 import { Purchases } from './online/purchases.js';
 import { StoreView } from './ui/storeView.js';
 import { Gacha } from './gacha/gacha.js';
+import { returnTankToStock } from './breeding/variants.js';
 import { GachaView } from './ui/gachaView.js';
 
 const $ = (id) => document.getElementById(id);
@@ -528,7 +529,7 @@ async function boot() {
     onChanged: () => shell.update(),
     onWallsChanged: () => (wallsDirty = true),
     onTankRemoved: (tank) => {
-      for (const [id, n] of Object.entries(tank.userData.creatures ?? {})) expeditions.give(id, n);
+      returnTankToStock(tank, expeditions); // アルビノなども一緒に戻す
     },
     // コピーした水槽があれば、館内レイアウト編集の間だけ「貼り付け」を出す
     onClipboard: (show) => {

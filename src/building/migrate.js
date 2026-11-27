@@ -3,6 +3,7 @@ import { CATEGORY } from '../tanks/tankData.js';
 import { FloorPlan, CELL } from '../room/floorPlan.js';
 import { ZONES, FLOOR_COUNT, BASEMENT, PLAN_FLOORS, WING_FLOORS, WING_BASE, WING_RECT, WING_YARD, GRID_X, NORTH_ROWS, isWing, ATRIUM_TANK_POS, LAYOUT, WING_GRID_CENTER, getZone, inRect, oldZoneOffset, zoneCenter, zoneRectCenter } from './blueprint.js';
 import { LEGACY_V3 } from './legacyLayoutV3.js';
+import { returnTankToStock } from '../breeding/variants.js';
 
 /** 版3の別館の区画（格子 72×46） */
 const OLD_WING_RECT = [19, 6, 52, 39];
@@ -118,7 +119,7 @@ export function relocateInvalid({ manager, unlocked, inventory, expeditions, eco
 /** 置けない物を在庫とお金に戻す */
 function stow(o, { manager, inventory, expeditions, economy }) {
   const def = manager.defOf(o);
-  for (const [id, n] of Object.entries(o.userData.creatures ?? {})) expeditions.give(id, n);
+  returnTankToStock(o, expeditions);
   if (o.userData.clip) economy.earn(manager.contentsValue(o));
   if (def.category === CATEGORY.TANK) inventory.add(def.id);
   else economy.earn(def.price);

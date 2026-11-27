@@ -33,7 +33,7 @@ export class TankManager {
 
   // ---- 追加・削除 ---------------------------------------------------------
 
-  add(defId, { x = 0, z = 0, rotY = 0, floor = this.currentFloor, uid, contents = [], embed = null, look = null, creatures = null, clean = null, care = null, name = null } = {}) {
+  add(defId, { x = 0, z = 0, rotY = 0, floor = this.currentFloor, uid, contents = [], embed = null, look = null, creatures = null, variants = null, clean = null, care = null, name = null } = {}) {
     const def = getDef(defId);
     const obj = buildObject(def);
     obj.userData.uid = uid ?? this.nextUid++;
@@ -71,6 +71,8 @@ export class TankManager {
     if (creatures && obj.userData.clip) {
       obj.userData.creatures = Object.fromEntries(Object.entries(creatures).filter(([id]) => getCreature(id))); // 削除した魚種は捨てる
       if (care) obj.userData.care = { ...care };
+      // アルビノ・変色個体（展示数の内数）
+      if (variants) obj.userData.variants = Object.fromEntries(Object.entries(variants).filter(([id]) => obj.userData.creatures[id] > 0).map(([id, v]) => [id, { ...v }]));
       syncLife(obj);
     }
     return obj;
@@ -377,6 +379,7 @@ export class TankManager {
       ...(o.userData.name && { name: o.userData.name }),
       ...(o.userData.look && { look: o.userData.look }),
       ...(o.userData.creatures && { creatures: { ...o.userData.creatures } }),
+      ...(o.userData.variants && { variants: structuredClone(o.userData.variants) }),
       ...(o.userData.clean && { clean: { ...o.userData.clean } }),
       ...(o.userData.care && { care: { ...o.userData.care } }),
       ...(o.userData.clip && { contents: this.dumpInterior(o) }),

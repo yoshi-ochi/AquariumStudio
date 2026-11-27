@@ -8,6 +8,7 @@ import { ANATOMY } from './creatureAnatomy.js';
 import { tracedParts } from './creatureTraced.js';
 import { FIN, tagFin, ensureFinAttrs } from './finTag.js';
 import { swimOf } from './swimStyles.js';
+import { recolorPart } from '../breeding/morphColor.js';
 
 /**
  * 展示生物のポリゴンアートモデル。+X が頭、原点が体の中心。三角形ごとに塗り分けて質感を統一する。
@@ -487,12 +488,15 @@ if (uMode < 0.5) {
  * 写真から模様を細かく写した種は、離れて見るとき用の粗い形（lite）も持つ。
  */
 const SHAPES = new Map();
-function shapeOf(c) {
-  let s = SHAPES.get(c.id);
+/** 形と色（variant：アルビノ・変色個体は部品の色を変えてから陰影を焼き込む） */
+function shapeOf(c, variant = null) {
+  const key = variant ? `${c.id}|${variant}` : c.id;
+  let s = SHAPES.get(key);
   if (s) return s;
   const f = FORMS[c.form];
   const make = (a) => {
     const { parts, mode = 0, opacity = 1 } = a ? { parts: tracedParts(c, a), mode: a.mode ?? 0, opacity: a.opacity ?? 1 } : f ? { parts: fishParts(c, f) } : softParts(c);
+    if (variant) parts.forEach((g) => !g.userData.glow && recolorPart(g, variant));
     const merge = (list) => {
       const geo = mergeGeometries(list.map((g) => {
         g.deleteAttribute('uv');
@@ -515,7 +519,7 @@ function shapeOf(c) {
   const lite = ANATOMY[`${c.id}__lite`];
   if (lite) s.lite = make(lite);
   s.wave = f?.wave ?? 1;
-  SHAPES.set(c.id, s);
+  SHAPES.set(key, s);
   return s;
 }
 
@@ -523,10 +527,11 @@ function shapeOf(c) {
 const DETAIL_RANGE = 14;
 
 /** c.len に拡大した生物を作る。fish.userData.uni.uTime を進めると泳ぐ。形は種類ごとに共有する */
-export function buildCreature(c) {
+export function buildCreature(c, variant = null) {
   const root = new THREE.Group();
   root.userData.creature = c.id;
-  const shape = shapeOf(c);
+  if (variant) root.userData.variant = variant;
+  const shape = shapeOf(c, variant);
   const { geo, clearGeo, glowGeo, mode, opacity } = shape;
   const sw = swimOf(c);
   // 水紋の uniform（uCauOn など）：水槽に入れたら、その水槽のものに差し替える（tankLife.js）
