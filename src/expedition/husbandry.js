@@ -1,6 +1,6 @@
 import { DESTINATIONS, getCreature } from './creatureData.js';
 import { getDef } from '../tanks/tankData.js';
-import { crowding } from './tankLife.js';
+import { crowding, shallowSpecies } from './tankLife.js';
 
 /** バックヤードの飼育設備（冷凍庫など）の効果。lifeSystems が毎秒更新する */
 const facilities = { freezer: 0, liveFeed: 0, foodPrep: 0 };
@@ -66,13 +66,22 @@ export function crowdFactor(tank) {
   return r <= 1 ? 1 : Math.max(0.3, 1 - (r - 1) * 0.4);
 }
 
-/** 幸福度 0.3〜1.17。エサ・水温・混泳・過密・飼育設備で決まり、展示生物の魅力に掛かる */
+/** 水深が体高より浅い個体の割合で下げる（全部なら 0.5 倍） */
+export function depthFactor(tank) {
+  const low = new Set(shallowSpecies(tank));
+  if (!low.size) return 1;
+  const list = speciesIn(tank);
+  const total = list.reduce((s, [, n]) => s + n, 0);
+  return 1 - 0.5 * (list.reduce((s, [id, n]) => s + (low.has(id) ? n : 0), 0) / total);
+}
+
+/** 幸福度 0.3〜1.17。エサ・水温・混泳・過密・水深・飼育設備で決まり、展示生物の魅力に掛かる */
 export function tankHealth(tank, now = Date.now()) {
   if (!hasLife(tank)) return 1;
   const over = (now - ensureCare(tank, now).fed) / feedInterval();
   const food = over <= 1 ? 1 : Math.max(0.3, 1 - (over - 1) * 0.5);
   const temp = 1 - waterMismatch(tank) * 0.6;
-  return Math.max(0.3, food * temp * (predatorConflict(tank) ? 0.7 : 1) * crowdFactor(tank) * (1 + facilityBonus()));
+  return Math.max(0.3, food * temp * (predatorConflict(tank) ? 0.7 : 1) * crowdFactor(tank) * depthFactor(tank) * (1 + facilityBonus()));
 }
 export const tankHappiness = tankHealth;
 

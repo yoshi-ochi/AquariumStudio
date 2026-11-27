@@ -142,6 +142,9 @@ input[type=color] { width: 44px; height: 32px; border: none; padding: 0; backgro
 .seg button { flex: 1; min-height: 34px; padding: 4px 6px; }
 .slider { display: grid; grid-template-columns: 64px 1fr 52px; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .slider output { text-align: right; color: var(--text); }
+.slider:has(input[data-fmt="water"]) { grid-template-columns: 64px 1fr 104px; } /* 水位：「10%（ひたひた）」まで入る幅 */
+[data-water-note] .note { margin: 4px 0 0; font-size: 12px; }
+[data-water-note] .warn { color: var(--danger); }
 
 #detail-panel .palette, .tv-look .palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin: 6px 0; }
 #detail-panel .palette.frames, .tv-look .palette.frames { grid-template-columns: repeat(6, 36px); }

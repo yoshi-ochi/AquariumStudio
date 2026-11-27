@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MATERIALS, RENDER_ORDER } from './materials.js';
 import { waterSurfaceMesh } from '../water/waterSurface.js';
+import { markWater, markSurface } from './waterLevel.js';
 
 /**
  * 上から見た輪郭を描いて作る水槽（建造）。def.poly = [[x, z], ...]（m、中心が原点）。
@@ -67,12 +68,13 @@ export function buildPolyTank(g, def) {
   g.userData.bottom = { kind: 'shape', shape: inner };
   g.add(sand);
   const waterH = h * 0.9 - t;
-  g.add(slab(inner, waterH, MATERIALS.water, t));
+  g.add(markWater(slab(inner, waterH, MATERIALS.water, t), t, waterH, false));
   const surf = new THREE.ShapeGeometry(inner);
   surf.rotateX(-Math.PI / 2);
   const s = waterSurfaceMesh(surf);
   s.position.y = t + waterH + 0.001;
-  g.add(s);
+  g.add(markSurface(s));
+  g.userData.waterSpan = { hi: h - RIM_H, def: t + waterH }; // 水位の範囲（waterLevel.js）
   const xs = poly.map((p) => p[0]);
   const zs = poly.map((p) => p[1]);
   g.userData.interior = {

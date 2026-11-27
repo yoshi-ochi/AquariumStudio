@@ -6,6 +6,8 @@ import { normalizeLook, PALETTE, FRAME_COLORS } from './tankLook.js';
 import { SAND_TYPES } from './sandLook.js';
 import { floorLabel } from '../building/blueprint.js';
 import { specOf, pointCount, LEVELS } from '../flora/floraBuilder.js';
+import { levelLabel, snapLevel } from './waterLevel.js';
+import { waterSection, setWaterLevel, refreshWaterNote } from './waterControl.js';
 
 const yen = (n) => `¥${Math.round(n).toLocaleString('ja-JP')}`;
 const cm = (v) => Math.round(v * 100);
@@ -26,6 +28,7 @@ export function format(fmt, v) {
     const [, a, b] = fmt.split(':').map(Number);
     return fmtLen(a + (b - a) * (Math.round(v * (LEVELS - 1)) / (LEVELS - 1)));
   }
+  if (fmt === 'water') return levelLabel(v); // 水位（0〜100%、5%刻み）
   if (fmt === 'lv') return `${Math.round(v / 0.2)} / 20`; // 水槽ライトの光量の段階
   return `${v}`;
 }
@@ -38,6 +41,8 @@ export function format(fmt, v) {
 export class TankCustomizer {
   constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getGrowMode, getFloraRadius, stairsTo }) {
     Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getGrowMode, getFloraRadius, stairsTo });
+    // 水位のスライダーはここで処理する（詳細パネルと編集シートの「見た目」タブのどちらからも onAction で届く）
+    this.onAction = (action, obj, value) => (action === 'param-water-level' ? this._setWater(obj, value) : onAction(action, obj, value));
     this.selected = null;
     this.helper = null;
     this.allowEmbed = false;
@@ -100,6 +105,14 @@ export class TankCustomizer {
     this.gizmoEl.querySelectorAll('[data-action="delete"]').forEach((b) => (b.hidden = fixed));
   }
 
+  /** 水位を変える。生き物がいて 0% にできないときはスライダーを戻して知らせる */
+  _setWater(tank, value) {
+    const lv = setWaterLevel(tank, value);
+    if (lv == null) return;
+    for (const el of document.querySelectorAll('input[data-param="water-level"]')) el.value = lv;
+    refreshWaterNote(tank, snapLevel(value) === 0 && lv > 0);
+  }
+
   deselect() {
     if (!this.selected) return;
     this.selected = null;
@@ -148,6 +161,7 @@ export class TankCustomizer {
       </div>
       ${def.stairs ? this._stairsSection(obj) : ''}
       ${isTank && this.allowEmbed && !def.atrium ? this._embedSection(obj) : ''}
+      ${isTank ? waterSection(obj, slider) : ''}
       ${obj.userData.interiorItem && obj.userData.locked ? '<p class="note">ロック中です。「ロック解除」で移動・回転・編集ができます（解除できるのは1つだけ。ほかの物は自動でロックされます）</p>' : `
       ${def.shape === 'liveRock' && obj.userData.interiorItem && !obj.userData.locked ? this._rockShapeSection(obj) : ''}
       ${def.flora && this.getGrowMode ? this._floraSection(obj, def) : def.growth && this.getGrowMode ? this._growthSection(obj) : ''}`}
@@ -191,7 +205,7 @@ export class TankCustomizer {
     const frameSw = FRAME_COLORS.map(
       (c) => `<button class="swatch big${c === look.frameColor ? ' on' : ''}" style="background:${c}" data-action="look-framecolor-${c}" aria-label="${c}"></button>`,
     ).join('');
-    return `<div class="section"><h4>バックスクリーン・底面（色と透明度）</h4>
+    return `${waterSection(obj, slider)}<div class="section"><h4>バックスクリーン・底面（色と透明度）</h4>
       <div class="seg">${sides.map(tab).join('')}</div>
       <div class="palette">${swatches}</div>
       ${slider('side-alpha', '不透明度', 0, 1, 0.05, cur.alpha, '%')}

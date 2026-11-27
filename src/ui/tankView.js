@@ -5,6 +5,7 @@ import { MAX_PIECES } from '../expedition/growth.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
 import { WATER, ensureCare, feedCost, hasLife, isHungry, predatorConflict, tankHealth, waterMismatch, nextFeedIn, crowdFactor, FEED_INTERVAL } from '../expedition/husbandry.js';
 import { tankLabel, defaultTankLabel, cleanTankName } from '../tanks/tankLabel.js';
+import { isDry } from '../tanks/waterLevel.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
@@ -96,6 +97,7 @@ export class TankView {
   }
 
   _picker(t) {
+    if (isDry(t)) return '<button data-act="tank-add-back">← 戻る</button><p class="gs-empty">水を抜いた水槽（水位 0%）には生き物を入れられません。「🎨 見た目」タブの水位を上げてください。</p>';
     const free = tankCapacity(this.manager.defOf(t)) - usedCapacity(t);
     // この水槽で展示中の種は、在庫が無くても並べて「展示 n」を出す（展示中の種を先に）
     const shown = t.userData.creatures ?? {};
@@ -161,6 +163,7 @@ export class TankView {
     const [id, want] = key.split(':');
     const c = getCreature(id);
     const n = Math.min(Number(want) || 1, this.expeditions.count(id));
+    if (isDry(t)) return this.toast('水を抜いた水槽には生き物を入れられません。水位を上げてください', { error: true });
     if (!c || n <= 0 || !this.expeditions.take(id, n)) return;
     const list = (t.userData.creatures ??= {});
     list[id] = (list[id] ?? 0) + n;

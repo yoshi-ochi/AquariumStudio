@@ -57,7 +57,11 @@ const _s = new THREE.Vector3();
 /** 泡を更新。height = エアストーンから水面までの高さ */
 export function updateBubbles(item, time, height) {
   const mesh = item.getObjectByName('bubbles');
-  if (!mesh || height <= 0.02) return;
+  if (!mesh) return;
+  if (height <= 0.02) {
+    mesh.count = 0; // 水が無い・エアストーンが水面より上：泡を出さない
+    return;
+  }
   const amount = item.userData.bubbles ?? DEFAULT_BUBBLES;
   const n = Math.round(MAX_BUBBLES * amount);
   mesh.count = n;

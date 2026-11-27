@@ -65,6 +65,7 @@ export class HallInteraction {
       defId: tank.userData.defId,
       rotY: tank.rotation.y,
       look: tank.userData.look ? structuredClone(tank.userData.look) : null,
+      waterLevel: tank.userData.waterLevel ?? null,
       contents: this.manager.dumpInterior(tank),
       label: `${tank.userData.name ? `${tank.userData.name}（${def.name}）` : def.name}・レイアウト${this.manager.interiorItems(tank).length}個`,
     };
@@ -267,7 +268,7 @@ export class HallInteraction {
       rotY: p.ghost.rotation.y,
       embed: p.def.wallMount ? { ...p.embed } : null,
       // 貼り付け：見た目と水槽内レイアウトを写す（展示生物は空のまま）
-      ...(p.copy && { look: p.copy.look ? structuredClone(p.copy.look) : null, contents: structuredClone(p.copy.contents) }),
+      ...(p.copy && { look: p.copy.look ? structuredClone(p.copy.look) : null, waterLevel: p.copy.waterLevel ?? null, contents: structuredClone(p.copy.contents) }),
     });
     if (p.def.wallMount) this.onWallsChanged?.();
     this.toast(p.copy ? `${p.def.name} を${built ? '作って' : ''}複製しました（展示生物は空です）` : `${p.def.name} を設置しました`);

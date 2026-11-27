@@ -1,6 +1,7 @@
 import { creatureThumb } from './creatureThumb.js';
 import { creatureGrid, qtyPanel, updateQty, creatureInfo } from './creatureGrid.js';
 import { tankLabel } from '../tanks/tankLabel.js';
+import { isDry } from '../tanks/waterLevel.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 import { CREATURES, SEASONS, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
@@ -215,6 +216,7 @@ export class CreatureView {
     const id = this.picking;
     const c = getCreature(id);
     if (!tank) return;
+    if (isDry(tank)) return this.toast(`${tankLabel(this.manager, tank)} は水を抜いてあるので生き物を入れられません。水位を上げてください`, { error: true });
     const n = Math.min(this.pickQty ?? 1, this.expeditions.count(id));
     if (n <= 0 || !this.expeditions.take(id, n)) return;
     this.picking = null; // 展示したら一覧へ戻る

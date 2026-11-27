@@ -7,6 +7,7 @@ import { createMotion, stepMotion, reanchor } from './lifeMotion.js';
 import { lifeAnchors, anchorSig } from './lifeAnchors.js';
 import { speciesPieces, sizeOf, appealOf } from './growth.js';
 import { LeapFx } from './leapFx.js';
+import { FORMS } from './creatureForms.js';
 
 /** 水槽内の展示生物：収容枠の計算、モデルの同期、遊泳アニメーション */
 const LIFE = 'life';
@@ -35,11 +36,45 @@ export const crowding = (tank, def) => usedCapacity(tank) / tankCapacity(def);
 /** 描画する個体数の上限（それ以上は数だけ持つ）。群れは多めに見せる */
 const MAX_MODELS = 120;
 
-/** 泳げる範囲（水槽ローカル）。トンネル水槽はアーチより上、哺乳類用は水域のみ */
+/**
+ * 泳げる範囲（水槽ローカル）。トンネル水槽はアーチより上、哺乳類用は水域のみ。
+ * 水位を下げた水槽では、体の中心が水面より下に収まるように範囲を縮める（浅いと跳ばない）
+ */
 function swimBox(I) {
   const k = I.shape === 'cylinder' ? 0.68 : 0.86;
-  const y0 = I.tunnel ? I.tunnel.straightH + I.tunnel.r + 0.08 : I.floorY + 0.03;
-  return { cx: I.swim?.cx ?? 0, hx: (I.swim?.halfW ?? I.halfW) * k, hz: I.halfD * k, y0, y1: Math.max(y0 + 0.01, I.waterTop - 0.03), surf: I.waterTop, round: I.shape === 'cylinder' };
+  const top = I.waterTop;
+  const depth = Math.max(0, top - I.floorY);
+  const base = I.tunnel ? I.tunnel.straightH + I.tunnel.r + 0.08 : I.floorY + 0.03;
+  const y0 = Math.min(base, Math.max(I.floorY + Math.min(0.03, depth * 0.25), top - 0.06));
+  const y1 = Math.max(y0 + 0.002, top - Math.min(0.03, depth * 0.25));
+  return { cx: I.swim?.cx ?? 0, hx: (I.swim?.halfW ?? I.halfW) * k, hz: I.halfD * k, y0, y1, surf: top, round: I.shape === 'cylinder', shallow: depth < SHALLOW };
+}
+/** これより浅い水（m）では跳躍しない */
+const SHALLOW = 0.12;
+
+/** 水槽で見せる大きさの倍率（大きな生物は水槽に収め、成長（ピース）に応じて育つ） */
+function lifeScale(box, c, id) {
+  const room = Math.min(box.hx, box.hz) * 1.4;
+  return Math.min(1, room / c.len) * sizeOf(speciesPieces(id));
+}
+
+/** 水深（底から水面まで、m） */
+export const waterDepth = (tank) => {
+  const I = tank.userData.interior;
+  return I ? Math.max(0, I.waterTop - I.floorY) : 0;
+};
+
+/** 水槽で見せたときの体高（m） */
+export function bodyHeight(tank, id) {
+  const c = getCreature(id);
+  if (!c || !tank.userData.interior) return 0;
+  return c.len * lifeScale(swimBox(tank.userData.interior), c, id) * (FORMS[c.form]?.h ?? 0.3);
+}
+
+/** 水深が体高より浅い種（id の一覧） */
+export function shallowSpecies(tank) {
+  const depth = waterDepth(tank);
+  return Object.entries(tank.userData.creatures ?? {}).filter(([id, n]) => n > 0 && getCreature(id) && bodyHeight(tank, id) > depth).map(([id]) => id);
 }
 
 /** tank.userData.creatures に合わせてモデルを作り直す。動きは種ごとの行動（lifeMotion.js）で決める */
@@ -55,7 +90,6 @@ export function syncLife(tank) {
   group.name = LIFE;
   tank.add(group);
   const box = swimBox(tank.userData.interior);
-  const room = Math.min(box.hx, box.hz) * 1.4; // 大きな生物は水槽に収まる大きさに縮める
   // 水の流れの向き（チンアナゴなどが一斉に向く）は水槽ごとに決まっている
   const ctx = { box, anchors: lifeAnchors(tank), sig: anchorSig(tank), current: mulberry32(tank.userData.uid * 31 + 7)() * Math.PI * 2, checked: 0, last: null };
   group.userData.ctx = ctx;
@@ -71,7 +105,7 @@ export function syncLife(tank) {
       // 水槽の水紋（ON/OFF と、この水槽の真上をくり抜いた模様）を使う
       if (tank.userData.clip) for (const k of ['uCauOn', 'uCauTex', 'uCauOrigin', 'uCauSize', 'uCauTop', 'uCauVanish']) fish.userData.uni[k] = tank.userData.clip[k];
       const rand = mulberry32(tank.userData.uid * 131 + index++ * 977);
-      const scale = Math.min(1, room / c.len) * sizeOf(speciesPieces(id)); // 大きな生物は水槽に収め、成長（ピース）に応じて育つ
+      const scale = lifeScale(box, c, id);
       fish.scale.setScalar(scale);
       fish.userData.motion = createMotion(c, c.len * scale, ctx, rand, shared, i);
       group.add(fish);
@@ -113,7 +147,7 @@ export function updateLife(tank, time) {
 /** 魚が水面を抜けた・落ちたら、しぶきと波紋を出す（跳躍・滑空）。部品は最初に要るときに作る */
 function surfaceSplash(tank, ctx, m, dt) {
   const { surf } = ctx.box;
-  if (dt <= 0 || !m.visible || (m.py - surf) * (m.ry - surf) >= 0) return;
+  if (dt <= 0 || !m.visible || ctx.box.shallow || (m.py - surf) * (m.ry - surf) >= 0) return; // 浅い水では跳ねない
   if (!ctx.fx) {
     ctx.fx = new LeapFx(surf, Math.min(ctx.box.hx, ctx.box.hz) * 1.1);
     ctx.fx.group.name = FX;

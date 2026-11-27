@@ -202,7 +202,7 @@ export function updateCaustics(time, renderer, tanks = [], camera = null) {
     const cau = tank.userData.clip;
     if (!cau?.uCauTex || !tank.userData.interior) continue;
     alive.add(tank);
-    if (!cau.uCauOn.value || !tank.visible) continue;
+    if (!cau.uCauOn.value || !tank.visible || tank.userData.interior.dry) continue; // 水を抜いた水槽は水紋なし
     tank.updateWorldMatrix(true, false);
     tank.getWorldPosition(v3);
     if (camera && v3.distanceTo(camera.position) > NEAR) continue;
