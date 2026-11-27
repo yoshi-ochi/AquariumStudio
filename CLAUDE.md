@@ -84,4 +84,5 @@
 - 繁殖はオスとメス（種の雌雄比）・産卵（妊娠）→ふ化（出産）→保育の3段階と期限つきの世話（`src/breeding/`）。世話の厳しさは「3時間おきなら成功・8時間あくと失敗しやすい」を保つ。
 - 内装ガチャの景品（`src/decor/`）は「解放」で、出た物は何個でも置ける（置くときはコイン）。重複はコインに替える。解放の要る館内オブジェは def.unlock（gacha / dia）で、カタログは持っている物だけ並べる。
 - 環境保護区（Lv6、`src/reserve/`）は維持費がエコツアー収入より必ず大きい（持ち出し）設計で、見返りは水族館の来館者の倍率。
+- iPhone アプリは Capacitor（`npm run app:build`）。App内課金の付与は必ずサーバー（RevenueCat Webhook → `supabase/functions/revenuecat` → `iap_apply`）で行い、端末で有償ダイヤを増やさない。手順は `docs/iphone-release.md`。
 - 全体の設計と段階（卵ガチャ・繁殖・内装ガチャ・環境保護区・App内課金）は `docs/monetization.md`。

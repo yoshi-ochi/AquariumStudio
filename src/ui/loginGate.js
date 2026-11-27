@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 /**
  * スプラッシュ上のログイン。ログインとセーブの読込が終わるまで resolve しない。
  * ログイン状態は端末に保持されるので、ログアウトするまで再入力は不要。
@@ -69,7 +70,8 @@ function askRetry(online, host, message) {
 }
 
 async function askLogin(online, host, initialError) {
-  const providers = await online.providers();
+  // iPhone アプリでは外部ログイン（Google など）の画面遷移がアプリへ戻らないので、メールとパスワードだけにする
+  const providers = Capacitor.isNativePlatform() ? [] : await online.providers();
   return new Promise((resolve) => {
     host.innerHTML = formHtml(providers);
     const msg = host.querySelector('#lg-msg');

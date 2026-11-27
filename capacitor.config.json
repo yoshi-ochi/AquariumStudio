@@ -1,0 +1,9 @@
+{
+  "appId": "com.aquariumstudio.akusuta",
+  "appName": "アクスタ",
+  "webDir": "dist-app",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "Akusuta"
+  }
+}
