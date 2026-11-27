@@ -21,6 +21,8 @@ export class Expeditions extends EventTarget {
     this.xp = {}; // 成長：魚種ごとに成長に使った匹数（累計）
     this.getCapacity = () => Infinity;
     this.released = []; // 満杯で放流した生き物（直前の受け取り分）
+    this.variants = {}; // アルビノ・変色個体の数 { 種id: { albino, morph } }（在庫の数の内数）
+    this.lastVariants = null; // 直前の take で一緒に減ったアルビノ・変色個体
     this.getBonusTeams = () => 0; // 課金の調査隊（永久解放・館長パス）。main.js が wallet につなぐ
   }
 
@@ -139,8 +141,57 @@ export class Expeditions extends EventTarget {
   take(id, n = 1) {
     if (this.count(id) < n) return false;
     this.creatures[id] -= n;
+    this.lastVariants = this._clampVariants(id); // ふつうの個体から先に使い、足りない分だけアルビノなどが減る
     this._emit();
     return true;
+  }
+
+  // ---- アルビノ・変色個体（在庫の数の内数） ----------------------------------------
+
+  variantsOf(id) {
+    return { albino: 0, morph: 0, ...this.variants[id] };
+  }
+
+  variantTotal(id) {
+    const v = this.variantsOf(id);
+    return v.albino + v.morph;
+  }
+
+  /** アルビノなどを n 匹ぶん記録する（在庫の数はすでに増えていること） */
+  addVariant(id, kind, n = 1) {
+    if (!(n > 0) || !['albino', 'morph'].includes(kind)) return;
+    const v = this.variantsOf(id);
+    v[kind] += n;
+    this.variants[id] = v;
+    this._clampVariants(id);
+    this._emit();
+  }
+
+  /** アルビノなどを n 匹取り出す（水槽へ展示するとき） */
+  takeVariant(id, kind, n = 1) {
+    const v = this.variantsOf(id);
+    if (v[kind] < n || this.count(id) < n) return false;
+    v[kind] -= n;
+    this.variants[id] = v;
+    this.creatures[id] -= n;
+    this._emit();
+    return true;
+  }
+
+  /** 在庫の数を超えたアルビノなどを減らす（変色→アルビノの順）。減った数を返す */
+  _clampVariants(id) {
+    const v = this.variantsOf(id);
+    const gone = { albino: 0, morph: 0 };
+    let over = v.albino + v.morph - this.count(id);
+    for (const k of ['morph', 'albino']) {
+      const d = Math.min(Math.max(0, over), v[k]);
+      v[k] -= d;
+      gone[k] = d;
+      over -= d;
+    }
+    if (v.albino || v.morph) this.variants[id] = v;
+    else delete this.variants[id];
+    return gone;
   }
 
   /** 魚種の成長：埋まったピースの数（0〜48） */
@@ -153,7 +204,8 @@ export class Expeditions extends EventTarget {
    * 展示していない魚種は、在庫に最低1匹残す（全部使うと手元からいなくなるため）
    */
   usable(id, shown = 0) {
-    return Math.max(0, this.count(id) - (shown > 0 ? 0 : 1));
+    // アルビノ・変色個体は成長に使わない
+    return Math.max(0, this.count(id) - this.variantTotal(id) - (shown > 0 ? 0 : 1));
   }
 
   /** 使える在庫で次のピースを埋められるか（図鑑の通知バッジ） */
@@ -174,6 +226,7 @@ export class Expeditions extends EventTarget {
     if (n < 1 || this.usable(id, shown) < n) return null;
     const from = this.pieces(id);
     this.creatures[id] -= n;
+    this._clampVariants(id);
     this.xp[id] = (this.xp[id] ?? 0) + n;
     this._emit();
     return { from, to: this.pieces(id), used: n };
@@ -185,7 +238,7 @@ export class Expeditions extends EventTarget {
   }
 
   toJSON() {
-    return { extraTeams: this.extraTeams, trips: this.trips.map((t) => ({ ...t })), creatures: { ...this.creatures }, seen: { ...this.seen }, xp: { ...this.xp }, xpv: 4 };
+    return { extraTeams: this.extraTeams, trips: this.trips.map((t) => ({ ...t })), creatures: { ...this.creatures }, seen: { ...this.seen }, xp: { ...this.xp }, xpv: 4, variants: structuredClone(this.variants) };
   }
 
   fromJSON(data) {
@@ -196,6 +249,8 @@ export class Expeditions extends EventTarget {
     this.creatures = known(data?.creatures);
     this.seen = known(data?.seen);
     this.xp = known(data?.xp);
+    this.variants = known(data?.variants);
+    for (const id of Object.keys(this.variants)) this._clampVariants(id);
     // xpv 4・2 は使った匹数。版なし・xpv 3 は経験値なので、旧版の1匹の経験値で割って匹数に直す
     if (data?.xpv !== 4 && data?.xpv !== 2) for (const id of Object.keys(this.xp)) this.xp[id] = legacyXpToFish(id, this.xp[id]);
     for (const [id, n] of Object.entries(this.creatures)) if (n > 0) this.markSeen(id);

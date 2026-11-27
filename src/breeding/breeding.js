@@ -211,6 +211,7 @@ export class Breeding extends EventTarget {
       for (let k = 0; k < babies; k++) if (this._rand(job) < p) morphs[this._rand(job) < 0.7 ? 'albino' : 'morph']++;
       this.expeditions.discover(job.id);
       if (babies > 1) this.expeditions.give(job.id, babies - 1);
+      for (const k of ['albino', 'morph']) if (morphs[k]) this.expeditions.addVariant(job.id, k, morphs[k]);
       rec.albino += morphs.albino;
       rec.morph += morphs.morph;
       if (success) {

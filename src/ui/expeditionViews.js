@@ -1,6 +1,7 @@
 import { creatureThumb } from './creatureThumb.js';
 import { creatureGrid, qtyPanel, updateQty, creatureInfo } from './creatureGrid.js';
 import { tankLabel } from '../tanks/tankLabel.js';
+import { addTankVariants, takeTankVariants } from '../breeding/variants.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 import { CREATURES, SEASONS, getCreature, getDestination, travelPlan, inSeason } from '../expedition/creatureData.js';
 import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js';
@@ -242,6 +243,7 @@ export class CreatureView {
     this.picking = null; // 展示したら一覧へ戻る
     const list = (tank.userData.creatures ??= {});
     list[id] = (list[id] ?? 0) + n;
+    addTankVariants(tank, id, this.expeditions.lastVariants); // ふつうの個体が足りなければアルビノなども一緒に
     syncLife(tank);
     this.toast(`${c.name} を${n}匹 ${tankLabel(this.manager, tank)} に展示しました`);
     this.onChanged();
@@ -252,10 +254,12 @@ export class CreatureView {
     const tank = this.manager.objects.get(+uid);
     if (!tank?.userData.creatures?.[id]) return;
     if (this.expeditions.usedSlots + getCreature(id).slots > this.expeditions.getCapacity()) return this.toast('保持枠がいっぱいです', { error: true });
+    const moved = takeTankVariants(tank, id, 1);
     tank.userData.creatures[id]--;
     if (!tank.userData.creatures[id]) delete tank.userData.creatures[id];
     syncLife(tank);
     this.expeditions.give(id);
+    for (const k of ['albino', 'morph']) if (moved[k]) this.expeditions.addVariant(id, k, moved[k]);
     this.onChanged();
   }
 }

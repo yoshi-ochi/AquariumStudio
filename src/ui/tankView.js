@@ -6,6 +6,12 @@ import { tankCapacity, usedCapacity, syncLife } from '../expedition/tankLife.js'
 import { WATER, ensureCare, feedCost, hasLife, isHungry, predatorConflict, tankHealth, waterMismatch, nextFeedIn, crowdFactor, FEED_INTERVAL } from '../expedition/husbandry.js';
 import { tankLabel, defaultTankLabel, cleanTankName } from '../tanks/tankLabel.js';
 import { coin as yen } from './currency.js';
+import { tankVariants, addTankVariants, takeTankVariants, takeOneVariant } from '../breeding/variants.js';
+import { VARIANT_NAME } from '../breeding/morphColor.js';
+
+/** 在庫・展示のアルビノなどの数の表示と、1匹ずつ出し入れするボタン */
+const variantText = (v) => [v.albino ? `アルビノ ${v.albino}` : '', v.morph ? `変色 ${v.morph}` : ''].filter(Boolean).map((s) => ` ・ ${s}`).join('');
+const variantButtons = (v, id, act, suffix) => ['albino', 'morph'].filter((k) => v[k] > 0).map((k) => ({ act, id: `${id}:${k}`, label: `${VARIANT_NAME[k]}${suffix}` }));
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const span = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}時間${Math.floor((s % 3600) / 60)}分` : `${Math.max(1, Math.ceil(s / 60))}分`);
@@ -67,7 +73,7 @@ export class TankView {
     if (list.length) {
       const n = this.sel ? t.userData.creatures[this.sel] : 0;
       const panel = this.sel
-        ? qtyPanel({ title: getCreature(this.sel).name, info: creatureInfo(this.sel, `展示中 ${n}`), max: n, qty: this.qty, buttons: [{ act: 'tank-unshow', id: `${this.sel}:{n}`, label: '{n}匹 バックヤードへ戻す', primary: true }, { act: 'tank-grow', id: this.sel, label: `育てる（${this.expeditions.pieces(this.sel)}/${MAX_PIECES}ピース）` }] })
+        ? qtyPanel({ title: getCreature(this.sel).name, info: creatureInfo(this.sel, `展示中 ${n}${variantText(tankVariants(t, this.sel))}`), max: n, qty: this.qty, buttons: [{ act: 'tank-unshow', id: `${this.sel}:{n}`, label: '{n}匹 バックヤードへ戻す', primary: true }, ...variantButtons(tankVariants(t, this.sel), this.sel, 'tank-unshow-v', 'を1匹戻す'), { act: 'tank-grow', id: this.sel, label: `育てる（${this.expeditions.pieces(this.sel)}/${MAX_PIECES}ピース）` }] })
         : '';
       shown.push(creatureGrid(this.previews, list.map(([id, k]) => ({ id, n: k, pieces: this.expeditions.pieces(id) })), { sel: this.sel, panel }));
     }
@@ -110,8 +116,8 @@ export class TankView {
       const have = this.expeditions.count(c.id);
       const fit = Math.max(0, Math.floor(free / c.slots));
       panel = qtyPanel({
-        title: c.name, info: creatureInfo(c.id, `${shown[c.id] ? `展示中 ${shown[c.id]} ・ ` : ''}所持 ${have} ・ ${fit > 0 ? `空き枠に収まるのは ${fit}匹まで` : '空き枠なし（過密になります）'}`), max: have, qty: this.qty,
-        buttons: [{ act: 'tank-show', id: `${c.id}:{n}`, label: '{n}匹 展示する', primary: true }],
+        title: c.name, info: creatureInfo(c.id, `${shown[c.id] ? `展示中 ${shown[c.id]} ・ ` : ''}所持 ${have}${variantText(this.expeditions.variantsOf(c.id))} ・ ${fit > 0 ? `空き枠に収まるのは ${fit}匹まで` : '空き枠なし（過密になります）'}`), max: have, qty: this.qty,
+        buttons: [{ act: 'tank-show', id: `${c.id}:{n}`, label: '{n}匹 展示する', primary: true }, ...variantButtons(this.expeditions.variantsOf(c.id), c.id, 'tank-show-v', 'を1匹展示する')],
       });
     }
     const grid = owned.length ? creatureGrid(this.previews, owned.map((c) => ({ id: c.id, n: this.expeditions.count(c.id), shown: shown[c.id] ?? 0 })), { sel: this.sel, panel }) : '<p class="gs-empty">生物を持っていません。採取遠征で捕まえましょう。</p>';
@@ -150,6 +156,8 @@ export class TankView {
     }
     else if (act === 'tank-show') this._show(t, id);
     else if (act === 'tank-unshow') this._unshow(t, id);
+    else if (act === 'tank-show-v') this._showVariant(t, id);
+    else if (act === 'tank-unshow-v') this._unshowVariant(t, id);
     else if (act === 'tank-interior') this.onInterior(t);
     else if (act === 'tank-share') this.onShare?.(t);
     else if (act === 'tank-grow') this.onGrow?.(id);
@@ -164,8 +172,33 @@ export class TankView {
     if (!c || n <= 0 || !this.expeditions.take(id, n)) return;
     const list = (t.userData.creatures ??= {});
     list[id] = (list[id] ?? 0) + n;
+    addTankVariants(t, id, this.expeditions.lastVariants); // ふつうの個体が足りなければアルビノなども一緒に
     syncLife(t);
     this.toast(`${c.name} を${n}匹展示しました`);
+    this.onChanged();
+  }
+
+  /** アルビノなどを1匹展示する */
+  _showVariant(t, key) {
+    const [id, kind] = key.split(':');
+    const c = getCreature(id);
+    if (!c || !this.expeditions.takeVariant(id, kind)) return;
+    const list = (t.userData.creatures ??= {});
+    list[id] = (list[id] ?? 0) + 1;
+    addTankVariants(t, id, { [kind]: 1 });
+    syncLife(t);
+    this.toast(`${c.name}（${VARIANT_NAME[kind]}）を展示しました`);
+    this.onChanged();
+  }
+
+  /** アルビノなどを1匹バックヤードへ戻す */
+  _unshowVariant(t, key) {
+    const [id, kind] = key.split(':');
+    if (this.expeditions.usedSlots + getCreature(id).slots > this.expeditions.getCapacity()) return this.toast('バックヤードの保持枠がいっぱいです', { error: true });
+    if (!takeOneVariant(t, id, kind)) return;
+    syncLife(t);
+    this.expeditions.give(id);
+    this.expeditions.addVariant(id, kind, 1);
     this.onChanged();
   }
 
@@ -175,10 +208,12 @@ export class TankView {
     const room = Math.floor((this.expeditions.getCapacity() - this.expeditions.usedSlots) / getCreature(id).slots);
     const n = Math.min(have, Number(want) || 1, room);
     if (n <= 0) return this.toast('バックヤードの保持枠がいっぱいです。放流か食堂で空けられます', { error: true });
+    const moved = takeTankVariants(t, id, n);
     t.userData.creatures[id] -= n;
     if (!t.userData.creatures[id]) delete t.userData.creatures[id];
     syncLife(t);
     this.expeditions.give(id, n);
+    for (const k of ['albino', 'morph']) if (moved[k]) this.expeditions.addVariant(id, k, moved[k]);
     if (n < Math.min(have, Number(want) || 1)) this.toast(`保持枠が足りないため${n}匹だけ戻しました`);
     this.onChanged();
   }
