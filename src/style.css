@@ -783,3 +783,6 @@ body.editing #hud .hud-stat.money, body[data-mode=tank] #hud .hud-stat.money { g
 .br-road li { opacity: .7; }
 .br-road li.ok { opacity: 1; color: #2a7a3a; }
 .br-hours { display: block; margin-top: 4px; }
+.dc-got { margin: 6px 0 0; padding-left: 0; list-style: none; font-size: 12px; }
+.seg.wrap { flex-wrap: wrap; }
+.card.dia-locked img { opacity: .55; }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { getDef, hasDef, CATEGORY } from './tankData.js';
-import { buildObject, disposeObject } from './tankBuilder.js';
+import { buildObject, disposeObject, rebuildBody } from './tankBuilder.js';
 import { createClipUniforms, updateClipUniforms, applyClip, floorAt } from './tankClip.js';
 import { conformFlora } from '../flora/floraSurface.js';
 import { ROCK_SHAPES } from './interiorBuilder.js';
@@ -33,9 +33,9 @@ export class TankManager {
 
   // ---- 追加・削除 ---------------------------------------------------------
 
-  add(defId, { x = 0, z = 0, rotY = 0, floor = this.currentFloor, uid, contents = [], embed = null, look = null, creatures = null, variants = null, clean = null, care = null, name = null } = {}) {
+  add(defId, { x = 0, z = 0, rotY = 0, floor = this.currentFloor, uid, contents = [], embed = null, look = null, creatures = null, variants = null, clean = null, care = null, name = null, skin = null } = {}) {
     const def = getDef(defId);
-    const obj = buildObject(def);
+    const obj = buildObject(def, { skin: def.skin ? skin : undefined }); // 水槽台・説明プレートのデザイン
     obj.userData.uid = uid ?? this.nextUid++;
     this.nextUid = Math.max(this.nextUid, obj.userData.uid + 1);
     obj.userData.floor = floor;
@@ -174,6 +174,14 @@ export class TankManager {
   }
 
   /** 水槽の見た目（バックスクリーン・フレーム・ライト）を部分的に変更 */
+  /** 水槽台・説明プレートのデザインを変える */
+  setSkin(obj, skin) {
+    const def = getDef(obj.userData.defId);
+    if (!def.skin) return;
+    rebuildBody(obj, def, { skin });
+    obj.visible = this._visibleOn(obj, this.currentFloor);
+  }
+
   setTankLook(tank, patch) {
     const cur = tank.userData.look ?? {};
     const next = { ...cur, ...patch, light: { ...(cur.light ?? {}), ...(patch.light ?? {}) } };
@@ -380,6 +388,7 @@ export class TankManager {
       ...(o.userData.look && { look: o.userData.look }),
       ...(o.userData.creatures && { creatures: { ...o.userData.creatures } }),
       ...(o.userData.variants && { variants: structuredClone(o.userData.variants) }),
+      ...(o.userData.skin && { skin: o.userData.skin }),
       ...(o.userData.clean && { clean: { ...o.userData.clean } }),
       ...(o.userData.care && { care: { ...o.userData.care } }),
       ...(o.userData.clip && { contents: this.dumpInterior(o) }),

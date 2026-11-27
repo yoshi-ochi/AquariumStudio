@@ -10,8 +10,8 @@ export const WALL_EDIT_LEVEL = 4;
  * kind: 'look' | 'lights'
  */
 export class RoomPanel {
-  constructor({ el, getSettings, getPlan, getLevel, onChange }) {
-    Object.assign(this, { el, getSettings, getPlan, getLevel, onChange });
+  constructor({ el, getSettings, getPlan, getLevel, onChange, getSkins }) {
+    Object.assign(this, { el, getSettings, getPlan, getLevel, onChange, getSkins });
     this.brush = 'add';
     this.section = 'floor';
     this.lightIndex = 0;
@@ -135,10 +135,19 @@ export class RoomPanel {
       <div class="row"><button data-act="light-down">真下に向ける</button></div>
       ${range('intensity', '光量', 0, 4, 0.05, l.intensity, '')}
       ${range('angle', '照射角', 20, 150, 5, l.angle, '°')}
+      ${this._fixtureRow(l)}
       <div class="row"><span class="label">色調</span><input type="color" data-field="light-color" value="${l.color}">
         <button data-act="light-preset" data-v="#ffd9a8">電球色</button>
         <button data-act="light-preset" data-v="#fff6e8">温白色</button>
         <button data-act="light-preset" data-v="#e8f2ff">昼光色</button></div>` : ''}`;
+  }
+
+  /** 照明器具のデザイン（増やすのは内装ガチャ） */
+  _fixtureRow(l) {
+    const list = this.getSkins?.('light') ?? [];
+    if (list.length < 2) return '';
+    const cur = l.fixture ?? list[0].id;
+    return `<div class="row wrap"><span class="label">器具</span>${list.map((f) => `<button data-act="light-fixture" data-v="${f.id}" class="${cur === f.id ? 'active' : ''}">${f.name}</button>`).join('')}</div>`;
   }
 
   _act(act, v) {
@@ -172,6 +181,8 @@ export class RoomPanel {
     } else if (act === 'light-remove' && s.lights[this.lightIndex]?.zone === this.zone) {
       s.lights.splice(this.lightIndex, 1);
       this.lightIndex = this._zoneLights()[0] ?? -1;
+    } else if (act === 'light-fixture' && s.lights[this.lightIndex]) {
+      s.lights[this.lightIndex].fixture = v; // 器具の形が変わるので照明を作り直す（下の lights）
     } else if (act === 'light-preset') {
       s.lights[this.lightIndex].color = v;
       this.onChange('light-update', this.lightIndex);

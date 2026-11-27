@@ -267,7 +267,7 @@ export class Room {
       const handle = new THREE.Group();
       handle.add(bulb, ring, aim, line, drop);
       this.helperGroup.add(handle);
-      const fixture = this._fixture();
+      const fixture = this._fixture(l.fixture);
       fixture.visible = this.ceilingOn;
       this.lightGroup.add(fixture);
       const entry = { index: i, zone: l.zone, spot, handle, bulb, ring, aim, aimEdge, line, drop, fixture };
@@ -288,14 +288,27 @@ export class Room {
    * 天井から吊るしたペンダントライト：天井の受け皿・吊り棒（長さは scale.y）・下向きの笠・光る面。
    * 原点が笠の高さ（ライトの高さ）
    */
-  _fixture() {
+  _fixture(type = 'pendant') {
     const g = new THREE.Group();
     const rose = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.03, 16), this.fixtureMat);
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 6).translate(0, 0.5, 0), this.fixtureMat);
-    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.17, 0.16, 20, 1, true).translate(0, 0.02, 0), this.fixtureMat);
-    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.15, 20).rotateX(Math.PI / 2).translate(0, -0.05, 0), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    let shade;
+    let glow;
+    // 内装ガチャのデザイン：球形ペンダント・提灯は笠の代わりに光る球、ダウンライトは常に天井に埋め込む
+    if (type === 'globe') {
+      shade = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 14).translate(0, -0.1, 0), new THREE.MeshBasicMaterial({ color: 0xfff6e8 }));
+      glow = new THREE.Mesh(new THREE.CircleGeometry(0.01, 6), new THREE.MeshBasicMaterial());
+    } else if (type === 'chochin') {
+      shade = new THREE.Group();
+      shade.add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12).scale(1, 1.35, 1).translate(0, -0.2, 0), new THREE.MeshBasicMaterial({ color: 0xf6dca0 })));
+      for (const y of [-0.01, -0.39]) shade.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.03, 12).translate(0, y, 0), this.fixtureMat));
+      glow = new THREE.Mesh(new THREE.CircleGeometry(0.01, 6), new THREE.MeshBasicMaterial());
+    } else {
+      shade = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.17, 0.16, 20, 1, true).translate(0, 0.02, 0), this.fixtureMat);
+      glow = new THREE.Mesh(new THREE.CircleGeometry(0.15, 20).rotateX(Math.PI / 2).translate(0, -0.05, 0), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    }
     g.add(rose, stem, shade, glow);
-    g.userData = { rose, stem, glow, shade };
+    g.userData = { rose, stem, glow, shade, type };
     g.traverse((o) => (o.raycast = () => {}));
     return g;
   }
@@ -337,9 +350,10 @@ export class Room {
     line.material.color.set(l.color);
     // 照明器具：天井近くなら天井に埋め込んだダウンライト（枠と光る面だけ）、低ければ吊り棒と笠のペンダント
     const H = this.ceilingHeight;
-    const recessed = l.height >= H - 0.15;
-    fixture.position.set(l.x, recessed ? H - 0.012 : Math.min(l.height, H - 0.1), l.z);
-    const { rose, stem, glow, shade } = fixture.userData;
+    const { rose, stem, glow, shade, type } = fixture.userData;
+    const hanging = type === 'globe' || type === 'chochin'; // 吊るす器具は天井近くでも少し下げて見せる
+    const recessed = type === 'downlight' || (!hanging && l.height >= H - 0.15);
+    fixture.position.set(l.x, recessed ? H - 0.012 : Math.min(l.height, H - (hanging ? 0.5 : 0.1)), l.z);
     stem.visible = shade.visible = !recessed;
     stem.position.y = 0.1;
     stem.scale.y = Math.max(0.01, H - fixture.position.y - 0.1);
