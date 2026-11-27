@@ -45,7 +45,33 @@
    - Authorization header：手順1の `REVENUECAT_WEBHOOK_AUTH` と同じ値
    - 「Send test event」を押し、200 が返ることを確かめる（テストは何も付与しない）
 
-## 4. ビルドと実機での確認（Mac）
+## 4a. Windows だけの場合：Codemagic でビルドして TestFlight で試す
+Mac が無くても、クラウドの Mac（Codemagic）でビルドし、iPhone の TestFlight アプリから入れて試せる。設定は `codemagic.yaml`。
+Apple Developer Program の登録が「保留中」の間はできない（App Store Connect に入れるようになってから）。
+
+1. **アプリの ID を登録**：developer.apple.com → Certificates, Identifiers & Profiles → Identifiers → ＋ → App IDs
+   - Bundle ID は `com.aquariumstudio.akusuta`（Explicit）。Capabilities の「In-App Purchase」はオンのまま
+2. **App Store Connect にアプリを作る**：マイApp → ＋ → 新規App（プラットフォーム iOS・言語 日本語・Bundle ID は手順1のもの）
+   - できたアプリの「App情報」にある **Apple ID（数字）** を控える → 手順4の `APP_STORE_APPLE_ID`
+3. **App Store Connect の API キーを作る**：ユーザとアクセス → 統合 → App Store Connect API → チームキー → ＋
+   - アクセスは「App Manager」。作ったら **Issuer ID・キーID** を控え、**.p8 ファイル** をダウンロード（1回しかダウンロードできない）
+4. **Codemagic**（codemagic.io）に GitHub でサインアップし、このリポジトリ（AquariumStudio）を追加する
+   - Team settings → Team integrations → Developer Portal → Manage keys → Add key
+     - 名前は **`aquastu_asc`**（codemagic.yaml と同じ）。手順3の Issuer ID・キーID・.p8 を入れる
+   - アプリの Environment variables に、グループ名 **`app_env`** で次を追加（Secure にチェック）
+     - `VITE_SUPABASE_URL`・`VITE_SUPABASE_ANON_KEY`（`.env.local` と同じ値）
+     - `VITE_REVENUECAT_IOS_KEY`（手順3の RevenueCat の公開キー。まだ無ければ空でもビルドはできる。課金だけ使えない）
+     - `APP_STORE_APPLE_ID`（手順2の数字）
+5. Codemagic で **Start new build** → ブランチ main・ワークフロー「iOS TestFlight」
+   - 署名の証明書とプロファイルは Codemagic が API キーで自動で作る
+   - 15〜25分ほどで TestFlight に届く（Apple の処理にさらに数分〜数十分）
+6. **TestFlight で試す**：App Store Connect → アプリ → TestFlight → 内部テスト → グループを作って自分を追加
+   - iPhone に「TestFlight」アプリを入れ、届いた招待から「アクスタ」を入れる
+   - 課金は App Store Connect の Sandbox テスター（ユーザとアクセス → Sandbox）で試す
+
+無料枠は月500分ほど（1回のビルドで約20分）。ビルドが失敗したら、Codemagic のログ（または artifacts の xcodebuild のログ）を見せてもらえれば直します。
+
+## 4. ビルドと実機での確認（Mac がある場合）
 ```
 npm install
 npm run app:build      # dist-app を作り、ios/ へコピーする

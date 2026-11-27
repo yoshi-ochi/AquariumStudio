@@ -1,0 +1,41 @@
+# Codemagic（クラウドの Mac）で iPhone アプリをビルドし、TestFlight へ送る。
+# Windows だけでも iPhone アプリを作れるようにするための設定。手順は docs/iphone-release.md の「Windows だけの場合」。
+# Codemagic の画面で用意するもの：
+#   - App Store Connect の API キーの連携（名前：aquastu_asc）
+#   - 環境変数のグループ app_env：VITE_SUPABASE_URL・VITE_SUPABASE_ANON_KEY・VITE_REVENUECAT_IOS_KEY・APP_STORE_APPLE_ID
+workflows:
+  ios-testflight:
+    name: iOS TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: aquastu_asc
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.aquariumstudio.akusuta # capacitor.config.json の appId と同じ
+      groups:
+        - app_env
+      node: 22 # Capacitor 8 は Node 22 以上
+      xcode: latest
+    scripts:
+      - name: 依存を入れる
+        script: npm ci
+      - name: アプリ用にビルドして iOS へコピー
+        script: npm run app:build
+      - name: 署名の設定を Xcode のプロジェクトに入れる
+        script: xcode-project use-profiles
+      - name: ビルド番号を TestFlight の最新より1つ上げる
+        script: |
+          cd ios/App
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $((LATEST + 1))
+      - name: ipa を作る
+        script: xcode-project build-ipa --project "ios/App/App.xcodeproj" --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
