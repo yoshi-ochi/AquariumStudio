@@ -19,7 +19,7 @@ export function applyCreatureReset(data) {
   const life = data.life;
   if (life) {
     life.zukan = []; // 図鑑の地域の達成報酬も、もう一度受け取れる
-    if (life.backyard) life.backyard.jobs = {};
+    if (life.backyard?.state?.breed) life.backyard.state.breed.jobs = {};
     if (life.mail) {
       life.mail.items = (life.mail.items ?? []).filter((m) => !MAIL_KINDS.has(m.kind));
       life.mail.keys = (life.mail.keys ?? []).filter((k) => !String(k).startsWith('allyrun:'));

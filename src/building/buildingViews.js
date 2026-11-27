@@ -1,13 +1,11 @@
-import { creatureThumb } from '../ui/creatureThumb.js';
 import { PLAN_FLOORS, WING_FLOORS, isWing, ZONES, ZONE_TYPE, MAX_ZONE_NAME, defaultZoneName, floorLabel, getZone } from './blueprint.js';
-import { pickBoost } from '../ui/boostPicker.js';
 import { jobHtml, boostButton, timeNote } from './builder.js';
 import { zoneSeconds } from '../management/buildTimes.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 import { EXPAND_COST, EXPAND_SLOTS } from './backyardData.js';
-import { CREATURES, RARITY_NAME, getCreature } from '../expedition/creatureData.js';
-import { RESEARCH, BREED_HOURS, researchCost, breedHours } from './backyardData.js';
+import { RESEARCH, researchCost } from './backyardData.js';
+import { BreedView } from '../breeding/breedView.js';
 import { coin as yen } from '../ui/currency.js';
 
 
@@ -78,6 +76,7 @@ export class ZoneView {
 export class BackyardView {
   constructor({ backyard, expeditions, economy, previews, toast, items, wallet }) {
     Object.assign(this, { backyard, expeditions, economy, previews, toast, items, wallet });
+    this.breedView = new BreedView({ backyard, expeditions, previews, items, wallet, toast });
   }
 
   html() {
@@ -88,7 +87,6 @@ export class BackyardView {
       const max = cost == null;
       return `<div class="gs-row"><div class="gs-info"><b>${r.name} Lv${lv}</b><small>${r.text}</small></div>${max ? '<span class="zn-open">最大（Lv100）</span>' : `<button data-act="lab-up" data-id="${r.id}" class="primary" ${b.points >= cost ? '' : 'disabled'}>${cost}pt</button>`}</div>`;
     });
-    const slots = b.breeders.map((uid, i) => this._slot(uid, i));
     const hold = this.expeditions;
     const holding = `<div class="st-sum"><div class="st-head"><b>魚の保持 ${hold.usedSlots}/${b.capacity}枠</b><small>拡張 ${b.expansions}回</small></div>
         <div class="st-bar"><i style="width:${Math.min(100, (hold.usedSlots / b.capacity) * 100)}%"></i></div>
@@ -99,19 +97,7 @@ export class BackyardView {
         ${b.labCount ? '' : '<em class="gs-alert">レイアウトでバックヤードに研究室を設置してください</em>'}
         ${b.labCount > b.researchers ? '<em class="gs-alert">スタッフから研究員を配置してください</em>' : ''}</div>
       <h4 class="gs-sub">研究</h4>${research.join('')}
-      <h4 class="gs-sub">繁殖</h4>${slots.join('') || '<p class="gs-empty">レイアウトでバックヤードに繁殖水槽を設置すると、在庫の親2匹から赤ちゃんを増やせます。親は減りません。</p>'}`;
-  }
-
-  _slot(uid, i) {
-    const b = this.backyard;
-    const job = b.jobs[uid];
-    if (job) {
-      const c = getCreature(job.id);
-      return `<div class="gs-row">${creatureThumb(this.previews, job.id)}<div class="gs-info"><b>繁殖水槽${i + 1}：${c.name}</b><small>誕生まで <span data-until="${job.until}"></span></small></div>${this.items ? `<button data-act="breed-boost" data-id="${uid}">⚡加速</button>` : ''}</div>`;
-    }
-    const opts = CREATURES.filter((c) => this.expeditions.count(c.id) >= 2 && b.canBreed(c));
-    const rows = opts.map((c) => `<button data-act="breed" data-id="${uid}:${c.id}">${c.name}（${RARITY_NAME[c.rarity]}・${breedHours(c.rarity, b.level('breeding'))}時間）</button>`);
-    return `<div class="gs-row wrap"><div class="gs-info"><b>繁殖水槽${i + 1}：空き</b><small>同じ種類を2匹以上持っている生き物を選びます（基本${BREED_HOURS[1]}〜${BREED_HOURS[3]}時間）</small></div><div class="gs-btns">${rows.join('') || '<small>繁殖できる生き物がいません</small>'}</div></div>`;
+      ${this.breedView.html()}`;
   }
 
   act(act, id) {
@@ -119,13 +105,7 @@ export class BackyardView {
     if (act === 'hold-expand') {
       if (this.economy.spend(EXPAND_COST)) b.expand();
     } else if (act === 'lab-up') b.upgrade(id);
-    else if (act === 'breed-boost') {
-      const job = b.jobs[id];
-      if (job) pickBoost({ items: this.items, wallet: this.wallet, toast: this.toast, left: (job.until - Date.now()) / 1000, title: '繁殖の加速' }).then((sec) => sec && b.boostJob(id, sec));
-    } else if (act === 'breed') {
-      const [uid, cid] = id.split(':');
-      b.startBreeding(+uid, cid);
-    } else return false;
+    else return this.breedView.act(act, id);
     return true;
   }
 }

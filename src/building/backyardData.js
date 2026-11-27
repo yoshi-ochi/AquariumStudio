@@ -9,7 +9,7 @@ export const researchBonus = (level) => Math.min(MAX_RESEARCH, Math.max(0, level
 export const RESEARCH = [
   { id: 'display', name: '展示解説', text: '1レベルごとに来館者+0.5%（Lv100で+50%）' },
   { id: 'field', name: '採取技術', text: '1レベルごとに遠征費用-0.5%（Lv100で-50%）' },
-  { id: 'breeding', name: '繁殖技術', text: '1レベルごとに繁殖時間-0.5%（Lv100で-50%）。Lv2で紫・金も繁殖可能' },
+  { id: 'breeding', name: '繁殖技術', text: '1レベルごとに産卵（妊娠）の時間-0.5%（Lv100で-50%）、アルビノ・変色個体の確率+0.01%（0.5%→Lv100で1.5%）。Lv2で紫・金も繁殖可能' },
   { id: 'welfare', name: '労務管理', text: '1レベルごとに賃金-0.5%（Lv100で-50%）' },
 ];
 

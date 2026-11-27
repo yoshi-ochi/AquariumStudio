@@ -28,6 +28,7 @@ export class LifeSystems {
     this.monthly = new Monthly({ state: this.state, manager, expeditions });
     this.backyard = new Backyard({ manager, ops, economy, expeditions, toast, isUnlocked, wallet });
     expeditions.getCapacity = () => this.backyard.capacity;
+    this.backyard.breeding.addEventListener('finished', (e) => this._breedResult(e.detail));
     expeditions.addEventListener('discovered', (e) => this._rewardDiscovery(e.detail));
     this.panels = {
       backyard: { title: 'バックヤード', live: true, view: new BackyardView({ backyard: this.backyard, expeditions, economy, previews, toast, items, wallet }) },
@@ -35,7 +36,7 @@ export class LifeSystems {
         this.state.flags.fed = true;
         this.mail.count('feeds');
       } }) },
-      zukan: { title: '生き物図鑑', view: new ZukanView({ expeditions, manager, previews, economy, state: this.state, toast, wallet }) },
+      zukan: { title: '生き物図鑑', view: new ZukanView({ expeditions, manager, previews, economy, state: this.state, toast, wallet, backyard: this.backyard }) },
       event: { title: 'イベント', live: true, view: new EventView({ economy, items, state: this.state, monthly: this.monthly, previews, getStats: () => this.stats(), toast, onStart: () => { this.state.flags.event = true; this.state.flags.events = (this.state.flags.events ?? 0) + 1; this.monthly.countEvent(); } }) },
     };
     // 報酬のボタンで受け取る。カードのほかの所をタップすると、進め方の案内（main.js の onGoalTap）
@@ -116,9 +117,29 @@ export class LifeSystems {
     setCleanIntervalBoost(1 + Math.min(4, count('waterPlant')) * 0.25);
     setCareFacilities({ freezer: count('freezer'), liveFeed: count('liveFeed'), foodPrep: count('foodPrep') });
     this.backyard.tick();
+    this._breedMail();
     this._month();
     this._husbandry();
     this._renderGoal(s);
+  }
+
+  /** 繁殖の世話の時間になったらメールで知らせる（期限内に「世話をする」） */
+  _breedMail(now = Date.now()) {
+    const br = this.backyard.breeding;
+    for (const [uid, job] of Object.entries(br.jobs)) {
+      const t = br.pendingTask(job, now);
+      if (!t) continue;
+      const c = getCreature(job.id);
+      const k = job.tasks.indexOf(t);
+      this.mail.add({ key: `breed:${uid}:${job.seed}:${job.stage}:${k}`, kind: 'breed', title: `${c.name}の繁殖：世話の時間です`, body: `${br.careText(job)}。期限を過ぎると子が死んでしまうことがあります。`, data: { uid: +uid, seed: job.seed, stage: job.stage, k }, actionable: true });
+    }
+  }
+
+  /** 繁殖の結果をメールで知らせる */
+  _breedResult({ id, kind, text }) {
+    const c = getCreature(id);
+    this.mail.add({ kind: 'breedResult', title: `${c?.name ?? ''}の繁殖：${{ raised: '保育成功', partial: '保育失敗', died: '全滅', nospawn: '産卵せず' }[kind] ?? '結果'}`, body: text });
+    this.toast(text, { duration: 5000, error: kind === 'died' });
   }
 
   /** 飼育員が足りていれば自動でエサやり */
