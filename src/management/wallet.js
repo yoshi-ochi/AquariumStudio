@@ -28,15 +28,18 @@ export class Wallet extends EventTarget {
     return this.total >= n;
   }
 
-  /** 使う。無償から先に減らし、足りない分を有償から（サーバーへは後で送り、失敗したら戻す） */
-  spend(n, reason = '') {
+  /**
+   * 使う。無償から先に減らし、足りない分を有償から（サーバーへは後で送り、失敗したら戻す）。
+   * remote: false は、サーバー側ですでに有償ダイヤを減らした場合（卵ガチャの抽選 gacha_draw）
+   */
+  spend(n, reason = '', { remote = true } = {}) {
     if (!(n > 0) || !this.canAfford(n)) return false;
     const fromFree = Math.min(this.free, n);
     const fromPaid = n - fromFree;
     this.free -= fromFree;
     if (fromPaid > 0) {
       this.paid -= fromPaid;
-      this.spendPaidRemote(fromPaid, reason).catch((err) => {
+      if (remote) this.spendPaidRemote(fromPaid, reason).catch((err) => {
         this.paid += fromPaid;
         console.warn('有償ダイヤの消費に失敗', err?.message);
         this._emit();

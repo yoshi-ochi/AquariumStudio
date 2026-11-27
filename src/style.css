@@ -763,3 +763,12 @@ body.editing #hud .hud-stat.money, body[data-mode=tank] #hud .hud-stat.money { g
 .st-tasks { list-style: none; margin: 4px 0; padding: 0; font-size: 12px; }
 .st-tasks li.done { opacity: .6; }
 .bd-job { color: #e0a000; }
+/* 卵ガチャ */
+.gc-egg { display: inline-block; flex: none; width: 22px; height: 28px; vertical-align: middle; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; background: var(--egg); border: 3px solid var(--ring); }
+.gc-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.gc-got { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; }
+.gc-machine .st-head b { display: inline-flex; align-items: center; gap: 6px; }
+.gc-odds { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.gc-odds th { text-align: left; padding: 4px 2px 2px; border-bottom: 1px solid var(--border, #d5dfe8); }
+.gc-odds td { padding: 2px; }
+.gc-odds td:last-child { text-align: right; font-variant-numeric: tabular-nums; }

@@ -98,6 +98,8 @@ import { Daily } from './game/daily.js';
 import { OFFLINE_MAX_HOURS } from './game/gameData.js';
 import { Purchases } from './online/purchases.js';
 import { StoreView } from './ui/storeView.js';
+import { Gacha } from './gacha/gacha.js';
+import { GachaView } from './ui/gachaView.js';
 
 const $ = (id) => document.getElementById(id);
 const MIN_SPLASH_MS = 1800;
@@ -135,6 +137,7 @@ async function boot() {
   const wallet = new Wallet({ economy });
   const items = new Items({ wallet });
   const construction = new Construction();
+  const gacha = new Gacha({ expeditions });
   expeditions.getBonusTeams = () => wallet.extraTeams();
   wallet.addEventListener('granted', (e) => toast(`💎 +${e.detail.n}ダイヤ（${e.detail.reason}）`));
   let home = null; // 自分の立地 { lat, lon }
@@ -740,7 +743,7 @@ async function boot() {
 
   /** 現在の状態を保存用データにする */
   function snapshot() {
-    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), dolphinPool: pool.toJSON(), wallet: wallet.toJSON(), items: items.toJSON(), construction: construction.toJSON(), daily: daily.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
+    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), dolphinPool: pool.toJSON(), wallet: wallet.toJSON(), items: items.toJSON(), construction: construction.toJSON(), daily: daily.toJSON(), gacha: gacha.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
   }
 
   let pendingLayout = null; // 初期設定で選んだ間取り
@@ -940,6 +943,7 @@ async function boot() {
       wallet.fromJSON(data.wallet);
       items.fromJSON(data.items);
       construction.fromJSON(data.construction);
+      gacha.fromJSON(data.gacha);
     }
     if (!visiting) refundOldShops();
     if (!visiting) home = data.home ?? null;
@@ -1319,6 +1323,7 @@ async function boot() {
       staff: { title: 'スタッフ', live: true, view: new StaffView({ ops }) },
       shop: { title: '店舗運営', live: true, view: new ShopView({ ops, economy, inventory, onPlace: (id) => { gameSheet.close(); mapPage.close(); if (mode !== 'hall-edit') enterHallEdit(); hall.startPlacement(id); } }) },
       ...life.panels,
+      gacha: { title: '卵ガチャ', live: true, view: new GachaView({ gacha, wallet, items, purchases, toast, onChange: () => gameSheet.view === 'gacha' && gameSheet.render() }) },
       store: { title: 'ショップ', live: true, view: new StoreView({ wallet, items, daily, purchases, builder, toast, onChange: () => gameSheet.view && gameSheet.render() }) },
       mail: { title: 'メール', live: true, view: mailView },
       pool: { title: 'イルカプール', view: new PoolView({ pool, expeditions, previews, toast }) },
@@ -1402,7 +1407,7 @@ async function boot() {
   // 開き直したときは前回の受け取り結果を消す（下の開閉処理より先に動かす）
   // 開き直したときは未読のあるタブを開き、前回の受け取り結果を消す（下の開閉処理より先に動かす）
   $('side-mail').addEventListener('click', () => mailView.reset(), true);
-  for (const [btn, id, ic] of [['side-mail', 'mail', 'mail'], ['side-clean', 'clean', 'clean'], ['side-care', 'care', 'care'], ['side-zukan', 'zukan', 'zukan'], ['side-staff', 'staff', 'staff']]) {
+  for (const [btn, id, ic] of [['side-mail', 'mail', 'mail'], ['side-clean', 'clean', 'clean'], ['side-care', 'care', 'care'], ['side-gacha', 'gacha', 'egg'], ['side-zukan', 'zukan', 'zukan'], ['side-staff', 'staff', 'staff']]) {
     $(btn).querySelector('.sa-ico').innerHTML = icon(ic, 24);
     $(btn).addEventListener('click', () => {
       if (visiting) return;
@@ -1448,6 +1453,9 @@ async function boot() {
     const shownBy = {};
     for (const t of manager.exhibits) for (const [id, n] of Object.entries(t.userData.creatures ?? {})) shownBy[id] = (shownBy[id] ?? 0) + n;
     const growable = CREATURES.filter((c) => expeditions.canLevelUp(c.id, shownBy[c.id] ?? 0)).length;
+    const eggs = gacha.ready().length; // かえった卵
+    $('gacha-badge').hidden = !eggs;
+    $('gacha-badge').textContent = eggs;
     $('zukan-badge').hidden = !growable;
     $('zukan-badge').textContent = growable;
   }, 1000);
