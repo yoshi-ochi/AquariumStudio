@@ -1,7 +1,7 @@
 import { BUILD_SHAPES, DRAW_GRID, normalizeSpec, customDef, registerCustom, volumeOf, validPoly } from '../tanks/customTanks.js';
 import { tankCapacity } from '../expedition/tankLife.js';
+import { coin as yen, coinText } from './currency.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const LABEL = { w: '幅', d: '奥行', h: '高さ' };
 
 /** 水槽建造：形と寸法を決めて水槽を作り、在庫に加える */
@@ -71,7 +71,7 @@ export class BuildView {
     const spec = this._spec;
     const price = spec ? customDef(spec).price : 0;
     const btn = list.querySelector('[data-act="build-make"]');
-    btn.textContent = `建造する ${spec ? yen(price) : ''}`;
+    btn.textContent = `建造する ${spec ? coinText(price) : ''}`;
     btn.disabled = !spec || !this.economy.canAfford(price);
   }
 
@@ -140,7 +140,7 @@ export class BuildView {
     if (!spec) return true;
     const price = customDef(spec).price;
     if (!this.economy.spend(price)) {
-      this.toast('資金が足りません', { error: true });
+      this.toast('コインが足りません', { error: true });
       return true;
     }
     const def = registerCustom(spec);

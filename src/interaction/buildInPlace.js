@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildObject, disposeObject } from '../tanks/tankBuilder.js';
 import { BUILD_SHAPES, customDef, normalizeSpec, registerCustom, validPoly, volumeOf } from '../tanks/customTanks.js';
 import { tankCapacity } from '../expedition/tankLife.js';
+import { coin as yen } from '../ui/currency.js';
 
 /**
  * 館内でその場に水槽を設計して建造する。
@@ -9,7 +10,6 @@ import { tankCapacity } from '../expedition/tankLife.js';
  * 10cm の格子に合わせ、高さはパネルで決める。確定するとその位置に設置する。
  */
 const GRID = 0.1; // m
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const snap = (v) => Math.round(v / GRID) * GRID;
 
 export class BuildInPlace {
@@ -183,7 +183,7 @@ export class BuildInPlace {
     if (!plan) return;
     const def = customDef(plan.spec);
     if (!this.hall._fits(def, 0, plan.x, plan.z)) return this.toast('床からはみ出しています', { error: true });
-    if (!this.economy.spend(def.price)) return this.toast('資金が足りません', { error: true });
+    if (!this.economy.spend(def.price)) return this.toast('コインが足りません', { error: true });
     registerCustom(plan.spec);
     const obj = this.manager.add(def.id, { x: plan.x, z: plan.z });
     this.manager.refreshElevations();

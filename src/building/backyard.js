@@ -1,10 +1,11 @@
 import { getCreature } from '../expedition/creatureData.js';
+import { EARN } from '../management/walletData.js';
 import { ARCHIVE_BONUS, EXPAND_SLOTS, HOLD_BY_LEVEL, HOLD_PER_TANK, POINTS_PER_MIN, breedHours, researchCost, migrateResearchLevel, BREED_HARD_RARITY } from './backyardData.js';
 
 /** バックヤードの研究室と繁殖水槽。state は保存データの一部 */
 export class Backyard {
-  constructor({ manager, ops, economy, expeditions, toast, isUnlocked }) {
-    Object.assign(this, { manager, ops, economy, expeditions, toast, isUnlocked });
+  constructor({ manager, ops, economy, expeditions, toast, isUnlocked, wallet }) {
+    Object.assign(this, { manager, ops, economy, expeditions, toast, isUnlocked, wallet });
     this.state = Backyard.emptyState();
   }
 
@@ -81,6 +82,14 @@ export class Backyard {
     return true;
   }
 
+  /** 加速：繁殖の残り時間を sec 縮める */
+  boostJob(uid, sec) {
+    const job = this.jobs[uid];
+    if (!job) return;
+    job.until -= sec * 1000;
+    this.tick(0);
+  }
+
   /** 毎秒の処理 */
   tick(secs = 1) {
     this.state.points += (this.ratePerMin / 60) * secs;
@@ -90,6 +99,9 @@ export class Backyard {
       else if (job.until <= now) {
         delete this.jobs[uid];
         this.expeditions.discover(job.id);
+        const c = getCreature(job.id);
+        const gem = EARN.breed[c?.rarity] ?? 0;
+        if (gem) this.wallet?.grant(gem, `繁殖成功：${c.name}`);
       }
     }
   }

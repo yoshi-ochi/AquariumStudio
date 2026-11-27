@@ -9,8 +9,9 @@ import { EVENTS } from './gameData.js';
 import { monthEnd } from './monthly.js';
 import { growPanel, growSpecies, shownCount } from '../ui/growPanel.js';
 import { updateQty } from '../ui/creatureGrid.js';
+import { coin as yen, coinText, dia } from '../ui/currency.js';
+import { EARN, cardFor } from '../management/walletData.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const span = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}時間${Math.floor((s % 3600) / 60)}分` : `${Math.max(1, Math.ceil(s / 60))}分`);
 
 /** 飼育：幸福度・エサ・水温 */
@@ -63,8 +64,8 @@ export class CareView {
  * 育成（成長）はここで行う（在庫の同じ魚種を使う）。並べ方は 地域別 / レア度別 / 育成（ピースの多い順）。
  */
 export class ZukanView {
-  constructor({ expeditions, manager, previews, economy, state, toast }) {
-    Object.assign(this, { expeditions, manager, previews, economy, state, toast });
+  constructor({ expeditions, manager, previews, economy, state, toast, wallet }) {
+    Object.assign(this, { expeditions, manager, previews, economy, state, toast, wallet });
     this.pick = null;
     this.mode = 'area';
     this.qty = 1;
@@ -120,7 +121,7 @@ export class ZukanView {
           : '<div class="zk-cell unknown"><span>？</span><small>未発見</small></div>';
         return i === rowEnd ? cell + this._pop(this.pick, at % 4) : cell;
       }).join('');
-      const reward = done && !claimed ? `<button data-act="zk-claim" data-id="${g.id}" class="primary">達成報酬 ${yen(g.reward)}</button>` : '';
+      const reward = done && !claimed ? `<button data-act="zk-claim" data-id="${g.id}" class="primary">達成報酬 ${yen(g.reward)} ＋ ${dia(EARN.place)}</button>` : '';
       const count = mode === 'grow' ? `${g.ids.length}種` : `${got}/${g.ids.length}`;
       return `<h4 class="gs-sub">${g.name} ${count}${mode === 'area' && claimed ? ' ・ 達成' : ''}</h4><div class="zk-grid">${cells || '<p class="gs-empty">在庫か展示中の生き物がいません。</p>'}</div>${reward}`;
     });
@@ -147,7 +148,8 @@ export class ZukanView {
       if (!this.state.zukan.includes(id)) {
         this.state.zukan.push(id);
         this.economy.earn(g.reward);
-        this.toast(`${g.name} の図鑑を達成！ ${yen(g.reward)} を獲得`);
+        this.wallet?.grant(EARN.place, `${g.name} の図鑑を達成`);
+        this.toast(`${g.name} の図鑑を達成！ ${coinText(g.reward)} と${EARN.place}ダイヤを獲得`);
       }
     } else return false;
     return true;
@@ -163,8 +165,8 @@ export class ZukanView {
 
 /** イベント開催 */
 export class EventView {
-  constructor({ economy, state, monthly, previews, getStats, toast, onStart }) {
-    Object.assign(this, { economy, state, monthly, previews, getStats, toast, onStart });
+  constructor({ economy, state, monthly, previews, getStats, toast, onStart, items }) {
+    Object.assign(this, { economy, state, monthly, previews, getStats, toast, onStart, items });
     this.ranking = null; // RankingView（main で設定）
     this.tab = 'event';
   }
@@ -205,9 +207,11 @@ export class EventView {
     const rows = EVENTS.map((e) => {
       const cool = (this.state.cooldown[e.id] ?? 0) - now;
       const lack = e.need(stats);
-      const ok = !active && cool <= 0 && !lack && this.economy.canAfford(e.cost);
+      const card = cardFor(e.id);
+      const have = this.items.count(card.id);
+      const ok = !active && cool <= 0 && !lack && (have > 0 || this.items.wallet.canAfford(card.price));
       const note = lack || (cool > 0 ? `次の開催まで ${span(cool / 1000)}` : `${e.minutes}分間 ・ 来館者 ${e.mult}倍`);
-      return `<div class="gs-row"><div class="gs-info"><b>${e.name}</b><small>${e.text}</small><small>${note}</small></div><button data-act="event-start" data-id="${e.id}" class="primary" ${ok ? '' : 'disabled'}>${yen(e.cost)}</button></div>`;
+      return `<div class="gs-row"><div class="gs-info"><b>${e.name}</b><small>${e.text}</small><small>${note}</small></div><button data-act="event-start" data-id="${e.id}" class="primary" ${ok ? '' : 'disabled'}>${have ? `カードで開催（所持${have}）` : `カード ${dia(card.price)}`}</button></div>`;
     });
     const tabs = this.ranking ? `<div class="sp-seg zk-mode"><button data-act="ev-tab" data-id="event" class="${this.tab === 'rank' ? '' : 'active'}">特集・イベント</button><button data-act="ev-tab" data-id="rank" class="${this.tab === 'rank' ? 'active' : ''}">ランキング</button></div>` : '';
     if (this.ranking && this.tab === 'rank') return tabs + this.ranking.html();
@@ -225,14 +229,20 @@ export class EventView {
       const got = this.monthly.claim(id, this.scale);
       if (got) {
         this.economy.earn(got.money);
-        this.toast(got.badge ? `ミッション達成！ ${yen(got.money)} と記念バッジ「${got.badge}」を獲得` : `ミッション達成！ ${yen(got.money)} を獲得`);
+        this.items.add(cardFor('feeding').id); // 特集のミッションでイベントカードももらえる
+        this.toast(got.badge ? `ミッション達成！ ${coinText(got.money)}・イベントカードと記念バッジ「${got.badge}」を獲得` : `ミッション達成！ ${coinText(got.money)} とイベントカード（餌やりショー）を獲得`);
       }
       return true;
     }
     if (act !== 'event-start') return false;
     const e = EVENTS.find((x) => x.id === id);
     const now = Date.now();
-    if (this.state.event?.until > now || e.need(this.getStats()) || !this.economy.spend(e.cost)) return true;
+    if (this.state.event?.until > now || e.need(this.getStats())) return true;
+    // イベントはカードで開く（持っていなければダイヤで買って使う）
+    if (!this.items.use(cardFor(id).id, { buy: true })) {
+      this.toast('ダイヤが足りません', { error: true });
+      return true;
+    }
     this.state.event = { id, until: now + e.minutes * 60000 };
     this.state.cooldown[id] = now + (e.minutes + 30) * 60000;
     this.onStart();

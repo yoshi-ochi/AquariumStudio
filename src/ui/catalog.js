@@ -1,6 +1,6 @@
 import { GROUP_LABELS, groupOf } from '../tanks/tankData.js';
+import { coin as yen } from './currency.js';
 
-const yen = (n) => `¥${n.toLocaleString('ja-JP')}`;
 
 /**
  * 編集シートのタブ + カタログカード。

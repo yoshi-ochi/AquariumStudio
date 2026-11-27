@@ -1,10 +1,10 @@
 import { tutorialSteps, goalSteps } from './guideSteps.js';
+import { coin as yen, coinText } from './currency.js';
 
 /**
  * はじめての人向けのチュートリアルと、目標の進め方の案内。どちらも guide.js（押す場所を指のマークで示す）で出す。
  * チュートリアルの進み具合は state.flags.tutorial に保存する（undefined: 未開始 / 数字: 進行中の手順 / 'done': 終了）
  */
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const REWARD = 20000;
 
 export class Tutorial {
@@ -52,7 +52,7 @@ export class Tutorial {
     if (completed && first) {
       this.flags.tutorialPaid = true;
       this.economy.earn(REWARD);
-      this.toast(`チュートリアル完了！ ${yen(REWARD)} を獲得しました`);
+      this.toast(`チュートリアル完了！ ${coinText(REWARD)} を獲得しました`);
     }
   }
 

@@ -21,6 +21,7 @@ export class Expeditions extends EventTarget {
     this.xp = {}; // 成長：魚種ごとに成長に使った匹数（累計）
     this.getCapacity = () => Infinity;
     this.released = []; // 満杯で放流した生き物（直前の受け取り分）
+    this.getBonusTeams = () => 0; // 課金の調査隊（永久解放・館長パス）。main.js が wallet につなぐ
   }
 
   /** 在庫の生き物が使っている保持枠 */
@@ -54,9 +55,9 @@ export class Expeditions extends EventTarget {
     return this.creatures[id] ?? 0;
   }
 
-  /** 同時に出せる調査隊の数（レベルと同数＋追加した隊） */
+  /** 同時に出せる調査隊の数（レベルと同数＋追加した隊＋課金の隊） */
   teamLimit(stageLevel) {
-    return stageLevel + this.extraTeams;
+    return stageLevel + this.extraTeams + this.getBonusTeams();
   }
 
   /** 次の調査隊を追加する費用。上限なら null */
@@ -93,11 +94,26 @@ export class Expeditions extends EventTarget {
     return trip.doneAt <= now;
   }
 
-  /** 帰還した隊の成果を受け取り、捕まえた生物の id 一覧を返す */
-  claim(index, now = Date.now()) {
+  /** 帰還した隊の成果（受け取る前に見せる。seed で決まっているので受け取りと同じ結果） */
+  preview(index) {
+    const trip = this.trips[index];
+    return trip ? rollCatch(trip) : [];
+  }
+
+  /** 加速：帰還までの時間を sec 縮める（成果の季節は出発時の予定のまま） */
+  boost(index, sec) {
+    const trip = this.trips[index];
+    if (!trip) return;
+    trip.rollAt ??= trip.doneAt;
+    trip.doneAt -= sec * 1000;
+    this._emit();
+  }
+
+  /** 帰還した隊の成果を受け取り、捕まえた生物の id 一覧を返す。mult：採取倍のアイテム（成果の数を2倍・4倍） */
+  claim(index, now = Date.now(), mult = 1) {
     const trip = this.trips[index];
     if (!trip || !this.isDone(trip, now)) return [];
-    const caught = rollCatch(trip);
+    const caught = rollCatch(trip).flatMap((id) => Array(Math.max(1, mult | 0)).fill(id));
     this.trips.splice(index, 1);
     this.released = [];
     const kept = [];
@@ -196,7 +212,7 @@ export function rollCatch(trip) {
   const rand = mulberry32(trip.seed);
   const pool0 = getDestination(trip.dest).pool.filter((id) => getCreature(id));
   // 季節外の生き物は捕れない（全部が季節外なら季節を問わない）
-  const fresh = pool0.filter((id) => inSeason(getCreature(id), trip.doneAt));
+  const fresh = pool0.filter((id) => inSeason(getCreature(id), trip.rollAt ?? trip.doneAt));
   const all = fresh.length ? fresh : pool0;
   const usable = trip.method ? all.filter((id) => SPECIES_METHODS[id]?.includes(trip.method)) : all;
   const pool = (usable.length ? usable : all).map(getCreature);
