@@ -786,3 +786,16 @@ body.editing #hud .hud-stat.money, body[data-mode=tank] #hud .hud-stat.money { g
 .dc-got { margin: 6px 0 0; padding-left: 0; list-style: none; font-size: 12px; }
 .seg.wrap { flex-wrap: wrap; }
 .card.dia-locked img { opacity: .55; }
+/* 環境保護区の地図 */
+.rv-map { display: grid; gap: 6px; margin: 6px 0; }
+.rv-sea, .rv-land { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.rv-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; padding: 6px; border-radius: 8px; border: 2px solid transparent; text-align: left; font-size: 11px; color: #12324a; }
+.rv-cell b { font-size: 11px; }
+.rv-cell.sea { background: #b8dcf0; }
+.rv-cell.land { background: #e4d8b4; }
+.rv-cell:not(.open) { opacity: .6; }
+.rv-cell.open.sea { background: #6fb8e0; color: #fff; }
+.rv-cell.open.land { background: #b8a46a; color: #fff; }
+.rv-cell.sel { border-color: #ffb300; }
+.rv-icons { display: flex; gap: 2px; }
+.rv-icons img, .rv-icons .ct { width: 22px; height: 16px; object-fit: contain; }

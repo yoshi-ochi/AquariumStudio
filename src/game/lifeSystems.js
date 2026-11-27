@@ -22,6 +22,7 @@ export class LifeSystems {
   constructor({ sceneMgr, room, manager, economy, ops, inventory, expeditions, previews, toast, getHome, goalEl, reportEl, isUnlocked, wallet, items }) {
     Object.assign(this, { manager, economy, ops, inventory, expeditions, toast, getHome, goalEl, reportEl, isUnlocked, wallet, items });
     this.offlineHours = () => OFFLINE_MAX_HOURS; // 館長パスで24時間（main.js が差し込む）
+    this.extraCostPerSec = () => 0; // 環境保護区の差し引きの維持費（main.js が差し込む）
     this.state = emptyState();
     this.mail = new Mailbox();
     this.crowd = new Crowd({ scene: sceneMgr.scene, room, manager });
@@ -201,7 +202,7 @@ export class LifeSystems {
     const secs = Math.min(away, maxH * 3600);
     const visitors = Math.round(this.manager.totalAppeal() * this.economy.stage.visitorFactor * visitorMult);
     const income = visitors * INCOME_PER_VISITOR * secs * OFFLINE_RATE;
-    const wages = this.ops.wages * secs * OFFLINE_RATE;
+    const wages = (this.ops.wages + this.extraCostPerSec()) * secs * OFFLINE_RATE; // 環境保護区の差し引きの維持費も
     const net = Math.max(0, Math.floor(income - wages));
     const h = Math.floor(away / 3600);
     const m = Math.floor((away % 3600) / 60);
