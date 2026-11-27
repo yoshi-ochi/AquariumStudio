@@ -1141,7 +1141,7 @@ async function boot() {
   setInterval(() => document.visibilityState === 'visible' && rankingView.submit().catch((err) => console.warn(err.message)), 300000);
   // 操作の案内（チュートリアル・目標の進め方）：押す場所を指のマークで示す
   const guide = new Guide();
-  if (import.meta.env.DEV) Object.assign(window, { __guide: guide, __hall: hall, __manager: manager }); // 開発用：動作を調べる
+  if (import.meta.env.DEV) Object.assign(window, { __guide: guide, __hall: hall, __manager: manager, __life: life, __ex: expeditions }); // 開発用：動作を調べる
   const _box = new THREE.Box3();
   const _v = new THREE.Vector3();
   const guideEnv = {
@@ -1296,7 +1296,7 @@ async function boot() {
       if (mode === 'tank' && focusTank) shell.setMode('tank', tankLabel(manager, focusTank));
     },
   });
-  const mailView = new MailView({ mailbox: life.mail, manager, expeditions, economy, ops, cleanView, careView: life.panels.care.view, allianceView, previews, toast });
+  const mailView = new MailView({ mailbox: life.mail, manager, expeditions, economy, ops, cleanView, careView: life.panels.care.view, allianceView, previews, toast, breeding: life.backyard.breeding });
   expeditions.addEventListener('claimed', (e) => {
     life.mail.count('trips');
     life.mail.count('caught', e.detail.length);

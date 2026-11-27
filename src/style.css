@@ -772,3 +772,14 @@ body.editing #hud .hud-stat.money, body[data-mode=tank] #hud .hud-stat.money { g
 .gc-odds th { text-align: left; padding: 4px 2px 2px; border-bottom: 1px solid var(--border, #d5dfe8); }
 .gc-odds td { padding: 2px; }
 .gc-odds td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+/* 繁殖 */
+.br-steps span.done { color: #5a9a5a; }
+.br-steps span.cur { font-weight: 700; color: #1769aa; }
+.br-care { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; padding: 6px 8px; border: 1px solid #e0a000; border-radius: 8px; background: #fff8e6; }
+.br-care b { font-size: 12px; }
+.br-auto { color: #2a8a5a; }
+.br-road { width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid var(--border, #d5dfe8); border-radius: 8px; font-size: 12px; }
+.br-road ol { list-style: none; margin: 4px 0 0; padding: 0; }
+.br-road li { opacity: .7; }
+.br-road li.ok { opacity: 1; color: #2a7a3a; }
+.br-hours { display: block; margin-top: 4px; }

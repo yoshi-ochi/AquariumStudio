@@ -3,7 +3,7 @@ import { jobHtml, boostButton } from '../building/builder.js';
 import { coin, dia } from './currency.js';
 
 const date = (t) => new Date(t).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-const kindName = { catch: '採取倍', boost: '加速', event: 'イベントカード' };
+const kindName = { catch: '採取倍', boost: '加速', nurse: '保育管理', event: 'イベントカード' };
 
 /**
  * ショップ：ダイヤの財布・両替・毎日のダイヤ・工事・アイテム・館長パス・調査隊の永久解放・ダイヤのパック。

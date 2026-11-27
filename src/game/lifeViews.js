@@ -11,6 +11,7 @@ import { growPanel, growSpecies, shownCount } from '../ui/growPanel.js';
 import { updateQty } from '../ui/creatureGrid.js';
 import { coin as yen, coinText, dia } from '../ui/currency.js';
 import { EARN, cardFor } from '../management/walletData.js';
+import { roadmapHtml, stageHoursText } from '../breeding/breedView.js';
 
 const span = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}時間${Math.floor((s % 3600) / 60)}分` : `${Math.max(1, Math.ceil(s / 60))}分`);
 
@@ -64,8 +65,8 @@ export class CareView {
  * 育成（成長）はここで行う（在庫の同じ魚種を使う）。並べ方は 地域別 / レア度別 / 育成（ピースの多い順）。
  */
 export class ZukanView {
-  constructor({ expeditions, manager, previews, economy, state, toast, wallet }) {
-    Object.assign(this, { expeditions, manager, previews, economy, state, toast, wallet });
+  constructor({ expeditions, manager, previews, economy, state, toast, wallet, backyard }) {
+    Object.assign(this, { expeditions, manager, previews, economy, state, toast, wallet, backyard });
     this.pick = null;
     this.mode = 'area';
     this.qty = 1;
@@ -96,7 +97,7 @@ export class ZukanView {
   _pop(id, col) {
     const c = getCreature(id);
     const name = c.sci || c.aka ? `<small class="zk-sci">${c.sci ? `<i>${c.sci}</i>` : ''}${c.aka ? `${c.sci ? ' ・ ' : ''}別名 ${c.aka}` : ''}</small>` : '';
-    const detail = `<div class="zk-note">${name}<small>全長 ${c.len >= 1 ? `${c.len}m` : `${Math.round(c.len * 100)}cm`} ・ ${WATER[zoneOf(id)].label}</small><small>${NOTES[id] ?? ''}</small></div>`;
+    const detail = `<div class="zk-note">${name}<small>全長 ${c.len >= 1 ? `${c.len}m` : `${Math.round(c.len * 100)}cm`} ・ ${WATER[zoneOf(id)].label}</small><small>${NOTES[id] ?? ''}</small></div>${this.backyard ? `${roadmapHtml(this.backyard.breeding, this.expeditions, id)}<small class="br-hours">繁殖の目安：${stageHoursText(id, this.backyard.level('breeding'))}</small>` : ''}`;
     return `<div class="cg-pop" style="--tip:${((col + 0.5) / 4) * 100}%">${growPanel({ expeditions: this.expeditions, manager: this.manager, id, qty: this.qty, note: detail })}</div>`;
   }
 

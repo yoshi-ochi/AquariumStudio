@@ -1,4 +1,4 @@
-import { BOOSTS, ITEMS } from '../management/walletData.js';
+import { BOOSTS, NURSES, ITEMS } from '../management/walletData.js';
 import { fmtLeft } from '../management/buildTimes.js';
 import { choose } from './dialog.js';
 
@@ -46,4 +46,19 @@ export async function pickCatchMult({ items, toast, caught, label }) {
     return 0;
   }
   return CATCH_ITEMS.find((x) => x.id === key).mult;
+}
+
+/** 保育管理アイテムを選んで使う。持っていなければダイヤで買って使う。使った秒数を返す（やめたら 0） */
+export async function pickNurse({ items, wallet, toast, text = '' }) {
+  const buttons = NURSES.map((b) => {
+    const n = items.count(b.id);
+    return { key: b.id, label: n ? `${b.name}を使う（所持${n}）` : `${b.name}を${b.price}ダイヤで買って使う`, kind: n ? 'primary' : '' };
+  });
+  const id = await choose({ title: '保育管理', text: `${text}その間の世話を自動で済ませます。ダイヤ ${wallet.total.toLocaleString('ja-JP')}`, buttons });
+  if (!id) return 0;
+  if (!items.use(id, { buy: true })) {
+    toast('ダイヤが足りません', { error: true });
+    return 0;
+  }
+  return NURSES.find((x) => x.id === id).sec;
 }
