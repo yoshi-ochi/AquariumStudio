@@ -77,9 +77,10 @@ export function buildBoat(hullColor = 0x1f5f8b, kind = 'fishing') {
 /**
  * 漁の舞台（海、または川）。水中が見える断面で表す。
  * setTime(k) は時刻（0 昼・0.5 朝夕・1 夜）、scroll(v) は走り続ける船に合わせて景色を後ろへ流す速さ。
+ * depth は海底の深さ（合同調査の深い海）、setDeep(k) は深海の暗さ（0 海面〜1 光の届かない深み）。
  */
-export function buildStage(scene, { river = false, still = false } = {}) {
-  const bedY = river ? RIVER_BED : BED;
+export function buildStage(scene, { river = false, still = false, depth = null } = {}) {
+  const bedY = depth ?? (river ? RIVER_BED : BED);
   const flow = river && !still ? RIVER_FLOW : 0;
   const W = 150; // 岩や浮遊物を置く範囲（漁をする所）
   const D = river ? 44 : 90;
@@ -184,24 +185,44 @@ export function buildStage(scene, { river = false, still = false } = {}) {
   stage.scroll = (v) => (stage.scrollV = v);
 
   let shownTime = -1;
-  stage.setTime = (k) => {
-    if (Math.abs(k - shownTime) < 0.01) return;
-    shownTime = k;
+  let shownDeep = -1;
+  let timeK = 0;
+  let deepK = 0;
+  const DEEP = new THREE.Color(0x020c18);
+  const BLUE = new THREE.Color(0x0c466b); // 潜り始めは青く、深くなるほど暗い
+  const sink = (c, d) => c.lerp(BLUE, Math.min(1, d * 2)).lerp(DEEP, Math.max(0, d * 2 - 1));
+  const paint = () => {
+    if (Math.abs(timeK - shownTime) < 0.01 && Math.abs(deepK - shownDeep) < 0.004) return;
+    const k = (shownTime = timeK);
+    const d = (shownDeep = deepK);
+    const top = sink(sky(0, k), d);
+    const low = sink(sky(1, k), d);
     const g = skyCanvas.getContext('2d');
     const grad = g.createLinearGradient(0, 0, 0, 128);
-    grad.addColorStop(0, `#${sky(0, k).getHexString()}`);
-    grad.addColorStop(0.62, `#${sky(1, k).getHexString()}`);
-    grad.addColorStop(1, `#${sky(1, k).getHexString()}`);
+    grad.addColorStop(0, `#${top.getHexString()}`);
+    grad.addColorStop(0.62, `#${low.getHexString()}`);
+    grad.addColorStop(1, `#${low.getHexString()}`);
     g.fillStyle = grad;
     g.fillRect(0, 0, 2, 128);
     skyTex.needsUpdate = true;
-    scene.fog.color.copy(sky(1, k));
+    scene.fog.color.copy(low);
+    const reach = stage.viewScale ?? 1; // 縦長の画面ではカメラが引くので、その分だけ見通しをのばす
+    scene.fog.near = lerp(110, 3 * reach, d);
+    scene.fog.far = lerp(300, 64 * reach, d);
     const dusk = 1 - Math.abs(k - 0.5) * 2;
-    hemi.intensity = lerp(1.7, 0.55, k);
-    sun.intensity = lerp(1.5, 0.12, k);
+    hemi.intensity = lerp(1.7, 0.55, k) * (1 - d * 0.78);
+    sun.intensity = lerp(1.5, 0.12, k) * (1 - d);
     sun.color.copy(col(0xfff4dc, 0xff9a5a, clamp01(dusk)));
     sea.material.color.copy(col(river ? 0x4fa3a0 : 0x2f8fb8, 0x15405e, k));
     water.material.color.copy(col(river ? 0x2f7f72 : 0x1c6f96, 0x0e3048, k));
+  };
+  stage.setTime = (k) => {
+    timeK = k;
+    paint();
+  };
+  stage.setDeep = (d) => {
+    deepK = clamp01(d);
+    paint();
   };
   stage.setTime(0);
 

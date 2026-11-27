@@ -14,7 +14,7 @@ export class FishingScene {
     el.innerHTML = `<canvas id="fs-canvas"></canvas>
       <div class="fs-top"><b id="fs-name"></b><small id="fs-count"></small></div>
       <div class="fs-card"><b id="fs-step"></b><p id="fs-text"></p><div class="st-bar"><i id="fs-bar"></i></div>
-        <details><summary>この漁法について</summary><p id="fs-how"></p><p id="fs-note"></p></details>
+        <details><summary id="fs-about"></summary><p id="fs-how"></p><p id="fs-note"></p></details>
         <button id="fs-skip">スキップ</button></div>`;
     this.$ = (id) => el.querySelector(`#fs-${id}`);
     this.$('skip').addEventListener('click', () => this._finish());
@@ -22,18 +22,43 @@ export class FishingScene {
 
   /** 作業の再現を再生し、終わると解決する。lastText は最後に表示する結果、water は採取地の水域（fishingData.js の waterOf） */
   play(methodId, lastText = '', water = 'sea') {
-    if (this.renderer) this._close();
-    const method = getMethod(methodId, water);
     this.water = water;
+    return this._open([getMethod(methodId, water)], lastText);
+  }
+
+  /**
+   * 合同調査の採取を、調査ごとに順に再現する（surveyData.js）。
+   * result は最後に表示する結果。Promise を渡すと、再現の裏で進めたサーバーの確認が終わるのを待って表示する。
+   */
+  playSurveys(ids, result = '') {
+    return import('./surveyGear.js').then(({ SURVEY_GEAR, getSurvey }) => {
+      this.surveyGear = SURVEY_GEAR;
+      const list = ids.map(getSurvey).filter(Boolean);
+      return list.length ? this._open(list, result) : undefined;
+    });
+  }
+
+  _open(list, result) {
+    if (this.renderer) this._close();
     this.el.hidden = false;
-    this.method = method;
-    this.lastText = lastText;
+    this.queue = list;
+    this.at = 0;
+    this.lastText = result;
+    this.ticket = null;
+    this._next();
+    return new Promise((resolve) => (this.resolve = resolve));
+  }
+
+  /** 並んだ再現のうち、今の番のものを始める */
+  _next() {
+    const method = (this.method = this.queue[this.at]);
     this.$('name').textContent = method.name;
+    this.$('about').textContent = method.survey ? 'この調査について' : 'この漁法について';
     this.$('how').textContent = method.how;
     this.$('note').textContent = `資源を守る視点：${method.note}`;
     this.$('skip').textContent = 'スキップ';
+    this.$('skip').disabled = false;
     this._start(method);
-    return new Promise((resolve) => (this.resolve = resolve));
   }
 
   _start(method) {
@@ -42,10 +67,18 @@ export class FishingScene {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     const scene = new THREE.Scene();
     const river = !!method.river;
-    const stage = buildStage(scene, { river, still: this.water === 'lake' });
-    const boat = stage.makeBoat();
-    const school = new School(stage.group, river ? { count: 60, len: 0.6, color: 0xe6eed2, floor: stage.bedY } : {});
-    const update = (river ? RIVER_GEAR : GEAR)[method.id]({ group: stage.group, scene, boat, school, makeBoat: stage.makeBoat, bedY: stage.bedY, flow: stage.flow, time: stage.setTime, scroll: stage.scroll });
+    const survey = method.survey ? this.surveyGear[method.id] : null;
+    const stage = buildStage(scene, survey ? { depth: method.depth } : { river, still: this.water === 'lake' });
+    let school = null;
+    let update;
+    if (survey) {
+      update = survey({ group: stage.group, scene, stage, bedY: stage.bedY, time: stage.setTime, deep: stage.setDeep, scroll: stage.scroll });
+      school = update.school ?? null;
+    } else {
+      const boat = stage.makeBoat();
+      school = new School(stage.group, river ? { count: 60, len: 0.6, color: 0xe6eed2, floor: stage.bedY } : {});
+      update = (river ? RIVER_GEAR : GEAR)[method.id]({ group: stage.group, scene, boat, school, makeBoat: stage.makeBoat, bedY: stage.bedY, flow: stage.flow, time: stage.setTime, scroll: stage.scroll });
+    }
     const camera = new THREE.PerspectiveCamera(46, 1, 0.5, 500);
     this.view = { scene, camera, stage, school, update, shots: update.shots ?? [], base: river ? SHOT.river : SHOT.sea, pos: new THREE.Vector3(), look: new THREE.Vector3(), cut: true };
     this.stepIndex = 0;
@@ -66,6 +99,7 @@ export class FishingScene {
     // 下の説明カードに隠れないよう、景色を少し上へ寄せる
     camera.setViewOffset(w, h, 0, h * 0.1, w, h);
     this.view.far = Math.max(1, 1.05 / camera.aspect); // 縦長の画面では引いて全体を入れる
+    this.view.stage.viewScale = this.view.far;
     camera.updateProjectionMatrix();
   }
 
@@ -85,7 +119,8 @@ export class FishingScene {
 
   _showStep() {
     const s = this.method.steps[this.stepIndex];
-    this.$('count').textContent = `作業 ${this.stepIndex + 1} / ${this.method.steps.length}`;
+    const many = this.queue.length > 1 ? `調査 ${this.at + 1}/${this.queue.length} ・ ` : '';
+    this.$('count').textContent = `${many}作業 ${this.stepIndex + 1} / ${this.method.steps.length}`;
     this.$('step').textContent = s.title;
     this.$('text').textContent = s.text;
   }
@@ -101,7 +136,7 @@ export class FishingScene {
     const p = Math.min(1, this.stepTime / s.sec);
     const v = this.view;
     v.update(this.stepIndex, p, this.time);
-    v.school.update(dt, this.time);
+    v.school?.update(dt, this.time);
     v.stage.tick(dt, this.time);
     this._aim(dt);
     this.$('bar').style.width = `${((this.stepIndex + p) / steps.length) * 100}%`;
@@ -114,18 +149,38 @@ export class FishingScene {
     } else this._complete();
   }
 
-  /** 全作業が終わったら結果を見せて、閉じるボタンにする */
+  /** 全作業が終わったら、次の調査へ進む。最後なら結果を見せて、閉じるボタンにする */
   _complete() {
-    this.renderer.setAnimationLoop(null);
-    if (!this.lastText) return this._finish();
-    this.$('step').textContent = '結果';
-    this.$('text').textContent = this.lastText;
-    this.$('skip').textContent = '閉じる';
+    if (this.at < this.queue.length - 1) {
+      this._close();
+      this.at++;
+      return this._next();
+    }
+    this.renderer?.setAnimationLoop(null);
+    const result = this.lastText;
+    if (!result) return this._finish();
     this.lastText = '';
+    const skip = this.$('skip');
+    this.$('step').textContent = '結果';
+    skip.textContent = '閉じる';
+    if (typeof result === 'string') return void (this.$('text').textContent = result);
+    // サーバーの確認がまだなら、終わるまで待つ
+    const ticket = (this.ticket = {});
+    this.$('text').textContent = '成果を確認しています…';
+    skip.disabled = true;
+    result.then((text) => {
+      if (this.ticket !== ticket) return;
+      this.$('text').textContent = text;
+      skip.disabled = false;
+    });
   }
 
   _finish() {
-    if (this.lastText) return this._complete();
+    if (this.lastText) {
+      this.at = this.queue.length - 1; // スキップ：残りの調査を飛ばして結果へ
+      return this._complete();
+    }
+    this.ticket = null;
     this._close();
     this.el.hidden = true;
     this.resolve?.();
@@ -138,7 +193,7 @@ export class FishingScene {
     this.renderer.setAnimationLoop(null);
     this.view.scene.background?.dispose?.();
     this.view.scene.traverse((o) => {
-      o.geometry?.dispose();
+      if (!o.geometry?.userData.shared) o.geometry?.dispose(); // 生き物の形は館内と共有しているので残す
       o.material?.map?.dispose();
       o.material?.dispose();
     });
