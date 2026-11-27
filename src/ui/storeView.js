@@ -9,7 +9,7 @@ const kindName = { catch: '採取倍', boost: '加速', nurse: '保育管理', e
 
 /**
  * ショップ：ダイヤの財布・両替・毎日のダイヤ・工事・アイテム・館長パス・調査隊の永久解放・ダイヤのパック。
- * 有料の商品は purchases.js を通す（開発中はテスト購入、本番は第7段階の App内課金まで準備中）。
+ * 有料の商品は purchases.js を通す（iPhone アプリは App内課金、開発中はテスト購入、公開版のブラウザは表示だけ）。
  */
 export class StoreView {
   constructor({ wallet, items, daily, purchases, builder, toast, onChange }) {
@@ -18,7 +18,9 @@ export class StoreView {
 
   html() {
     const w = this.wallet;
-    const dev = this.purchases.mode === 'dev';
+    const mode = this.purchases.mode;
+    const dev = mode === 'dev';
+    const canBuy = mode === 'store' || dev;
     const ex = (units) => `<button data-act="st-exchange" data-id="${units}" ${w.canAfford(EXCHANGE.dia * units) ? '' : 'disabled'}>${dia(EXCHANGE.dia * units)} → ${coin(EXCHANGE.coin * units)}</button>`;
     const wallet = `<div class="st-sum"><div class="st-head"><b>ダイヤ ${dia(w.total)}</b><small>無償 ${w.free.toLocaleString('ja-JP')} ・ 有償 ${w.paid.toLocaleString('ja-JP')}</small></div>
       <small>使うときは無償ダイヤから先に減ります。ダイヤはコインに両替できます（コインはダイヤにできません）。</small>
@@ -33,7 +35,7 @@ export class StoreView {
     const rows = ITEMS.map((it) => `<div class="gs-row"><div class="gs-info"><b>${it.name}</b><small>${it.text} ・ 所持 ${this.items.count(it.id)}</small></div>
       <button data-act="st-item" data-id="${it.id}" class="primary" ${w.canAfford(it.price) ? '' : 'disabled'}>${dia(it.price)}</button></div>`);
     const groups = Object.keys(kindName).map((k) => `<h4 class="gs-sub">${kindName[k]}</h4>${rows.filter((_, i) => ITEMS[i].kind === k).join('')}`).join('');
-    const buy = (id, yen, ok = true) => `<button data-act="st-buy" data-id="${id}" class="primary" ${dev && ok ? '' : 'disabled'}>¥${yen.toLocaleString('ja-JP')}${dev ? '（テスト）' : ''}</button>`;
+    const buy = (id, yen, ok = true) => `<button data-act="st-buy" data-id="${id}" class="primary" ${canBuy && ok && !this.busy ? '' : 'disabled'}>${this.purchases.priceLabel(id, yen)}${dev ? '（テスト）' : ''}</button>`;
     const pass = `<h4 class="gs-sub">館長パス（${PASS.days}日）</h4><div class="gs-row"><div class="gs-info"><b>館長パス</b>
       <small>放置収入の上限${PASS.offlineHours}時間 ・ 調査隊+${PASS.teams}（期間中） ・ 採取倍${PASS.catchCards}枚 ・ ${PASS.dia.toLocaleString('ja-JP')}ダイヤ</small>
       <small>${w.hasPass() ? `有効：${date(w.passUntil)}まで（買い足すと${PASS.days}日延長）` : '未購入'}</small></div>${buy(PASS.id, PASS.yen)}</div>`;
@@ -42,8 +44,13 @@ export class StoreView {
     const woodLeft = woodOwned.filter((d) => !this.purchases.decor?.ownsDef(d)).length;
     const wood = `<div class="gs-row"><div class="gs-info"><b>大型流木セット</b><small>大型流木5形（枝分かれ・根張り・アーチ・倒木・ねじれ）をまとめて解放。1形ずつならカタログから${BIGWOOD_SET.dia ?? 300}ダイヤ ・ 未解放 ${woodLeft}/${woodOwned.length}</small></div>${buy(BIGWOOD_SET.id, BIGWOOD_SET.yen, woodLeft > 0)}</div>`;
     const packs = PACKS.map((p) => `<div class="gs-row"><div class="gs-info"><b>${dia(p.dia)}</b></div>${buy(p.id, p.yen)}</div>`).join('');
-    const note = dev ? '<p class="gs-empty">開発中のテスト購入です（この端末にだけ記録され、お金はかかりません）。</p>' : '<p class="gs-empty">App内課金は準備中です。</p>';
-    return `${wallet}${daily}${work}${groups}${pass}${teams}${wood}<h4 class="gs-sub">ダイヤ</h4>${note}${packs}`;
+    const note = dev
+      ? '<p class="gs-empty">開発中のテスト購入です（この端末にだけ記録され、お金はかかりません）。</p>'
+      : mode === 'store'
+        ? '<p class="gs-empty">購入した有償ダイヤ・パス・解放はアカウントに記録されます。</p>'
+        : '<p class="gs-empty">購入はiPhoneアプリ版で行えます。買った分はこの画面にも反映されます。</p>';
+    const restore = mode === 'store' ? '<button data-act="st-restore" class="tv-wide">購入を復元</button>' : '';
+    return `${wallet}${daily}${work}${groups}${pass}${teams}${wood}<h4 class="gs-sub">ダイヤ</h4>${note}${packs}${restore}`;
   }
 
   act(act, id) {
@@ -56,8 +63,16 @@ export class StoreView {
     } else if (act === 'build-boost') {
       const [kind, jid] = id.split('|');
       this.builder.boost(kind, kind === 'stage' ? +jid : jid);
+    } else if (act === 'st-restore') {
+      this.purchases.restore().then(() => {
+        this.toast('購入を復元しました');
+        this.onChange?.();
+      }, (err) => this.toast(err.message, { error: true }));
     } else if (act === 'st-buy') {
-      this.purchases.buy(id).then(() => {
+      if (this.busy) return true;
+      this.busy = true;
+      this.purchases.buy(id).finally(() => (this.busy = false)).then((ok) => {
+        if (ok === false) return this.onChange?.(); // やめた
         this.toast('購入しました');
         this.onChange?.();
       }, (err) => this.toast(err.message, { error: true }));

@@ -1,6 +1,6 @@
 # 通貨と課金の設計（コイン・ダイヤ）
 
-iPhone 版リリースに向けた課金要素の全体設計。段階1（土台）は実装済み、段階2以降は未実装。
+iPhone 版リリースに向けた課金要素の全体設計。段階1〜7は実装済み、段階8（両生類・爬虫類・鳥類の体）は未実装。
 
 ## 段階1で実装したもの（コード）
 - コイン表記：`src/ui/currency.js`（`coin` / `coinText` / `dia`）
@@ -48,8 +48,15 @@ iPhone 版リリースに向けた課金要素の全体設計。段階1（土台
 - 維持費が払えないと、払えるまで来館者の増加が止まる（メールで知らせる）。閉じている間の維持費も留守中の報告で差し引く
 - 画面は区画の地図（2D）。保護区の3Dの景色はまだ
 
+## 段階7で実装したもの（iPhone アプリと App内課金）
+- Capacitor 8（`capacitor.config.json`・`ios/`）。`npm run app:build` で dist-app を作って iOS へコピー、`npm run app:ios` で Xcode を開く
+- 購入は RevenueCat（`src/online/purchases.js` の store モード）。商品IDは `STORE_IDS`（`src/management/walletData.js`）
+- 付与はサーバー：RevenueCat の Webhook → Edge Function `revenuecat` → `iap_apply`（`supabase/iap.sql`）。同じ知らせは二重に付与しない。返金は差し引く
+- 館長パスの採取倍カード・大型流木セットは、権利としてサーバーに置き、ゲームが読み込むときに受け取る
+- アプリではメールのログインだけ（Google ログインは出さない）。メールのリンクは公開版へ戻る
+- 手作業の設定（App Store Connect・RevenueCat・Supabase の関数）は `docs/iphone-release.md`
+
 ## 未実装
-- App内課金とサーバーでの有償ダイヤ・権利の付与（段階7）。App内課金（段階7）以降。
 - 環境保護区の3Dの景色（今は区画の地図だけ）。
 - アルビノ・変色個体をイルカプール・生け簀へ入れたときの見た目（そこではふつうの個体として扱う）。
 - 両生類・爬虫類・鳥類の体の組み立て（段階8）。それまでその3区分は「準備中」のまま

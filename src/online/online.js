@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { createClient } from '@supabase/supabase-js';
 import { SaveConflict } from './autoSave.js';
 import { encodeRow, decodeRow } from './saveCodec.js';
@@ -24,7 +25,9 @@ const JA = [
   [/failed to fetch|network/i, '通信できませんでした。接続を確認してください'],
 ];
 const ja = (m) => JA.find(([re]) => re.test(m))?.[1] ?? m;
-const HOME = () => location.origin + location.pathname;
+// メールのリンク（登録の確認・パスワードの再設定）の戻り先。iPhone アプリの中のページ（capacitor://）には戻れないので公開版へ
+const WEB_HOME = 'https://yoshi-ochi.github.io/AquariumStudio/';
+const HOME = () => (Capacitor.isNativePlatform() ? WEB_HOME : location.origin + location.pathname);
 
 export class Online {
   constructor() {

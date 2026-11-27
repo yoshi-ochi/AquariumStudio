@@ -12,9 +12,15 @@
     "admin:build": "vite build --config admin/vite.config.js",
     "species:release": "node tools/species-release.mjs",
     "species:pull": "node tools/species-pull.mjs",
-    "share:deploy": "node tools/share-deploy.mjs"
+    "share:deploy": "node tools/share-deploy.mjs",
+    "app:build": "vite build --mode app && cap sync ios",
+    "app:ios": "cap open ios"
   },
   "dependencies": {
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/ios": "8.6.2",
+    "@revenuecat/purchases-capacitor": "14.1.0",
     "@supabase/supabase-js": "^2.119.0",
     "fflate": "^0.8.3",
     "three": "^0.169.0",
@@ -22,6 +28,7 @@
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.2",
     "mp4-muxer": "^5.2.2",
     "vite": "^5.4.10"
   }

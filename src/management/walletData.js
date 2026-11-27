@@ -63,3 +63,22 @@ export const PACKS = [
 export const PASS = { id: 'pass30', yen: 720, days: 30, offlineHours: 24, teams: 1, catchCards: 10, dia: 5000 };
 /** 調査隊の永久解放（1隊ずつ、2隊まで） */
 export const TEAM_UNLOCK = { id: 'team', yen: 480, max: 2 };
+
+/**
+ * App Store の商品ID（App Store Connect と RevenueCat に同じIDで登録する）。
+ * ダイヤ・パスは消耗型（パスは「非更新サブスクリプション」でもよい）、調査隊・大型流木は非消耗型。
+ * 調査隊の永久解放は2隊まで買えるよう、1隊目・2隊目を別の商品にする。
+ */
+export const STORE_IDS = {
+  dia300: 'aquastu.dia300',
+  dia900: 'aquastu.dia900',
+  dia1900: 'aquastu.dia1900',
+  dia3200: 'aquastu.dia3200',
+  dia6200: 'aquastu.dia6200',
+  dia10500: 'aquastu.dia10500',
+  dia22000: 'aquastu.dia22000',
+  pass30: 'aquastu.pass30',
+  team1: 'aquastu.team1',
+  team2: 'aquastu.team2',
+  bigwoodSet: 'aquastu.bigwood',
+};
