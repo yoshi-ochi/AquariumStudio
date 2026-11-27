@@ -44,3 +44,61 @@ export async function saveCached(key, data) {
     /* キャッシュできなくても動作には影響しない */
   }
 }
+
+/** 文字列などをまとめて読む（1回の取引で）。見つからない key は Map に入らない */
+export async function loadMany(keys) {
+  const out = new Map();
+  if (!keys.length) return out;
+  try {
+    const db = await openDB();
+    try {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const store = tx.objectStore(STORE);
+        for (const k of keys) {
+          const req = store.get(k);
+          req.onsuccess = () => req.result != null && out.set(k, req.result);
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    } finally {
+      db.close();
+    }
+  } catch {
+    /* 読めなくても動作には影響しない */
+  }
+  return out;
+}
+
+/** まとめて書く（[key, value] の配列） */
+export async function saveMany(entries) {
+  if (!entries.length) return;
+  try {
+    const db = await openDB();
+    try {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        for (const [k, v] of entries) store.put(v, k);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    } finally {
+      db.close();
+    }
+  } catch {
+    /* 保存できなくても動作には影響しない */
+  }
+}
+
+/** 配信している計算済みの水面データ（public/waves/<key>.bin）。無ければ null（端末で計算する） */
+export async function loadShipped(key) {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}waves/${key}.bin`);
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}

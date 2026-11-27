@@ -3,6 +3,7 @@ import { GEAR, RIVER_GEAR } from './fishingGear.js';
 import { getMethod } from './fishingData.js';
 import { buildStage } from './fishingStage.js';
 import { School } from './fishingFx.js';
+import { pixelRatio } from '../core/quality.js';
 
 // 作業ごとのカメラ（位置, 注視点）が無い漁法の既定
 const SHOT = { sea: [-34, 19, 42, 0, -5, 0], river: [-22, 11, 32, 0, -1, 0] };
@@ -64,7 +65,7 @@ export class FishingScene {
   _start(method) {
     const canvas = this.$('canvas');
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setPixelRatio(pixelRatio());
     const scene = new THREE.Scene();
     const river = !!method.river;
     const survey = method.survey ? this.surveyGear[method.id] : null;

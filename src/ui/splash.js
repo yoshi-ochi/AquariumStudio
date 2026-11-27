@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildEarth } from './splash/earth.js';
 import { buildHumpback, buildOrca, buildDolphin } from './splash/creatures.js';
+import { pixelRatio } from '../core/quality.js';
 
 const EARTH_R_WORLD = 1.3; // 地球の半径
 // 体長（ザトウクジラ : シャチ : イルカ ≒ 14 : 7 : 3）
@@ -66,7 +67,7 @@ export class Splash {
     this.label = label;
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(pixelRatio());
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
     this.target = new THREE.Vector3(0, 0, 0);

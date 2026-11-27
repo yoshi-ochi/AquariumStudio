@@ -1,6 +1,7 @@
 import { ANATOMY } from '../expedition/creatureAnatomy.js';
 import { CREATURES } from '../expedition/creatureData.js';
 import { ALL_DEFS } from '../tanks/tankData.js';
+import { loadMany, saveMany } from '../water/waveCache.js';
 
 /**
  * 配信サムネイル（GitHub Pages の public/thumbs/ に置いた WebP）。
@@ -42,6 +43,25 @@ export async function loadThumbManifest() {
     return null;
   }
 }
+
+/** 端末で撮った画像の保存先の key（形のデータが変われば key も変わるので、古い画像は使われない） */
+const shotKey = (kind, def) => `thumb:${kind}:${def.id}:${thumbKey(kind, def)}`;
+
+/** 端末に保存してある撮影済みの画像を使い、まだ無い物だけを返す { cached: Map(id → dataURL), rest: [def] } */
+export async function takeCachedShots(kind, defs) {
+  const found = await loadMany(defs.map((d) => shotKey(kind, d)));
+  const cached = new Map();
+  const rest = [];
+  for (const d of defs) {
+    const url = found.get(shotKey(kind, d));
+    if (typeof url === 'string') cached.set(d.id, url);
+    else rest.push(d);
+  }
+  return { cached, rest };
+}
+
+/** 撮った画像を端末に保存する（次の起動から撮り直さない） */
+export const keepShots = (kind, defs, shots) => saveMany(defs.filter((d) => shots.has(d.id)).map((d) => [shotKey(kind, d), shots.get(d.id)]));
 
 /** 配信画像を使える物（URL）と、端末で撮影する物に分ける */
 export function splitThumbs(kind, defs, manifest) {
