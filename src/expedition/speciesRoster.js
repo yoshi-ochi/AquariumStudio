@@ -15,6 +15,7 @@ import { SCI } from './speciesSci.js';
 import { PLANNED_JAPAN } from './speciesPlannedJapan.js';
 import { PLANNED_REEF } from './speciesPlannedReef.js';
 import { PLANNED_WORLD } from './speciesPlannedWorld.js';
+import { GACHA_PLANNED } from '../gacha/gachaSpecies.js';
 
 const p = (id, name, form, len, rarity, appeal, body, belly, fin, extra = {}) => ({ id, name, form, len, rarity, slots: 1, appeal, colors: { body, belly, fin }, ...extra });
 
@@ -58,9 +59,9 @@ const PLANNED_FIRST = [
   p('denkiunagi', 'デンキウナギ', 'eel', 2.0, 4, 40, 0x4a4a3a, 0xd88a3a, 0x3a3a2e, { methods: ['gill'], note: '最大860ボルトの電気を出す。口から空気を吸う呼吸が必要で、数分ごとに水面へ上がる。長い尻びれを波打たせて前後に泳ぐ。' }),
 ];
 
-/** 追加予定種の全部（最初の33種＋日本・サンゴ礁と外洋・世界の各ファイル）。後半の種は at に採取地の id を持つ */
+/** 追加予定種の全部（最初の33種＋日本・サンゴ礁と外洋・世界の各ファイル＋卵ガチャ限定種）。後半の種は at に採取地の id を持つ。ガチャ限定種は gacha を持ち、採取地には入らない */
 for (const p of PLANNED_FIRST) p.sci ??= SCI[p.id];
-export const PLANNED = [...PLANNED_FIRST, ...PLANNED_JAPAN, ...PLANNED_REEF, ...PLANNED_WORLD];
+export const PLANNED = [...PLANNED_FIRST, ...PLANNED_JAPAN, ...PLANNED_REEF, ...PLANNED_WORLD, ...GACHA_PLANNED];
 
 /** 新しい採取地（日本海側と世界各地）。pool にはモデルのある種だけが残る。water は水域（'river' 川・'lake' 湖。無ければ海）で、漁の再現が川用に変わる */
 export const NEW_PLACES = [

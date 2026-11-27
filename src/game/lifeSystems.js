@@ -84,7 +84,7 @@ export class LifeSystems {
     return {
       tanks: tanks.length,
       creatures: tanks.reduce((s, t) => s + Object.values(t.userData.creatures ?? {}).reduce((a, n) => a + n, 0), 0),
-      species: CREATURES.filter((c) => this.expeditions.seenCount(c.id) > 0).length,
+      species: CREATURES.filter((c) => !c.gacha && this.expeditions.seenCount(c.id) > 0).length, // 目標の発見数にガチャ限定種は数えない
       guides: this.ops.staff.guide,
       shops: this.isUnlocked('store') ? 1 : 0,
       cafes: this.isUnlocked('diner') ? 1 : 0,
