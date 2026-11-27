@@ -18,10 +18,17 @@ function rollReward(project, runId, userId) {
   return Array.from({ length: REWARD_COUNT }, () => project.pool[Math.floor(rand() * project.pool.length)]);
 }
 
+/** 受け取った成果を1行で（シーラカンス×2、…） */
+function gotText(got) {
+  const all = Object.entries(countIds(got)).filter(([id]) => getCreature(id)).map(([id, n]) => `${getCreature(id).name}×${n}`).join('、');
+  return all ? `成果：${all}` : '受け取れる成果はありませんでした（受け取り済みです）。';
+}
+
 /** 同盟水族館：加入・メンバー訪問・合同調査 */
 export class AllianceView {
-  constructor({ api, online, economy, expeditions, mailbox, toast, onVisit, onChanged }) {
-    Object.assign(this, { api, online, economy, expeditions, mailbox, toast, onVisit, onChanged });
+  /** scene は採取の再現を再生する画面（fishingScene.js）。成果を受け取るときに、調査ごとの採取の様子を見せる */
+  constructor({ api, online, economy, expeditions, mailbox, toast, onVisit, onChanged, scene }) {
+    Object.assign(this, { api, online, economy, expeditions, mailbox, toast, onVisit, onChanged, scene });
     this.list = null;
     this.error = '';
     this.loading = false;
@@ -61,8 +68,23 @@ export class AllianceView {
     }
   }
 
-  /** 合同調査の成果を受け取る（同盟画面・メールの両方から） */
-  async claimRun(pid, runId, { quiet = false, refresh = true } = {}) {
+  /**
+   * 受け取るあいだ、その調査（pids）の採取の様子を再生する。
+   * サーバーへの確認と読み直し（work）は再生の裏で進め、終わると成果を画面の最後に表示する。
+   */
+  _withMotion(pids, work) {
+    const done = work();
+    const text = done.then((got) => gotText(got.flat().filter(Boolean)), (err) => `受け取れませんでした（${err.message}）`);
+    this.scene?.playSurveys(JOINT_PROJECTS.map((p) => p.id).filter((id) => pids.includes(id)), text).catch((err) => console.warn(err.message));
+    return done;
+  }
+
+  /** 合同調査の成果を受け取る（同盟画面・メールの両方から）。採取の様子を再生する */
+  claimRun(pid, runId) {
+    return this._withMotion([pid], () => this._claim(pid, runId));
+  }
+
+  async _claim(pid, runId, { quiet = false, refresh = true } = {}) {
     if (!(await this.api.claim(runId, { refresh }))) return [];
     const project = JOINT_PROJECTS.find((p) => p.id === pid);
     const got = rollReward(project, runId, this.online.user.id);
@@ -79,8 +101,14 @@ export class AllianceView {
   }
 
   /** 複数の回をまとめて受け取る。サーバーへは数件ずつ並行で問い合わせ、最後に1回だけ読み直す。
+   *  そのあいだ、含まれる調査の採取の様子を順に再生する。
    *  返り値は回ごとの成果（失敗で中断した回は undefined）。失敗はトーストで知らせる */
-  async claimMany(items, parallel = 8) {
+  claimMany(items, parallel = 8) {
+    if (!items.length) return Promise.resolve([]);
+    return this._withMotion(items.map((x) => x.project), () => this._claimMany(items, parallel));
+  }
+
+  async _claimMany(items, parallel) {
     const out = new Array(items.length);
     let next = 0;
     let error = null;
@@ -88,7 +116,7 @@ export class AllianceView {
       while (next < items.length && !error) {
         const i = next++;
         try {
-          out[i] = await this.claimRun(items[i].project, items[i].run, { quiet: true, refresh: false });
+          out[i] = await this._claim(items[i].project, items[i].run, { quiet: true, refresh: false });
         } catch (err) {
           error = err;
         }

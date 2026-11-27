@@ -1157,13 +1157,14 @@ async function boot() {
     syncVisitorsBtn();
   });
   const allianceApi = new AllianceApi(online);
+  const fishingScene = new FishingScene($('fishing-scene')); // 漁法と合同調査の採取の再現（全画面）
   const allianceView = new AllianceView({
-    mailbox: life.mail,
+    mailbox: life.mail, scene: fishingScene,
     api: allianceApi, online, economy, expeditions, toast,
     onVisit: (id, name) => visitAquarium(id, name),
     onChanged: () => mapPage.refresh(),
   });
-  const expeditionView = new ExpeditionView({ economy, expeditions, toast, previews, getHome: () => home, getDiscount: () => researchBonus(life.backyard.level('field')), getCapacity: () => life.backyard.capacity, fishing: new FishingScene($('fishing-scene')) });
+  const expeditionView = new ExpeditionView({ economy, expeditions, toast, previews, getHome: () => home, getDiscount: () => researchBonus(life.backyard.level('field')), getCapacity: () => life.backyard.capacity, fishing: fishingScene });
   // 地図で選んだ仲間の水族館
   const placeView = {
     pin: null,
