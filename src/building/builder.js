@@ -2,19 +2,21 @@ import { getZone } from './blueprint.js';
 import { PEN, sectionCells } from './seaPen.js';
 import { zoneSeconds, stageSeconds, PEN_UNLOCK_SECONDS, PEN_CELL_SECONDS, fmtLeft } from '../management/buildTimes.js';
 import { pickBoost } from '../ui/boostPicker.js';
+import { getParcel, RESERVE_LEVEL, PARCEL_BUILD_SECONDS } from '../reserve/reserveData.js';
 
 /**
  * 建築の注文窓口：コインを払って工事を始め、完了したら解放する。
  * 増築タブ・館内エリア・生け簀・拡張ボタンはここを通す。同時に進められる工事は1件。
  */
 export class Builder {
-  constructor({ construction, economy, seaPen, items, wallet, toast, getUnlocked, onZone, onStage, onPen, onPenCell, onChange }) {
+  constructor({ construction, economy, seaPen, items, wallet, toast, getUnlocked, onZone, onStage, onPen, onPenCell, onReserve, onChange }) {
     Object.assign(this, { construction, economy, seaPen, items, wallet, toast, getUnlocked, onChange });
     construction.onComplete = (job) => {
       if (job.kind === 'zone') onZone(job.id);
       else if (job.kind === 'stage') onStage(job.id);
       else if (job.kind === 'pen') onPen();
       else if (job.kind === 'penCell') onPenCell(job.data);
+      else if (job.kind === 'reserve') onReserve?.(job.id);
       this.onChange?.();
     };
   }
@@ -60,6 +62,13 @@ export class Builder {
   orderPen() {
     if (!this.seaPen.canUnlock(this.economy.stage.level)) return false;
     return this._order({ kind: 'pen', id: 'pen', label: '屋外生け簀', cost: PEN.unlockCost, seconds: PEN_UNLOCK_SECONDS });
+  }
+
+  /** 環境保護区の区画の整備（1日） */
+  orderReserve(id) {
+    const p = getParcel(id);
+    if (!p || this.economy.stage.level < RESERVE_LEVEL) return false;
+    return this._order({ kind: 'reserve', id, label: `保護区：${p.name}`, cost: p.cost, seconds: PARCEL_BUILD_SECONDS });
   }
 
   /** 生け簀の区画（1マス5分） */

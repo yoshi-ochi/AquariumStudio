@@ -5,6 +5,8 @@ export const STAGES = [
   { level: 3, name: '大型総合水族館', wallHeight: 3.6, maxFloors: 3, upgradeCost: 10000000, visitorFactor: 9 },
   { level: 4, name: '世界的な水族館', wallHeight: 3.6, maxFloors: 3, upgradeCost: 25000000, visitorFactor: 12 },
   { level: 5, name: '海とつながる水族館', wallHeight: 3.6, maxFloors: 3, upgradeCost: 60000000, visitorFactor: 15 },
+  // Lv6：自前の環境保護区を作れる（src/reserve/）
+  { level: 6, name: '環境保護区をもつ水族館', wallHeight: 3.6, maxFloors: 3, upgradeCost: 150000000, visitorFactor: 18 },
 ];
 
 export const STARTING_MONEY = 300000;
