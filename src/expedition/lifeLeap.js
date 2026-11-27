@@ -17,6 +17,7 @@ export const surfaceOf = (box) => box.surf ?? box.y1 + 0.03;
 /** 高さ y から跳べるか */
 export function canLeap(ctx, y) {
   const { box } = ctx;
+  if (box.shallow) return false; // 水位を下げた浅い水槽では跳ばない
   return (y - box.y0) / Math.max(1e-3, surfaceOf(box) - box.y0) >= LEAP_FROM;
 }
 

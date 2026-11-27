@@ -8,6 +8,8 @@ import { buildAirstone } from './aeration.js';
 import { buildPolyTank } from './polyTank.js';
 import { normalizeGrowth } from './growth.js';
 import { waterSurfaceMesh } from '../water/waterSurface.js';
+import { markWater, markSurface } from './waterLevel.js';
+import { tunnelShape, tunnelWater, tunnelSurface } from './tunnelShape.js';
 import { DECOR_BUILDERS, buildStandSkin } from '../decor/decorBuilders.js';
 
 /** 水平な水面ジオメトリ（XZ 平面）を高さ y に置く */
@@ -15,8 +17,11 @@ function addSurface(parent, geometry, y, x = 0) {
   geometry.rotateX(-Math.PI / 2);
   const m = waterSurfaceMesh(geometry);
   m.position.set(x, y, 0);
-  parent.add(m);
+  parent.add(markSurface(m));
 }
+
+/** 水位の範囲（waterLevel.js）：hi は水位100%（フチ）、def は水位未設定のときの高さ */
+const waterSpan = (g, hi, def) => (g.userData.waterSpan = { hi, def });
 
 /**
  * 定義からオブジェクトを生成する。
@@ -107,6 +112,8 @@ function rim(parent, w, d, y, thick, height) {
   for (const m of parts) m.userData.rim = true; // フレームなし（オールガラス）で非表示にする
 }
 
+const rimHOf = (h) => Math.max(0.012, h * 0.04);
+
 /** 箱型ガラス（前・後・左右・底）。ガラス厚 t を返す */
 function glassBox(parent, w, h, d) {
   const t = THREE.MathUtils.clamp(Math.min(w, d) * 0.02, 0.004, 0.02);
@@ -117,7 +124,7 @@ function glassBox(parent, w, h, d) {
   box(parent, t, h, d - 2 * t, g, -w / 2 + t / 2, h / 2, 0);
   box(parent, w - 2 * t, t, d - 2 * t, g, 0, t / 2, 0);
   const rimT = Math.max(0.008, t * 1.5);
-  const rimH = Math.max(0.012, h * 0.04);
+  const rimH = rimHOf(h);
   rim(parent, w, d, h - rimH / 2, rimT, rimH);
   rim(parent, w, d, rimH / 2, rimT, rimH);
   return t;
@@ -137,8 +144,9 @@ function buildBoxTank(g, def) {
   sand.userData.sandBase = { y0: t, h: sandH, centered: true };
   g.userData.bottom = { kind: 'box', w: iw, d: id };
   const waterH = h * 0.9 - t;
-  box(g, iw, waterH, id, MATERIALS.water, 0, t + waterH / 2, 0);
+  markWater(box(g, iw, waterH, id, MATERIALS.water, 0, t + waterH / 2, 0), t, waterH);
   addSurface(g, new THREE.PlaneGeometry(iw, id), t + waterH + 0.001);
+  waterSpan(g, h - rimHOf(h), t + waterH);
   g.userData.interior = { shape: 'box', floorY: t + sandH, halfW: w / 2 - t, halfD: d / 2 - t, waterTop: t + waterH };
 }
 
@@ -174,27 +182,10 @@ function buildCylinderTank(g, def) {
   const waterH = glassH * 0.92;
   const water = mesh(new THREE.CylinderGeometry(r * 0.985, r * 0.985, waterH, seg), MATERIALS.water);
   water.position.y = baseH + waterH / 2;
-  g.add(water);
+  g.add(markWater(water, baseH, waterH));
+  waterSpan(g, h - 0.004, baseH + waterH);
   addSurface(g, new THREE.CircleGeometry(r * 0.985, 64), baseH + waterH + 0.001);
   g.userData.interior = { shape: 'cylinder', floorY: baseH + sandH, halfW: r, halfD: r, radius: r * 0.99, waterTop: baseH + waterH };
-}
-
-/** 断面（幅 w・高さ topH）にアーチ状の穴をあけた Shape */
-function tunnelShape(w, topH, r, straightH) {
-  const s = new THREE.Shape();
-  s.moveTo(-w / 2, 0);
-  s.lineTo(w / 2, 0);
-  s.lineTo(w / 2, topH);
-  s.lineTo(-w / 2, topH);
-  s.closePath();
-  const hole = new THREE.Path();
-  hole.moveTo(-r, 0);
-  hole.lineTo(-r, straightH);
-  hole.absarc(0, straightH, r, Math.PI, 0, true);
-  hole.lineTo(r, 0);
-  hole.closePath();
-  s.holes.push(hole);
-  return s;
 }
 
 function buildTunnelTank(g, def) {
@@ -202,15 +193,15 @@ function buildTunnelTank(g, def) {
   const r = Math.min(w * 0.28, h * 0.38);
   const straightH = Math.min(0.9, h - r - 0.5);
 
-  // 水（アーチ穴付きの押し出し）
-  const waterGeo = new THREE.ExtrudeGeometry(tunnelShape(w - 0.04, h * 0.93, r + 0.01, straightH), {
-    depth: d - 0.04,
-    bevelEnabled: false,
-    curveSegments: 24,
-  });
-  waterGeo.translate(0, 0, -(d - 0.04) / 2);
-  g.add(mesh(waterGeo, MATERIALS.water));
+  // 水（アーチ穴付きの押し出し）。水位を変えたら作り直す（waterLevel.js）
+  const remake = (top) => tunnelWater(w - 0.04, d - 0.04, r + 0.01, straightH, top);
+  const water = mesh(remake(h * 0.93), MATERIALS.water);
+  water.userData.water = { y0: 0, h0: h * 0.93, remake };
+  g.add(water);
   addSurface(g, new THREE.PlaneGeometry(w - 0.04, d - 0.04), h * 0.93 + 0.001);
+  const surf = g.children[g.children.length - 1];
+  surf.userData.waterSurface = { remake: (top) => tunnelSurface(w - 0.04, d - 0.04, r + 0.01, straightH, top) };
+  waterSpan(g, h - 0.08, h * 0.93);
 
   // 前後ガラス（穴付き）
   const faceGeo = new THREE.ShapeGeometry(tunnelShape(w, h, r, straightH), 24);
@@ -274,8 +265,9 @@ function buildMammalTank(g, def) {
 
   // 水域
   const waterH = h * 0.8;
-  box(g, poolW, waterH, id, MATERIALS.water, -w / 2 + t + poolW / 2, t + waterH / 2, 0);
+  markWater(box(g, poolW, waterH, id, MATERIALS.water, -w / 2 + t + poolW / 2, t + waterH / 2, 0), t, waterH);
   addSurface(g, new THREE.PlaneGeometry(poolW, id), t + waterH + 0.001, -w / 2 + t + poolW / 2);
+  waterSpan(g, h - rimHOf(h), t + waterH);
   box(g, poolW, 0.06, id, MATERIALS.sand, -w / 2 + t + poolW / 2, t + 0.03, 0);
 
   // 陸地（岩場）

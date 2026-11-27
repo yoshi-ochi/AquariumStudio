@@ -28,6 +28,7 @@ export function snapshotTank(manager, tank) {
     defId: u.defId,
     ...(u.name && { name: u.name }),
     ...(u.look && { look: u.look }),
+    ...(u.waterLevel != null && { waterLevel: u.waterLevel }), // 無ければ標準の水位
     creatures: Object.fromEntries(Object.entries(u.creatures ?? {}).filter(([, n]) => n > 0)),
     ...(u.variants && { variants: structuredClone(u.variants) }), // アルビノ・変色個体
     contents: manager.dumpInterior(tank),

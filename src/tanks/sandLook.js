@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyWater } from './waterLevel.js';
 import { withCaustics } from './caustics.js';
 
 /**
@@ -146,4 +147,5 @@ export function applySand(tank, look) {
     I.floorY = floorY;
     for (const item of tank.getObjectByName('contents')?.children ?? []) item.position.y += dy;
   }
+  applyWater(tank); // 水位は床（砂の上面）からの割合なので、床が変わったら合わせる
 }

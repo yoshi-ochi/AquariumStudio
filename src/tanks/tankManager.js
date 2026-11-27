@@ -12,6 +12,7 @@ import { getCreature } from '../expedition/creatureData.js';
 import { cleanAppealFactor, updateCareVisual } from './tankCleaning.js';
 import { tankHealth } from '../expedition/husbandry.js';
 import { FLOOR_COUNT, STORY_H } from '../building/blueprint.js';
+import { applyWater, snapLevel } from './waterLevel.js';
 
 /**
  * 館内に配置されたオブジェクトの管理。
@@ -33,7 +34,7 @@ export class TankManager {
 
   // ---- 追加・削除 ---------------------------------------------------------
 
-  add(defId, { x = 0, z = 0, rotY = 0, floor = this.currentFloor, uid, contents = [], embed = null, look = null, creatures = null, variants = null, clean = null, care = null, name = null, skin = null } = {}) {
+  add(defId, { x = 0, z = 0, rotY = 0, floor = this.currentFloor, uid, contents = [], embed = null, look = null, creatures = null, variants = null, clean = null, care = null, name = null, skin = null, waterLevel = null } = {}) {
     const def = getDef(defId);
     const obj = buildObject(def, { skin: def.skin ? skin : undefined }); // 水槽台・説明プレートのデザイン
     obj.userData.uid = uid ?? this.nextUid++;
@@ -47,8 +48,10 @@ export class TankManager {
       obj.userData.clip = createClipUniforms(obj.userData.interior);
       obj.userData.clean = clean ? { ...clean } : { last: Date.now() };
       if (name) obj.userData.name = String(name).slice(0, 20);
+      if (Number.isFinite(waterLevel)) obj.userData.waterLevel = snapLevel(waterLevel); // 無ければ標準の水位（以前の保存）
       if (look) applyTankLook(obj, def, look);
       else applySand(obj, normalizeLook()); // 底砂（標準）と底の光の模様
+      applyWater(obj);
     }
     this.group.add(obj);
     this.objects.set(obj.userData.uid, obj);
@@ -385,6 +388,7 @@ export class TankManager {
       rotY: round(o.rotation.y),
       ...(o.userData.embed && { embed: { ...o.userData.embed } }),
       ...(o.userData.name && { name: o.userData.name }),
+      ...(o.userData.waterLevel != null && { waterLevel: o.userData.waterLevel }),
       ...(o.userData.look && { look: o.userData.look }),
       ...(o.userData.creatures && { creatures: { ...o.userData.creatures } }),
       ...(o.userData.variants && { variants: structuredClone(o.userData.variants) }),
