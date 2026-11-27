@@ -1,9 +1,9 @@
 import { getCreature, RARITY_NAME } from '../expedition/creatureData.js';
 import { creatureThumb } from './creatureThumb.js';
 import { octagrams } from './octagram.js';
+import { coin as yen, coinText } from './currency.js';
 
 const COLS = 4;
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 
 /**
  * 生き物を4列のアイコンで並べる（種類が多くても一覧しやすい）。
@@ -35,7 +35,7 @@ export function creatureGrid(previews, items, { sel = null, panel = '' } = {}) {
  */
 export function qtyPanel({ title, info = '', extra = '', max, qty, buttons, field = 'cg-qty' }) {
   const n = Math.max(1, Math.min(qty, max));
-  const fill = (s, b) => s.replaceAll('{n}', n).replaceAll('{yen}', yen((b.unit ?? 0) * n)).replaceAll('{xp}', ((b.xp ?? 0) * n).toLocaleString('ja-JP'));
+  const fill = (s, b) => s.replaceAll('{n}', n).replaceAll('{yen}', coinText((b.unit ?? 0) * n)).replaceAll('{xp}', ((b.xp ?? 0) * n).toLocaleString('ja-JP'));
   const btns = buttons.map((b) => `<button data-act="${b.act}" data-id="${fill(b.id, b)}" data-idtpl="${b.id}" data-tpl="${b.label}" data-unit="${b.unit ?? 0}" data-xp="${b.xp ?? 0}" class="${b.primary ? 'primary' : ''}" ${b.disabled ? 'disabled' : ''}>${fill(b.label, b)}</button>`);
   const stepper = max > 1
     ? `<div class="cg-step">
@@ -64,7 +64,7 @@ export function updateQty(el) {
   plus.disabled = n >= max;
   top.disabled = n >= max;
   pop.querySelectorAll('.cg-acts button[data-tpl]').forEach((b) => {
-    const fill = (s) => s.replaceAll('{n}', n).replaceAll('{yen}', yen(Number(b.dataset.unit) * n)).replaceAll('{xp}', (Number(b.dataset.xp) * n).toLocaleString('ja-JP'));
+    const fill = (s) => s.replaceAll('{n}', n).replaceAll('{yen}', coinText(Number(b.dataset.unit) * n)).replaceAll('{xp}', (Number(b.dataset.xp) * n).toLocaleString('ja-JP'));
     b.textContent = fill(b.dataset.tpl);
     b.dataset.id = fill(b.dataset.idtpl);
   });

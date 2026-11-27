@@ -28,7 +28,9 @@ export function growPanel({ expeditions, manager, id, qty, note = '' }) {
   const have = expeditions.count(id);
   const shown = shownCount(manager, id);
   const usable = expeditions.usable(id, shown);
-  const info = creatureInfo(id, `在庫 ${have} ・ 展示中 ${shown} ・ 成長に使える ${usable}`);
+  const v = expeditions.variantsOf(id);
+  const morphs = [v.albino ? `アルビノ ${v.albino}` : '', v.morph ? `変色 ${v.morph}` : ''].filter(Boolean).join('・');
+  const info = creatureInfo(id, `在庫 ${have}${morphs ? `（${morphs}）` : ''} ・ 展示中 ${shown} ・ 成長に使える ${usable}`);
   const extra = `${note}${growBar(expeditions, id)}`;
   const maxed = expeditions.isMaxed(id);
   if (!usable || maxed) {

@@ -39,7 +39,7 @@ export const PLAN_FLOORS = [0, 1, BASEMENT];
  * 1F・2F は本館の 1F・2F と同じ階（同じ格子に並べて同時に表示）。3F 以上は別館だけの階で、階番号は WING_BASE + 階数-1。
  */
 export const WING_BASE = 10;
-export const WING_MAX = 8;
+export const WING_MAX = 10;
 /** 別館の i 番目（0 = 1F）の階のフロア番号 */
 export const wingFloor = (i) => (i < FLOOR_COUNT ? i : WING_BASE + i);
 export const WING_FLOORS = Array.from({ length: WING_MAX }, (_, i) => wingFloor(i));

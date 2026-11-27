@@ -92,7 +92,7 @@ export class InteriorInteraction {
     const items = this.manager.interiorItems(this.tank);
     if (!items.length) return this.toast('水槽内に物がありません');
     const refund = items.reduce((s, it) => s + Math.floor(getDef(it.userData.defId).price * REFUND_RATE), 0);
-    const ok = await askConfirm({ title: '水槽内レイアウトをクリア', text: `水槽内のオブジェ ${items.length} 個をすべて撤去します（払い戻し ¥${refund.toLocaleString('ja-JP')}）。\n「↶ 戻す」で元に戻せます。`, ok: 'すべて撤去する', danger: true });
+    const ok = await askConfirm({ title: '水槽内レイアウトをクリア', text: `水槽内のオブジェ ${items.length} 個をすべて撤去します（払い戻し ${refund.toLocaleString('ja-JP')}コイン）。\n「↶ 戻す」で元に戻せます。`, ok: 'すべて撤去する', danger: true });
     if (!ok || !this.tank) return;
     this.cancelPlacement();
     this.setGrowMode(null);
@@ -101,7 +101,7 @@ export class InteriorInteraction {
     for (const it of items) this.manager.removeInterior(it);
     this.economy.earn(refund);
     this.history.charge(-refund);
-    this.toast(`水槽内レイアウトをクリアしました（¥${refund.toLocaleString('ja-JP')} 払い戻し）`);
+    this.toast(`水槽内レイアウトをクリアしました（${refund.toLocaleString('ja-JP')}コイン払い戻し）`);
     this.onChanged?.();
   }
 
@@ -364,7 +364,7 @@ export class InteriorInteraction {
     const p = this.placing;
     if (!p.ghost.visible) return;
     if (!p.valid) {
-      this.toast('資金が足りません', { error: true });
+      this.toast('コインが足りません', { error: true });
       return;
     }
     this.history.record(`${p.def.name}の配置`);

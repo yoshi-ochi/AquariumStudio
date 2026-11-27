@@ -2,6 +2,8 @@
  * メール：採取の帰還・留守中の報告・1日の報告・掃除やエサの依頼などを届ける受信箱。
  * 各メールは key で重複を防ぐ（同じ出来事から2通届かない）。指示ボタンの処理は mailView.js が受け持つ。
  */
+import { EARN } from '../management/walletData.js';
+
 const MAX_MAILS = 60;
 const MAX_KEYS = 300;
 const today = (t = Date.now()) => {
@@ -114,6 +116,7 @@ export class Mailbox extends EventTarget {
   count(field, n = 1) {
     if (this.day.date !== today()) this.closeDay();
     this.day[field] = (this.day[field] ?? 0) + n;
+    this.dispatchEvent(new CustomEvent('counted', { detail: { field, n } }));
   }
 
   closeDay(now = Date.now()) {
@@ -121,11 +124,13 @@ export class Mailbox extends EventTarget {
     this.day = newDay(today(now));
     if (!d.income && !d.trips && !d.cleans && !d.feeds) return;
     const [, m, dd] = d.date.split('-').map(Number);
+    const dia = EARN.daily[gradeOf(d)] ?? 0; // 1日の評価のダイヤ（受け取りは daily.js）
     this.add({
       key: `daily:${d.date}`, kind: 'daily', title: `${m}月${dd}日の報告（評価・まとめ）`,
       body: `${m}月${dd}日の営業の評価とまとめです。`,
-      data: { ...d },
+      data: { ...d, dia },
     });
+    if (dia) this.dispatchEvent(new CustomEvent('dayclosed', { detail: { date: d.date, dia } }));
   }
 
   // ---- 保存 ------------------------------------------------------------------

@@ -2,9 +2,9 @@ import { JOINT_PROJECTS, ALLIANCE_NEXT_XP, allianceLevel, allianceBonus, getCrea
 import { mulberry32 } from '../tanks/random.js';
 import { countIds } from './catchBlocks.js';
 import { artIcon } from './artIcons.js';
+import { coin as yen } from './currency.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const FUND_STEPS = [100000, 1000000, 10000000];
 const REWARD_COUNT = 2;
 /** 同じ合同調査を同時に進められる回数（supabase/joint_carryover.sql と同じ値） */

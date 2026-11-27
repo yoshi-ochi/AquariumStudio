@@ -1,15 +1,17 @@
 import { getCreature } from '../expedition/creatureData.js';
-import { ARCHIVE_BONUS, EXPAND_SLOTS, HOLD_BY_LEVEL, HOLD_PER_TANK, POINTS_PER_MIN, breedHours, researchCost, migrateResearchLevel, BREED_HARD_RARITY } from './backyardData.js';
+import { Breeding } from '../breeding/breeding.js';
+import { ARCHIVE_BONUS, EXPAND_SLOTS, HOLD_BY_LEVEL, HOLD_PER_TANK, POINTS_PER_MIN, researchCost, migrateResearchLevel, BREED_HARD_RARITY } from './backyardData.js';
 
-/** バックヤードの研究室と繁殖水槽。state は保存データの一部 */
+/** バックヤードの研究室と繁殖水槽。state は保存データの一部（繁殖の中身は breeding/breeding.js） */
 export class Backyard {
-  constructor({ manager, ops, economy, expeditions, toast, isUnlocked }) {
-    Object.assign(this, { manager, ops, economy, expeditions, toast, isUnlocked });
+  constructor({ manager, ops, economy, expeditions, toast, isUnlocked, wallet }) {
+    Object.assign(this, { manager, ops, economy, expeditions, toast, isUnlocked, wallet });
     this.state = Backyard.emptyState();
+    this.breeding = new Breeding({ backyard: this, expeditions, wallet, toast });
   }
 
   static emptyState() {
-    return { points: 0, levels: {}, jobs: {}, expansions: 0, rv: 2 };
+    return { points: 0, levels: {}, breed: { jobs: {}, records: {}, deep: [] }, expansions: 0, rv: 2 };
   }
 
   get expansions() {
@@ -31,7 +33,7 @@ export class Backyard {
   }
 
   get jobs() {
-    return this.state.jobs;
+    return this.breeding.jobs;
   }
 
   level(id) {
@@ -69,29 +71,10 @@ export class Backyard {
     return c.rarity < BREED_HARD_RARITY || this.level('breeding') >= 2;
   }
 
-  /** 親2匹を確認して繁殖を始める（親は減らない） */
-  startBreeding(uid, id) {
-    const c = getCreature(id);
-    if (this.jobs[uid] || !this.breeders.includes(uid) || !c || !this.canBreed(c) || this.expeditions.count(id) < 2) return false;
-    if (this.expeditions.usedSlots + c.slots > this.capacity) {
-      this.toast('保持枠がいっぱいです', { error: true });
-      return false;
-    }
-    this.jobs[uid] = { id, until: Date.now() + breedHours(c.rarity, this.level('breeding')) * 3600000 };
-    return true;
-  }
-
   /** 毎秒の処理 */
   tick(secs = 1) {
     this.state.points += (this.ratePerMin / 60) * secs;
-    const now = Date.now();
-    for (const [uid, job] of Object.entries(this.jobs)) {
-      if (!this.breeders.includes(+uid)) delete this.jobs[uid]; // 水槽が撤去された
-      else if (job.until <= now) {
-        delete this.jobs[uid];
-        this.expeditions.discover(job.id);
-      }
-    }
+    this.breeding.tick();
   }
 
   toJSON() {
@@ -99,7 +82,11 @@ export class Backyard {
   }
 
   fromJSON(data) {
-    this.state = { ...Backyard.emptyState(), ...(data ?? {}) };
+    const { jobs: oldJobs, ...rest } = data ?? {};
+    this.state = { ...Backyard.emptyState(), ...rest };
+    this.state.breed = { jobs: {}, records: {}, deep: [], ...this.state.breed };
+    // 以前の繁殖（breed より前の jobs）は産卵の段階として引き継ぐ
+    if (oldJobs && Object.keys(oldJobs).length) this.breeding.migrate(oldJobs);
     // 研究の版2（最大Lv100）より前のセーブは、効果が同じくらいになるレベルへ直す
     if (data && (data.rv ?? 1) < 2) {
       this.state.levels = Object.fromEntries(Object.entries(this.state.levels ?? {}).map(([id, lv]) => [id, migrateResearchLevel(id, lv)]));

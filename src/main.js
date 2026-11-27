@@ -89,6 +89,21 @@ import { RankingView } from './ui/rankingView.js';
 import { BuildInPlace } from './interaction/buildInPlace.js';
 import { setCustomHandler, registerCustomIds } from './tanks/customTanks.js';
 import { tankLabel } from './tanks/tankLabel.js';
+import { Wallet } from './management/wallet.js';
+import { Items } from './management/items.js';
+import { Construction } from './management/construction.js';
+import { PASS } from './management/walletData.js';
+import { Builder } from './building/builder.js';
+import { Daily } from './game/daily.js';
+import { OFFLINE_MAX_HOURS } from './game/gameData.js';
+import { Purchases } from './online/purchases.js';
+import { StoreView } from './ui/storeView.js';
+import { Gacha } from './gacha/gacha.js';
+import { Decor } from './decor/decor.js';
+import { Reserve } from './reserve/reserve.js';
+import { ReserveView } from './reserve/reserveView.js';
+import { returnTankToStock } from './breeding/variants.js';
+import { GachaView } from './ui/gachaView.js';
 
 const $ = (id) => document.getElementById(id);
 const MIN_SPLASH_MS = 1800;
@@ -122,6 +137,15 @@ async function boot() {
   const expeditions = new Expeditions();
   setGrowthSource((id) => expeditions.pieces(id)); // 展示の大きさ・集客は在庫側の成長（ピース）で決める
   const ops = new Operations();
+  // ダイヤ・アイテム・建築の工事（docs/monetization.md）
+  const wallet = new Wallet({ economy });
+  const items = new Items({ wallet });
+  const construction = new Construction();
+  const gacha = new Gacha({ expeditions });
+  const decor = new Decor({ economy, wallet }); // 内装ガチャのデザイン・館内オブジェと大型流木
+  const reserve = new Reserve({ economy, wallet }); // Lv6 の環境保護区
+  expeditions.getBonusTeams = () => wallet.extraTeams();
+  wallet.addEventListener('granted', (e) => toast(`💎 +${e.detail.n}ダイヤ（${e.detail.reason}）`));
   let home = null; // 自分の立地 { lat, lon }
   const manager = new TankManager(sceneMgr.scene);
   const room = new Room(sceneMgr.scene, sceneMgr);
@@ -161,7 +185,7 @@ async function boot() {
   const penScene = new SeaPenScene(sceneMgr.scene, seaPen);
   pool.isOpen = () => unlocked.has('pool');
   manager.extraExhibitAppeal = () => seaPen.appeal() + pool.appeal();
-  manager.extraExhibits = () => [...seaPen.exhibits, pool.exhibit];
+  manager.extraExhibits = () => [...seaPen.exhibits, pool.exhibit, ...reserve.exhibits];
   manager.themeBonus = (tank) => {
     const theme = zoneAt(tank.userData.floor, tank.position.x, tank.position.z)?.theme;
     const ids = Object.keys(tank.userData.creatures ?? {});
@@ -324,7 +348,13 @@ async function boot() {
     stairsTo,
     getGrowMode: () => interior.growMode,
     getFloraRadius: () => interior.floraRadius,
+    getSkins: (kind) => decor.ownedSkins(kind),
     onAction: (action, obj, value) => {
+      if (action.startsWith('skin-')) {
+        manager.setSkin(obj, action.slice(5));
+        customizer.select(obj);
+        return;
+      }
       if (action.startsWith('rockshape-')) return interior.setRockShape(obj, action === 'rockshape-random' ? 'random' : +action.slice(10));
       if (action.startsWith('grow-')) return interior.setGrowMode(action === 'grow-off' ? null : action.slice(5));
       if (action === 'param-flora-size') return interior.setFloraSize(obj, value);
@@ -398,6 +428,7 @@ async function boot() {
   const roomPanel = new RoomPanel({
     el: $('room-panel'),
     getSettings: () => roomSettings,
+    getSkins: (kind) => decor.ownedSkins(kind),
     getPlan: () => room.plan,
     getLevel: () => economy.stage.level,
     onChange: (kind, value) => {
@@ -415,10 +446,31 @@ async function boot() {
     },
   });
 
+  // 建築の注文窓口：コインを払って工事を始め、完了したら解放する（同時に1件）
+  const builder = new Builder({
+    construction, economy, seaPen, items, wallet, toast, getUnlocked: () => unlocked,
+    onZone: (id) => unlockZone(id),
+    onStage: () => finishStage(),
+    onPen: () => {
+      seaPen.unlock();
+      toast('屋外生け簀が完成しました');
+    },
+    onReserve: (id) => {
+      reserve.openParcel(id);
+      toast('環境保護区の区画が整備されました');
+    },
+    onPenCell: (r) => {
+      if (seaPen.rectOf([r.x0, r.z0], [r.x1, r.z1])) seaPen.addSection(r);
+      toast('生け簀の区画が完成しました');
+    },
+    onChange: () => {
+      shell.update();
+      if (gameSheet.view) gameSheet.render();
+    },
+  });
   // 地下展示室・別館・屋外生け簀の解放（レイアウト編集の「増築」タブからだけ）
   const expandPanel = new ExpandPanel({
-    el: $('expand-panel'), economy, getUnlocked: () => unlocked, seaPen,
-    onUnlockZone: (id) => unlockZone(id),
+    el: $('expand-panel'), economy, getUnlocked: () => unlocked, seaPen, builder,
     onSeaPen: () => gameSheet.openPanel('seapen'),
   });
 
@@ -439,6 +491,14 @@ async function boot() {
       active.startPlacement(id);
     },
     priceLabel: (def) => (def.category === CATEGORY.TANK ? `所持 ${inventory.count(def.id)}` : null),
+    // 内装ガチャの物は出るまで並べない。大型流木はダイヤで解放してから置ける
+    isOwned: (def) => decor.ownsDef(def),
+    onUnlock: async (def) => {
+      if (!(await askConfirm({ title: `${def.name}を解放`, text: `${def.diaPrice}ダイヤで解放すると、以後はコインで何個でも置けます。`, ok: `${def.diaPrice}ダイヤで解放` }))) return;
+      if (decor.unlockWithDia(def)) toast(`${def.name}を解放しました`);
+      else toast('ダイヤが足りません', { error: true });
+      catalog.refresh();
+    },
     onTab: (id, extra) => {
       if (mode !== 'hall-edit') return;
       hall.cancelPlacement();
@@ -493,7 +553,7 @@ async function boot() {
     onChanged: () => shell.update(),
     onWallsChanged: () => (wallsDirty = true),
     onTankRemoved: (tank) => {
-      for (const [id, n] of Object.entries(tank.userData.creatures ?? {})) expeditions.give(id, n);
+      returnTankToStock(tank, expeditions); // アルビノなども一緒に戻す
     },
     // コピーした水槽があれば、館内レイアウト編集の間だけ「貼り付け」を出す
     onClipboard: (show) => {
@@ -686,22 +746,29 @@ async function boot() {
     },
     onDone,
     onFloorChange: (floor) => views.goFloor(floor),
+    getStageJob: () => construction.find('stage'),
     onUpgrade: () => {
-      const res = economy.upgradeStage();
-      if (!res.ok) return toast(res.reason, { error: true });
-      // レベルに応じたエリアを解放して建物へ反映する
-      const opened = zonesUpToLevel(economy.stage.level).filter((id) => !unlocked.has(id));
-      opened.forEach((id) => unlocked.add(id));
-      applyRoom(false);
-      if (opened.length) toast(`${opened.map((id) => getZone(id).name).join('、')} を解放しました`, { duration: 5000 });
-      if (gameSheet.view) gameSheet.render();
-      toast(`「${economy.stage.name}」に拡張しました！`);
+      const job = construction.find('stage');
+      if (job) return builder.boost('stage', job.id);
+      builder.orderStage(); // 工事が終わると finishStage
     },
   });
 
+  /** 昇格の工事が終わった：レベルを上げ、レベルに応じたエリアを解放して建物へ反映する */
+  function finishStage() {
+    if (!economy.completeUpgrade()) return;
+    const opened = zonesUpToLevel(economy.stage.level).filter((id) => !unlocked.has(id));
+    opened.forEach((id) => unlocked.add(id));
+    applyRoom(false);
+    if (opened.length) toast(`${opened.map((id) => getZone(id).name).join('、')} を解放しました`, { duration: 5000 });
+    if (gameSheet.view) gameSheet.render();
+    shell.update();
+    toast(`「${economy.stage.name}」に拡張しました！`);
+  }
+
   /** 現在の状態を保存用データにする */
   function snapshot() {
-    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), dolphinPool: pool.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
+    return { version: LAYOUT_VERSION, creatureReset: CREATURE_RESET, savedAt: new Date().toISOString(), economy: economy.toJSON(), life: life.toJSON(), inventory: inventory.toJSON(), expedition: expeditions.toJSON(), ops: ops.toJSON(), seaPen: seaPen.toJSON(), dolphinPool: pool.toJSON(), wallet: wallet.toJSON(), items: items.toJSON(), construction: construction.toJSON(), daily: daily.toJSON(), gacha: gacha.toJSON(), decor: decor.toJSON(), reserve: reserve.toJSON(), ...(home && { home }), room: { ...roomSettings, building: BUILDING_VERSION, layout: LAYOUT.id, unlocked: [...unlocked], walls: WALL_EDITS }, objects: manager.serialize() };
   }
 
   let pendingLayout = null; // 初期設定で選んだ間取り
@@ -871,7 +938,7 @@ async function boot() {
     if (yen > 0) {
       economy.earn(yen);
       saveAfterLoad = true;
-      life.mail.add({ key: 'shops-retired', kind: 'room', title: 'お土産店・カフェの置物を払い戻しました', body: `売店・食堂のエリアに置き換えたため、置物を撤去して ¥${yen.toLocaleString('ja-JP')} を払い戻しました。館内エリアで売店・食堂を開けます。` });
+      life.mail.add({ key: 'shops-retired', kind: 'room', title: 'お土産店・カフェの置物を払い戻しました', body: `売店・食堂のエリアに置き換えたため、置物を撤去して ${yen.toLocaleString('ja-JP')}コインを払い戻しました。館内エリアで売店・食堂を開けます。` });
     }
   }
   let saveAfterLoad = false; // 読み込み時の救済で中身が変わった（すぐクラウドへ保存する）
@@ -896,6 +963,15 @@ async function boot() {
     ops.fromJSON(data.ops);
     seaPen.fromJSON(data.seaPen);
     pool.fromJSON(data.dolphinPool);
+    if (!visiting) {
+      // ダイヤ・アイテム・工事・毎日のダイヤは自分の水族館のものだけ（訪問先のは読まない）
+      wallet.fromJSON(data.wallet);
+      items.fromJSON(data.items);
+      construction.fromJSON(data.construction);
+      gacha.fromJSON(data.gacha);
+      decor.fromJSON(data.decor);
+      reserve.fromJSON(data.reserve);
+    }
     if (!visiting) refundOldShops();
     if (!visiting) home = data.home ?? null;
     roomSettings = { ...defaultRoomSettings(), ...(data.room ?? {}) };
@@ -923,6 +999,7 @@ async function boot() {
     delete roomSettings.plan;
     manager.setFloor(economy.floor);
     life.fromJSON(data.life, { own: !visiting, oldShops: data.life ? 0 : data.ops?.shops ?? 0 });
+    if (!visiting) daily.fromJSON(data.daily);
     if (!visiting) {
       const shown = new Set(manager.exhibits.flatMap((t) => Object.entries(t.userData.creatures ?? {}).filter(([, n]) => n > 0).map(([id]) => id)));
       if (life.repairDiscoveries(shown)) saveAfterLoad = true;
@@ -1059,7 +1136,7 @@ async function boot() {
 
   // ---- 上部バー・下部メニュー・アイテム ---------------------------------------
   // プレイヤーアイコン：これまでの「その他」のメニュー（拡張・館内エリア・フレンド・保存など）を開く
-  const hud = new Hud({ el: $('hud'), economy, online, onAccount: () => !visiting && shell.toggleMenu() });
+  const hud = new Hud({ el: $('hud'), economy, online, wallet, onAccount: () => !visiting && shell.toggleMenu(), onStore: () => !visiting && gameSheet.openPanel('store') });
   /** エリアを解放して建物を作り直す */
   function unlockZone(id) {
     unlocked.add(id);
@@ -1078,15 +1155,22 @@ async function boot() {
   const life = new LifeSystems({
     isUnlocked: (id) => unlocked.has(id),
     sceneMgr, room, manager, economy, ops, inventory, expeditions, previews, toast,
-    getHome: () => home, goalEl: $('goal-card'), reportEl: $('offline-report'),
+    getHome: () => home, goalEl: $('goal-card'), reportEl: $('offline-report'), wallet, items,
   });
+  life.offlineHours = () => (wallet.hasPass() ? PASS.offlineHours : OFFLINE_MAX_HOURS);
+  life.extraCostPerSec = () => reserve.stats().net / 3600;
+  reserve.addEventListener('unpaid', (e) => e.detail && life.mail.add({ key: `reserve-unpaid:${new Date().toDateString()}`, kind: 'room', title: '環境保護区の維持費が払えていません', body: 'コインが足りないため、保護区の効果（来館者の増加）が止まっています。収入を増やすか、保護している生き物を減らしてください。' }));
+  const daily = new Daily({ wallet, mail: life.mail, toast });
+  let dailyReady = false; // セーブを反映してスプラッシュを閉じてから（ログインボーナスなどを渡す）
+  daily.isActive = () => !visiting && dailyReady;
+  const purchases = new Purchases({ wallet, items, online, decor });
   // 総合レベルのランキング（イベント画面のタブ）。点数は5分ごとに送る
   const rankingView = new RankingView({ manager, expeditions, online, previews, isVisiting: () => !!visiting, onLoaded: () => gameSheet.view === 'event' && gameSheet.render() });
   life.panels.event.view.ranking = rankingView;
   setInterval(() => document.visibilityState === 'visible' && rankingView.submit().catch((err) => console.warn(err.message)), 300000);
   // 操作の案内（チュートリアル・目標の進め方）：押す場所を指のマークで示す
   const guide = new Guide();
-  if (import.meta.env.DEV) Object.assign(window, { __guide: guide, __hall: hall, __manager: manager }); // 開発用：動作を調べる
+  if (import.meta.env.DEV) Object.assign(window, { __guide: guide, __hall: hall, __manager: manager, __life: life, __ex: expeditions, __decor: decor, __builder: builder, __reserve: reserve }); // 開発用：動作を調べる
   const _box = new THREE.Box3();
   const _v = new THREE.Vector3();
   const guideEnv = {
@@ -1164,7 +1248,7 @@ async function boot() {
     onVisit: (id, name) => visitAquarium(id, name),
     onChanged: () => mapPage.refresh(),
   });
-  const expeditionView = new ExpeditionView({ economy, expeditions, toast, previews, getHome: () => home, getDiscount: () => researchBonus(life.backyard.level('field')), getCapacity: () => life.backyard.capacity, fishing: fishingScene });
+  const expeditionView = new ExpeditionView({ economy, expeditions, toast, previews, getHome: () => home, getDiscount: () => researchBonus(life.backyard.level('field')), getCapacity: () => life.backyard.capacity, fishing: fishingScene, items, wallet, onChange: () => gameSheet.view === 'expedition' && gameSheet.render() });
   // 地図で選んだ仲間の水族館
   const placeView = {
     pin: null,
@@ -1211,8 +1295,8 @@ async function boot() {
       if (old) {
         // 移転は高額。確認してから支払う
         const cost = relocateCost(economy.stage.level);
-        if (!economy.canAfford(cost)) return toast(`移転には ¥${cost.toLocaleString('ja-JP')} が必要です`, { error: true });
-        if (!(await askConfirm({ title: '水族館の立地を移転', text: `費用 ¥${cost.toLocaleString('ja-JP')}\n航海中の調査隊の残り時間も、新しい距離に合わせて変わります。`, ok: '移転する' }))) return;
+        if (!economy.canAfford(cost)) return toast(`移転には ${cost.toLocaleString('ja-JP')}コインが必要です`, { error: true });
+        if (!(await askConfirm({ title: '水族館の立地を移転', text: `費用 ${cost.toLocaleString('ja-JP')}コイン\n航海中の調査隊の残り時間も、新しい距離に合わせて変わります。`, ok: '移転する' }))) return;
         economy.spend(cost);
       }
       home = p;
@@ -1241,7 +1325,7 @@ async function boot() {
       if (mode === 'tank' && focusTank) shell.setMode('tank', tankLabel(manager, focusTank));
     },
   });
-  const mailView = new MailView({ mailbox: life.mail, manager, expeditions, economy, ops, cleanView, careView: life.panels.care.view, allianceView, previews, toast });
+  const mailView = new MailView({ mailbox: life.mail, manager, expeditions, economy, ops, cleanView, careView: life.panels.care.view, allianceView, previews, toast, breeding: life.backyard.breeding });
   expeditions.addEventListener('claimed', (e) => {
     life.mail.count('trips');
     life.mail.count('caught', e.detail.length);
@@ -1268,13 +1352,15 @@ async function boot() {
       staff: { title: 'スタッフ', live: true, view: new StaffView({ ops }) },
       shop: { title: '店舗運営', live: true, view: new ShopView({ ops, economy, inventory, onPlace: (id) => { gameSheet.close(); mapPage.close(); if (mode !== 'hall-edit') enterHallEdit(); hall.startPlacement(id); } }) },
       ...life.panels,
+      gacha: { title: '卵ガチャ', live: true, view: new GachaView({ gacha, decor, wallet, items, purchases, toast, onChange: () => gameSheet.view === 'gacha' && gameSheet.render() }) },
+      store: { title: 'ショップ', live: true, view: new StoreView({ wallet, items, daily, purchases, builder, toast, onChange: () => gameSheet.view && gameSheet.render() }) },
       mail: { title: 'メール', live: true, view: mailView },
       pool: { title: 'イルカプール', view: new PoolView({ pool, expeditions, previews, toast }) },
       diner: { title: '食堂', view: new DinerView({ expeditions, economy, previews, isOpen: () => unlocked.has('diner') }) },
       seapen: {
         title: '屋外生け簀',
         view: new SeaPenView({
-          pen: seaPen, economy, expeditions, previews, toast,
+          pen: seaPen, economy, expeditions, previews, toast, builder,
           onLook: () => {
             gameSheet.close();
             mapPage.close();
@@ -1286,10 +1372,11 @@ async function boot() {
           },
         }),
       },
+      reserve: { title: '環境保護区', live: true, view: new ReserveView({ reserve, expeditions, economy, previews, builder, toast }) },
       zones: {
         title: '館内エリア',
         view: new ZoneView({
-          economy, getUnlocked: () => unlocked, onUnlock: unlockZone,
+          economy, getUnlocked: () => unlocked, onUnlock: (id) => builder.orderZone(id), builder,
           getLook: (id) => ({ floor: roomSettings.floor.color, wall: roomSettings.wall.color, ceiling: roomSettings.ceiling.color, ...roomSettings.zoneLook?.[id] }),
           onLook: (id, kind, color) => {
             const all = { ...roomSettings.zoneLook };
@@ -1350,7 +1437,7 @@ async function boot() {
   // 開き直したときは前回の受け取り結果を消す（下の開閉処理より先に動かす）
   // 開き直したときは未読のあるタブを開き、前回の受け取り結果を消す（下の開閉処理より先に動かす）
   $('side-mail').addEventListener('click', () => mailView.reset(), true);
-  for (const [btn, id, ic] of [['side-mail', 'mail', 'mail'], ['side-clean', 'clean', 'clean'], ['side-care', 'care', 'care'], ['side-zukan', 'zukan', 'zukan'], ['side-staff', 'staff', 'staff']]) {
+  for (const [btn, id, ic] of [['side-mail', 'mail', 'mail'], ['side-clean', 'clean', 'clean'], ['side-care', 'care', 'care'], ['side-gacha', 'gacha', 'egg'], ['side-zukan', 'zukan', 'zukan'], ['side-staff', 'staff', 'staff']]) {
     $(btn).querySelector('.sa-ico').innerHTML = icon(ic, 24);
     $(btn).addEventListener('click', () => {
       if (visiting) return;
@@ -1359,7 +1446,7 @@ async function boot() {
       if (!open) gameSheet.openPanel(id);
     });
   }
-  for (const [btn, id] of [['btn-zones', 'zones'], ['btn-backyard', 'backyard']]) {
+  for (const [btn, id] of [['btn-zones', 'zones'], ['btn-backyard', 'backyard'], ['btn-reserve', 'reserve']]) {
     $(btn).addEventListener('click', () => {
       shell.toggleMenu(false);
       gameSheet.openPanel(id);
@@ -1370,10 +1457,13 @@ async function boot() {
     gameSheet.openPanel('event');
   });
   inventory.addEventListener('change', () => catalog.refresh());
+  decor.addEventListener('change', () => catalog.refresh());
   // 外注の完成チェック（閉じている間に完成した分も受け取る）
   setInterval(() => {
     if (visiting) return;
     inventory.collect();
+    construction.tick(); // 終わった工事を完了させる（閉じている間に終わった分も）
+    daily.tick();
     $('nav-map').classList.toggle('has-badge', expeditions.trips.some((t) => expeditions.isDone(t)));
     mapPage.refresh();
     for (const t of finishCleaning(manager.tanks)) {
@@ -1387,6 +1477,7 @@ async function boot() {
     $('side-sat').textContent = `満足度${Math.round(ops.satisfaction)}%`;
     manager.updateCare();
     life.tick();
+    reserve.tick(); // 環境保護区の維持費とエコツアー収入
     const hungry = manager.tanks.filter((t) => isHungry(t)).length;
     $('care-badge').hidden = !hungry;
     $('care-badge').textContent = hungry;
@@ -1394,6 +1485,9 @@ async function boot() {
     const shownBy = {};
     for (const t of manager.exhibits) for (const [id, n] of Object.entries(t.userData.creatures ?? {})) shownBy[id] = (shownBy[id] ?? 0) + n;
     const growable = CREATURES.filter((c) => expeditions.canLevelUp(c.id, shownBy[c.id] ?? 0)).length;
+    const eggs = gacha.ready().length; // かえった卵
+    $('gacha-badge').hidden = !eggs;
+    $('gacha-badge').textContent = eggs;
     $('zukan-badge').hidden = !growable;
     $('zukan-badge').textContent = growable;
   }, 1000);
@@ -1490,7 +1584,7 @@ async function boot() {
     pool.update(clock.elapsedTime);
     scenery.update(clock.elapsedTime);
     interior.update();
-    economy.update(dt, manager.totalAppeal() * (visiting ? 1 : ops.visitorMult * allyBonus() * life.visitorMult));
+    economy.update(dt, manager.totalAppeal() * (visiting ? 1 : ops.visitorMult * allyBonus() * life.visitorMult * reserve.visitorMult));
     views.update(dt);
     room.updateCeiling(sceneMgr.camera.position.y);
     room.updateCut(sceneMgr.camera.position.distanceTo(cameraCtl.controls.target), dt);
@@ -1559,6 +1653,11 @@ async function boot() {
   }
   await splash.hide();
   splashDone = true;
+  // ダイヤ：有償の残高と権利を読み、閉じている間の1日の評価・今日のログインボーナスを渡す
+  await purchases.load();
+  dailyReady = true;
+  daily.catchUp();
+  daily.tick();
   // 前回から追加された魚種・採取地を知らせる（他人の水族館を見ているときは出さない）
   if (!visiting) showNewSpecies({ previews, uid: online.user?.id, onOpenMap: () => mapPage.open() }).catch((err) => console.warn(err));
 }

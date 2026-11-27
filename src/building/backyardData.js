@@ -9,7 +9,7 @@ export const researchBonus = (level) => Math.min(MAX_RESEARCH, Math.max(0, level
 export const RESEARCH = [
   { id: 'display', name: '展示解説', text: '1レベルごとに来館者+0.5%（Lv100で+50%）' },
   { id: 'field', name: '採取技術', text: '1レベルごとに遠征費用-0.5%（Lv100で-50%）' },
-  { id: 'breeding', name: '繁殖技術', text: '1レベルごとに繁殖時間-0.5%（Lv100で-50%）。Lv2で紫・金も繁殖可能' },
+  { id: 'breeding', name: '繁殖技術', text: '1レベルごとに産卵（妊娠）の時間-0.5%（Lv100で-50%）、アルビノ・変色個体の確率+0.01%（0.5%→Lv100で1.5%）。Lv2で紫・金も繁殖可能' },
   { id: 'welfare', name: '労務管理', text: '1レベルごとに賃金-0.5%（Lv100で-50%）' },
 ];
 
@@ -32,7 +32,7 @@ export const breedHours = (rarity, level) => Math.round(BREED_HOURS[rarity] * (1
 
 // ---- 魚の保持 ------------------------------------------------------------------
 /** 建物のレベルごとの基本の保持枠 */
-export const HOLD_BY_LEVEL = [30, 60, 100, 160, 240];
+export const HOLD_BY_LEVEL = [30, 60, 100, 160, 240, 320];
 /** 地下の予備水槽1基あたりの保持枠 */
 export const HOLD_PER_TANK = 30;
 /** 拡張工事は建物が最大レベルでも同じ金額で続けられる */

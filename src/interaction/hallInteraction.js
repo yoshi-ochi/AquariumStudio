@@ -179,12 +179,12 @@ export class HallInteraction {
     if (copy) {
       const { tank, layout } = this._pasteCost(def, copy);
       if (this.economy.canAfford(tank + layout)) return '';
-      const yen = (n) => `¥${n.toLocaleString('ja-JP')}`;
-      return `資金が足りません：${yen(tank + layout)}（${tank ? `水槽 ${yen(tank)} ＋ ` : ''}水槽内レイアウト ${yen(layout)}）`;
+      const yen = (n) => `${n.toLocaleString('ja-JP')}コイン`;
+      return `コインが足りません：${yen(tank + layout)}（${tank ? `水槽 ${yen(tank)} ＋ ` : ''}水槽内レイアウト ${yen(layout)}）`;
     }
     if (this.inventory.count(def.id) > 0) return '';
     if (def.category === CATEGORY.TANK) return '在庫がありません';
-    return this.economy.canAfford(def.price) ? '' : '資金が足りません';
+    return this.economy.canAfford(def.price) ? '' : 'コインが足りません';
   }
 
   startPlacement(defId) {

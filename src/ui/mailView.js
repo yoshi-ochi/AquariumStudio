@@ -6,9 +6,9 @@ import { tankLabel } from '../tanks/tankLabel.js';
 import { icon } from './icons.js';
 import { catchBlocks, countIds } from './catchBlocks.js';
 import { TAB_OF, gradeOf } from '../game/mailbox.js';
+import { coin as yen, coinText } from './currency.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const num = (n) => Math.floor(n).toLocaleString('ja-JP');
 const when = (t) => {
   const d = new Date(t);
@@ -27,8 +27,8 @@ const TABS = [['system', 'システム'], ['report', '報告'], ['ally', '同盟
  * scan() を毎秒呼ぶと、帰還した調査隊・汚れた水槽・空腹の水槽をメールで知らせる。
  */
 export class MailView {
-  constructor({ mailbox, manager, expeditions, economy, ops, cleanView, careView, allianceView, previews, toast }) {
-    Object.assign(this, { mailbox, manager, expeditions, economy, ops, cleanView, careView, allianceView, previews, toast });
+  constructor({ mailbox, manager, expeditions, economy, ops, cleanView, careView, allianceView, previews, toast, breeding }) {
+    Object.assign(this, { mailbox, manager, expeditions, economy, ops, cleanView, careView, allianceView, previews, toast, breeding });
     this.open = null;
     this.tab = 'system';
     this.last = null; // 報告タブで直前に受け取った結果 { got, released, trips }
@@ -73,7 +73,15 @@ export class MailView {
       if (m.kind === 'trip' && !this.expeditions.trips.some((x) => x.seed === m.data.seed)) mb.finish(m.id, '受け取り済みです');
       else if (m.kind === 'clean' && (!t || !needsCleaning(t, now))) mb.finish(m.id, !t ? '水槽がありません' : isCleaning(t) ? '掃除を始めています' : '対応済みです');
       else if (m.kind === 'feed' && (!t || !isHungry(t, now))) mb.finish(m.id, '対応済みです');
+      else if (m.kind === 'breed' && !this._breedPending(m.data, now)) mb.finish(m.id, '期限が過ぎたか、済んでいます');
     }
+  }
+
+  /** 繁殖の世話のメールの世話が、まだ期限内で済んでいないか */
+  _breedPending({ uid, seed, stage, k }, now) {
+    const job = this.breeding?.jobs[uid];
+    const t = job && job.seed === seed && job.stage === stage ? job.tasks[k] : null;
+    return !!t && !t.done && t.at <= now && now < t.until;
   }
 
   /** 帰還した隊（seed で指定）の成果をまとめて受け取り、対応するメールを閉じる。{ got, released, trips } を返す */
@@ -232,6 +240,7 @@ export class MailView {
         spec.diver ? btn('mail-clean-diver', `ダイバーで掃除 ${yen(spec.diver.cost)}`, this.economy.canAfford(spec.diver.cost), !spec.staff) : '',
       ].join('');
     }
+    if (m.kind === 'breed') return btn('mail-breed', '世話をする');
     if (m.kind === 'feed') return btn('mail-feed', `エサやり ${yen(feedCost(t))}`, this.economy.canAfford(feedCost(t)));
     return '';
   }
@@ -261,7 +270,7 @@ export class MailView {
       mb.remove(m.id);
     } else if (act === 'mail-take') {
       this.economy.earn(m.data.net);
-      mb.finish(m.id, `${yen(m.data.net)} を受け取りました`);
+      mb.finish(m.id, `${coinText(m.data.net)} を受け取りました`);
     } else if (act === 'mail-claim') {
       if (!this.claimTrips([m.data.seed]).trips) mb.finish(m.id, '受け取り済みです');
     } else if (act === 'mail-ally-claim') {
@@ -270,6 +279,9 @@ export class MailView {
       const t = this.manager.objects.get(m.data.uid);
       if (t) this.cleanView.act(act.replace('mail-', ''), String(m.data.uid));
       if (t && isCleaning(t)) mb.finish(m.id, act === 'mail-clean-staff' ? '職員に掃除を指示しました' : 'ダイバーに掃除を依頼しました');
+    } else if (act === 'mail-breed') {
+      if (this.breeding?.care(m.data.uid)) mb.finish(m.id, '世話をしました');
+      else mb.finish(m.id, '期限が過ぎたか、済んでいます');
     } else if (act === 'mail-feed') {
       const t = this.manager.objects.get(m.data.uid);
       if (t) this.careView.act('care-feed', String(m.data.uid));

@@ -98,7 +98,7 @@ export class MapPage {
     note.hidden = !on;
     const moving = !!this.getHome();
     note.textContent = moving
-      ? `移転先をタップしてください。移転費用 ¥${this.getMoveCost().toLocaleString('ja-JP')}（航海中の調査隊の残り時間も新しい距離に変わります）`
+      ? `移転先をタップしてください。移転費用 ${this.getMoveCost().toLocaleString('ja-JP')}コイン（航海中の調査隊の残り時間も新しい距離に変わります）`
       : '水族館を建てる場所をタップしてください（0.1度単位で公開されます。最初の設定は無料）';
     this.el.querySelector('[data-map=home]').classList.toggle('active', on);
   }

@@ -1,8 +1,9 @@
 import { PLACEABLE_TANKS as TANK_DEFS, TANK_DEFS as ALL_TANKS } from '../tanks/tankData.js';
 import { MAX_ORDERS, outsourceCost, outsourceSeconds } from '../management/inventory.js';
 import { icon } from './icons.js';
+import { coin as yen } from './currency.js';
+import { fmtLeft } from '../management/buildTimes.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const time = (s) => (s >= 60 ? `${Math.floor(s / 60)}分${s % 60 ? `${s % 60}秒` : ''}` : `${s}秒`);
 const TABS = [['stock', '所持品'], ['creatures', '生物'], ['supplier', '取引先'], ['outsource', '外注']];
 
@@ -138,7 +139,7 @@ export class GameSheet {
     this.el.querySelectorAll('[data-until]').forEach((s) => {
       const left = Math.ceil((+s.dataset.until - Date.now()) / 1000);
       if (left <= 0) finished = true;
-      s.textContent = time(Math.max(0, left));
+      s.textContent = fmtLeft(Math.max(0, left));
     });
     if (finished) this.render(); // 帰還・完成を表示に反映
     else if (this.panels[this.view]?.live && ++this._beat % 3 === 0) this.render(); // 満足度などを更新

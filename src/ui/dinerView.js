@@ -1,8 +1,8 @@
 import { CREATURES } from '../expedition/creatureData.js';
 import { dishPrice } from './expeditionViews.js';
 import { creatureThumb } from './creatureThumb.js';
+import { coin as yen } from './currency.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 
 /** 食堂の画面：在庫の生き物を料理として提供して売上にする（食堂をタップで開く） */
 export class DinerView {

@@ -10,6 +10,7 @@ import { normalizeGrowth } from './growth.js';
 import { waterSurfaceMesh } from '../water/waterSurface.js';
 import { markWater, markSurface } from './waterLevel.js';
 import { tunnelShape, tunnelWater, tunnelSurface } from './tunnelShape.js';
+import { DECOR_BUILDERS, buildStandSkin } from '../decor/decorBuilders.js';
 
 /** 水平な水面ジオメトリ（XZ 平面）を高さ y に置く */
 function addSurface(parent, geometry, y, x = 0) {
@@ -27,7 +28,7 @@ const waterSpan = (g, hi, def) => (g.userData.waterSpan = { hi, def });
  * 戻り値の root は底面が y=0、中心が x=z=0 のローカル座標系。
  * root.children: 'body'（見た目）と 'contents'（水槽内オブジェ用の子グループ）。
  */
-export function buildObject(def, { seed = 1, growth, shape } = {}) {
+export function buildObject(def, { seed = 1, growth, shape, skin } = {}) {
   const flora = def.flora ? normalizeFlora(def, growth) : null;
   const g = flora ? flora.growth : def.growth ? normalizeGrowth(growth) : undefined;
   const root = new THREE.Group();
@@ -50,7 +51,8 @@ export function buildObject(def, { seed = 1, growth, shape } = {}) {
 
   const builder = BUILDERS[def.shape];
   if (!builder) throw new Error(`No builder for shape: ${def.shape}`);
-  builder(body, def, { seed, growth: g, shape: shape ?? 0 });
+  builder(body, def, { seed, growth: g, shape: shape ?? 0, skin });
+  if (skin) root.userData.skin = skin;
 
   if (def.category === CATEGORY.TANK) {
     // 水槽内レイアウト用の情報（ローカル座標）と子要素グループ
@@ -290,7 +292,8 @@ function buildMammalTank(g, def) {
   g.userData.interior = { shape: 'box', floorY: t + 0.06, halfW: w / 2 - t, halfD: d / 2 - t, waterTop: t + waterH, swim: { cx: -w / 2 + t + poolW / 2, halfW: poolW / 2 } };
 }
 
-function buildStand(g, def) {
+function buildStand(g, def, { skin } = {}) {
+  if (skin && skin !== 'wood') return buildStandSkin(g, def, skin); // 内装ガチャのデザイン
   const { w, h, d } = def.size;
   const topT = 0.04;
   box(g, w - 0.02, h - topT, d - 0.02, MATERIALS.wood, 0, (h - topT) / 2, 0);
@@ -415,4 +418,21 @@ const BUILDERS = {
   driftwood: buildDriftwood,
   flora: buildFlora,
   airstone: buildAirstone,
+  ...DECOR_BUILDERS,
 };
+
+/** 見た目（デザイン）を変えて体を作り直す。水槽台・説明プレートのデザインの差し替え用 */
+export function rebuildBody(obj, def, opts = {}) {
+  const old = obj.getObjectByName('body');
+  const body = new THREE.Group();
+  body.name = 'body';
+  if (old) {
+    body.position.copy(old.position);
+    obj.remove(old);
+    disposeObject(old);
+  }
+  obj.add(body);
+  BUILDERS[def.shape](body, def, opts);
+  if (opts.skin) obj.userData.skin = opts.skin;
+  else delete obj.userData.skin;
+}

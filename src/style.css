@@ -746,3 +746,59 @@ button[data-repeat] { -webkit-touch-callout: none; -webkit-user-select: none; us
 .gd-shake { animation: gd-shake .35s; }
 @keyframes gd-shake { 25% { margin-left: -8px; } 75% { margin-left: 8px; } }
 #goal-card { cursor: pointer; } #goal-card .goal-how { color: #ffe08a; font-weight: 700; }
+
+/* 通貨の表示（コイン・ダイヤ） */
+.cur { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; vertical-align: -2px; }
+.cur svg { flex: none; }
+.cur-coin svg { color: #d9a400; }
+.cur-dia svg { color: #3fb6e8; }
+/* HUD のダイヤ（タップでショップ）。コインの下に並べる */
+#hud .hud-stat.gem { display: flex; grid-column: 3; grid-row: 2; margin: 0; min-height: 0; border: 0; color: inherit; font: inherit; cursor: pointer; }
+#hud .hud-stat.gem svg, #hud .hud-stat.gem b { color: #7fd8ff; }
+#hud .hud-stat.money { grid-column: 2; grid-row: 2; }
+@media (min-width: 340px) {
+  #hud .hud-stat.money { grid-column: 4; grid-row: 1; height: 22px; border-radius: 11px; }
+  #hud .hud-stat.money b { font-size: 13px; }
+  #hud .hud-stat.gem { grid-column: 4; grid-row: 2; }
+}
+body.editing #hud .hud-stat.gem, body[data-mode=tank] #hud .hud-stat.gem { display: none; }
+body.editing #hud .hud-stat.money, body[data-mode=tank] #hud .hud-stat.money { grid-row: 1; }
+.st-tasks { list-style: none; margin: 4px 0; padding: 0; font-size: 12px; }
+.st-tasks li.done { opacity: .6; }
+.bd-job { color: #e0a000; }
+/* 卵ガチャ */
+.gc-egg { display: inline-block; flex: none; width: 22px; height: 28px; vertical-align: middle; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; background: var(--egg); border: 3px solid var(--ring); }
+.gc-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.gc-got { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; }
+.gc-machine .st-head b { display: inline-flex; align-items: center; gap: 6px; }
+.gc-odds { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.gc-odds th { text-align: left; padding: 4px 2px 2px; border-bottom: 1px solid var(--border, #d5dfe8); }
+.gc-odds td { padding: 2px; }
+.gc-odds td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+/* 繁殖 */
+.br-steps span.done { color: #5a9a5a; }
+.br-steps span.cur { font-weight: 700; color: #1769aa; }
+.br-care { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; padding: 6px 8px; border: 1px solid #e0a000; border-radius: 8px; background: #fff8e6; }
+.br-care b { font-size: 12px; }
+.br-auto { color: #2a8a5a; }
+.br-road { width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid var(--border, #d5dfe8); border-radius: 8px; font-size: 12px; }
+.br-road ol { list-style: none; margin: 4px 0 0; padding: 0; }
+.br-road li { opacity: .7; }
+.br-road li.ok { opacity: 1; color: #2a7a3a; }
+.br-hours { display: block; margin-top: 4px; }
+.dc-got { margin: 6px 0 0; padding-left: 0; list-style: none; font-size: 12px; }
+.seg.wrap { flex-wrap: wrap; }
+.card.dia-locked img { opacity: .55; }
+/* 環境保護区の地図 */
+.rv-map { display: grid; gap: 6px; margin: 6px 0; }
+.rv-sea, .rv-land { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.rv-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; padding: 6px; border-radius: 8px; border: 2px solid transparent; text-align: left; font-size: 11px; color: #12324a; }
+.rv-cell b { font-size: 11px; }
+.rv-cell.sea { background: #b8dcf0; }
+.rv-cell.land { background: #e4d8b4; }
+.rv-cell:not(.open) { opacity: .6; }
+.rv-cell.open.sea { background: #6fb8e0; color: #fff; }
+.rv-cell.open.land { background: #b8a46a; color: #fff; }
+.rv-cell.sel { border-color: #ffb300; }
+.rv-icons { display: flex; gap: 2px; }
+.rv-icons img, .rv-icons .ct { width: 22px; height: 16px; object-fit: contain; }

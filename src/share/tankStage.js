@@ -27,7 +27,7 @@ export class TankStage {
     floor.position.y = -0.001;
     this.scene.add(floor);
     this.manager = new TankManager(this.scene);
-    this.tank = this.manager.add(snap.defId, { x: 0, z: 0, contents: snap.contents ?? [], look: snap.look ?? null, creatures: snap.creatures ?? null, name: snap.name ?? null, waterLevel: snap.waterLevel ?? null });
+    this.tank = this.manager.add(snap.defId, { x: 0, z: 0, contents: snap.contents ?? [], look: snap.look ?? null, creatures: snap.creatures ?? null, variants: snap.variants ?? null, name: snap.name ?? null, waterLevel: snap.waterLevel ?? null });
   }
 
   /** 水槽の中心と、正面から全体が収まるカメラの距離 */

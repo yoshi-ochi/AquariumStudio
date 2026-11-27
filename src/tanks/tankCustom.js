@@ -8,8 +8,8 @@ import { floorLabel } from '../building/blueprint.js';
 import { specOf, pointCount, LEVELS } from '../flora/floraBuilder.js';
 import { levelLabel, snapLevel } from './waterLevel.js';
 import { waterSection, setWaterLevel, refreshWaterNote } from './waterControl.js';
+import { coin as yen } from '../ui/currency.js';
 
-const yen = (n) => `¥${Math.round(n).toLocaleString('ja-JP')}`;
 const cm = (v) => Math.round(v * 100);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -39,8 +39,8 @@ export function format(fmt, v) {
  * パネルの追加セクション：岩肌ブラシ（ライブロック）、成長（サンゴ・流木・海藻）、壁埋め込み（水槽・館内編集時）
  */
 export class TankCustomizer {
-  constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getGrowMode, getFloraRadius, stairsTo }) {
-    Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getGrowMode, getFloraRadius, stairsTo });
+  constructor({ scene, camera, panelEl, gizmoEl, getDef, onAction, getGrowMode, getFloraRadius, stairsTo, getSkins }) {
+    Object.assign(this, { scene, camera, panelEl, gizmoEl, getDef, onAction, getGrowMode, getFloraRadius, stairsTo, getSkins });
     // 水位のスライダーはここで処理する（詳細パネルと編集シートの「見た目」タブのどちらからも onAction で届く）
     this.onAction = (action, obj, value) => (action === 'param-water-level' ? this._setWater(obj, value) : onAction(action, obj, value));
     this.selected = null;
@@ -124,6 +124,14 @@ export class TankCustomizer {
     document.body.classList.remove('has-selection');
   }
 
+  /** デザイン（水槽台・説明プレート）：持っているデザインから選ぶ。増やすのは内装ガチャ */
+  _skinSection(obj, def) {
+    const cur = obj.userData.skin ?? null;
+    const list = this.getSkins(def.skin);
+    const btns = list.map((s, i) => `<button data-action="skin-${s.id}" class="${(cur ?? list[0].id) === s.id ? 'active' : ''}"><i class="chip" style="background:${s.chip}"></i>${esc(s.name)}</button>`).join('');
+    return `<div class="section"><h4>デザイン</h4><div class="seg wrap">${btns}</div><small class="note">内装ガチャでデザインが増えます</small></div>`;
+  }
+
   /** 階段：上下の階へ移動するボタン */
   _stairsSection(obj) {
     const go = (dir, mark) => {
@@ -160,6 +168,7 @@ export class TankCustomizer {
         ${def.stairs ? '' : '<button data-action="delete" class="danger">🗑 撤去</button>'}
       </div>
       ${def.stairs ? this._stairsSection(obj) : ''}
+      ${def.skin && this.getSkins ? this._skinSection(obj, def) : ''}
       ${isTank && this.allowEmbed && !def.atrium ? this._embedSection(obj) : ''}
       ${isTank ? waterSection(obj, slider) : ''}
       ${obj.userData.interiorItem && obj.userData.locked ? '<p class="note">ロック中です。「ロック解除」で移動・回転・編集ができます（解除できるのは1つだけ。ほかの物は自動でロックされます）</p>' : `

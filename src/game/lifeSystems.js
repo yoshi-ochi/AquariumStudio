@@ -9,28 +9,36 @@ import { Crowd } from '../visitors/crowd.js';
 import { CareView, EventView, ZukanView } from './lifeViews.js';
 import { EVENTS, GOALS, CHAPTERS, OFFLINE_MAX_HOURS, OFFLINE_RATE } from './gameData.js';
 import { goalStats } from './goalStats.js';
+import { EARN } from '../management/walletData.js';
+import { dia } from '../ui/currency.js';
 import { Mailbox } from './mailbox.js';
 import { Monthly } from './monthly.js';
+import { coin as yen, coinText } from '../ui/currency.js';
 
-const yen = (n) => `¥${Math.floor(n).toLocaleString('ja-JP')}`;
 const emptyState = () => ({ goals: [], flags: {}, zukan: [], event: null, cooldown: {}, monthly: null, badges: [] });
 
 /** 目標・オフライン収入・来館者・飼育・図鑑・イベントをまとめて管理する */
 export class LifeSystems {
-  constructor({ sceneMgr, room, manager, economy, ops, inventory, expeditions, previews, toast, getHome, goalEl, reportEl, isUnlocked }) {
-    Object.assign(this, { manager, economy, ops, inventory, expeditions, toast, getHome, goalEl, reportEl, isUnlocked });
+  constructor({ sceneMgr, room, manager, economy, ops, inventory, expeditions, previews, toast, getHome, goalEl, reportEl, isUnlocked, wallet, items }) {
+    Object.assign(this, { manager, economy, ops, inventory, expeditions, toast, getHome, goalEl, reportEl, isUnlocked, wallet, items });
+    this.offlineHours = () => OFFLINE_MAX_HOURS; // 館長パスで24時間（main.js が差し込む）
+    this.extraCostPerSec = () => 0; // 環境保護区の差し引きの維持費（main.js が差し込む）
     this.state = emptyState();
     this.mail = new Mailbox();
     this.crowd = new Crowd({ scene: sceneMgr.scene, room, manager });
     this.monthly = new Monthly({ state: this.state, manager, expeditions });
-    this.backyard = new Backyard({ manager, ops, economy, expeditions, toast, isUnlocked });
+    this.backyard = new Backyard({ manager, ops, economy, expeditions, toast, isUnlocked, wallet });
     expeditions.getCapacity = () => this.backyard.capacity;
+    this.backyard.breeding.addEventListener('finished', (e) => this._breedResult(e.detail));
     expeditions.addEventListener('discovered', (e) => this._rewardDiscovery(e.detail));
     this.panels = {
-      backyard: { title: 'バックヤード', live: true, view: new BackyardView({ backyard: this.backyard, expeditions, economy, previews, toast }) },
-      care: { title: '飼育', live: true, view: new CareView({ manager, economy, toast, onFed: () => (this.state.flags.fed = true) }) },
-      zukan: { title: '生き物図鑑', view: new ZukanView({ expeditions, manager, previews, economy, state: this.state, toast }) },
-      event: { title: 'イベント', live: true, view: new EventView({ economy, state: this.state, monthly: this.monthly, previews, getStats: () => this.stats(), toast, onStart: () => { this.state.flags.event = true; this.state.flags.events = (this.state.flags.events ?? 0) + 1; this.monthly.countEvent(); } }) },
+      backyard: { title: 'バックヤード', live: true, view: new BackyardView({ backyard: this.backyard, expeditions, economy, previews, toast, items, wallet }) },
+      care: { title: '飼育', live: true, view: new CareView({ manager, economy, toast, onFed: () => {
+        this.state.flags.fed = true;
+        this.mail.count('feeds');
+      } }) },
+      zukan: { title: '生き物図鑑', view: new ZukanView({ expeditions, manager, previews, economy, state: this.state, toast, wallet, backyard: this.backyard }) },
+      event: { title: 'イベント', live: true, view: new EventView({ economy, items, state: this.state, monthly: this.monthly, previews, getStats: () => this.stats(), toast, onStart: () => { this.state.flags.event = true; this.state.flags.events = (this.state.flags.events ?? 0) + 1; this.monthly.countEvent(); } }) },
     };
     // 報酬のボタンで受け取る。カードのほかの所をタップすると、進め方の案内（main.js の onGoalTap）
     goalEl.addEventListener('click', (e) => {
@@ -66,7 +74,9 @@ export class LifeSystems {
       const yen = DISCOVERY_REWARD[c?.rarity] ?? 0;
       if (!c || !yen) continue;
       this.economy.earn(yen);
-      this.mail.add({ key: `discovery:${id}`, kind: 'discovery', title: `新種発見：${c.name}`, body: `図鑑に${c.name}（レア度 ${RARITY_NAME[c.rarity]}）が載りました。発見の報酬 ¥${yen.toLocaleString('ja-JP')} を受け取りました。`, data: { id, yen } });
+      const gem = c.gacha ? 0 : EARN.discovery[c.rarity] ?? 0; // ガチャ限定種は発見のダイヤなし
+      if (gem) this.wallet?.grant(gem, `新種発見：${c.name}`);
+      this.mail.add({ key: `discovery:${id}`, kind: 'discovery', title: `新種発見：${c.name}`, body: `図鑑に${c.name}（レア度 ${RARITY_NAME[c.rarity]}）が載りました。発見の報酬 ${coinText(yen)}${gem ? `と${gem}ダイヤ` : ''} を受け取りました。`, data: { id, yen, dia: gem } });
     }
   }
 
@@ -76,7 +86,7 @@ export class LifeSystems {
     return {
       tanks: tanks.length,
       creatures: tanks.reduce((s, t) => s + Object.values(t.userData.creatures ?? {}).reduce((a, n) => a + n, 0), 0),
-      species: CREATURES.filter((c) => this.expeditions.seenCount(c.id) > 0).length,
+      species: CREATURES.filter((c) => !c.gacha && this.expeditions.seenCount(c.id) > 0).length, // 目標の発見数にガチャ限定種は数えない
       guides: this.ops.staff.guide,
       shops: this.isUnlocked('store') ? 1 : 0,
       cafes: this.isUnlocked('diner') ? 1 : 0,
@@ -108,9 +118,29 @@ export class LifeSystems {
     setCleanIntervalBoost(1 + Math.min(4, count('waterPlant')) * 0.25);
     setCareFacilities({ freezer: count('freezer'), liveFeed: count('liveFeed'), foodPrep: count('foodPrep') });
     this.backyard.tick();
+    this._breedMail();
     this._month();
     this._husbandry();
     this._renderGoal(s);
+  }
+
+  /** 繁殖の世話の時間になったらメールで知らせる（期限内に「世話をする」） */
+  _breedMail(now = Date.now()) {
+    const br = this.backyard.breeding;
+    for (const [uid, job] of Object.entries(br.jobs)) {
+      const t = br.pendingTask(job, now);
+      if (!t) continue;
+      const c = getCreature(job.id);
+      const k = job.tasks.indexOf(t);
+      this.mail.add({ key: `breed:${uid}:${job.seed}:${job.stage}:${k}`, kind: 'breed', title: `${c.name}の繁殖：世話の時間です`, body: `${br.careText(job)}。期限を過ぎると子が死んでしまうことがあります。`, data: { uid: +uid, seed: job.seed, stage: job.stage, k }, actionable: true });
+    }
+  }
+
+  /** 繁殖の結果をメールで知らせる */
+  _breedResult({ id, kind, text }) {
+    const c = getCreature(id);
+    this.mail.add({ kind: 'breedResult', title: `${c?.name ?? ''}の繁殖：${{ raised: '保育成功', partial: '保育失敗', died: '全滅', nospawn: '産卵せず' }[kind] ?? '結果'}`, body: text });
+    this.toast(text, { duration: 5000, error: kind === 'died' });
   }
 
   /** 飼育員が足りていれば自動でエサやり */
@@ -135,6 +165,8 @@ export class LifeSystems {
   _renderGoal(s) {
     const g = this._goal;
     const prog = g?.progress?.(s);
+    const gem = g ? EARN.goal[g.chapter] ?? 0 : 0;
+    const reward = g ? `${yen(g.reward)}${gem ? ` ＋ ${dia(gem)}` : ''}` : '';
     const key = g ? `${g.id}:${g.done(s)}:${prog ?? ''}` : 'none';
     this.goalEl.hidden = !g;
     if (key === this._goalKey) return;
@@ -144,7 +176,7 @@ export class LifeSystems {
     const inCh = GOALS.filter((x) => x.chapter === g.chapter);
     const head = `第${g.chapter}章 ${CHAPTERS[g.chapter - 1]} ${inCh.indexOf(g) + 1}/${inCh.length}`;
     const bar = prog && !ready ? `<small class="goal-prog">${prog[0]} / ${prog[1]}</small>` : '';
-    this.goalEl.innerHTML = `<small>${head}</small><b>${g.text}</b>${bar}${ready ? `<button class="primary">報酬 ${yen(g.reward)}</button>` : `<small>報酬 ${yen(g.reward)} ・ <span class="goal-how">👆 タップで進め方</span></small>`}`;
+    this.goalEl.innerHTML = `<small>${head}</small><b>${g.text}</b>${bar}${ready ? `<button class="primary">報酬 ${reward}</button>` : `<small>報酬 ${reward} ・ <span class="goal-how">👆 タップで進め方</span></small>`}`;
   }
 
   _claimGoal() {
@@ -152,9 +184,11 @@ export class LifeSystems {
     if (!g || !g.done(this.stats())) return;
     this.state.goals.push(g.id);
     this.economy.earn(g.reward);
+    const gem = EARN.goal[g.chapter] ?? 0;
+    if (gem) this.wallet?.grant(gem, '目標達成');
     const next = this._goal;
     const chapterDone = !next || next.chapter !== g.chapter;
-    this.toast(chapterDone ? `第${g.chapter}章「${CHAPTERS[g.chapter - 1]}」クリア！ ${yen(g.reward)} を獲得${next ? ` ・ 次は第${next.chapter}章「${CHAPTERS[next.chapter - 1]}」` : ''}` : `目標達成！ ${yen(g.reward)} を獲得`, { duration: chapterDone ? 4000 : 2400 });
+    this.toast(chapterDone ? `第${g.chapter}章「${CHAPTERS[g.chapter - 1]}」クリア！ ${coinText(g.reward)} を獲得${next ? ` ・ 次は第${next.chapter}章「${CHAPTERS[next.chapter - 1]}」` : ''}` : `目標達成！ ${coinText(g.reward)} を獲得`, { duration: chapterDone ? 4000 : 2400 });
     this._goalKey = null;
   }
 
@@ -164,17 +198,18 @@ export class LifeSystems {
   settleOffline(savedAt, visitorMult) {
     const away = (Date.now() - Date.parse(savedAt)) / 1000;
     if (!(away >= 300)) return;
-    const secs = Math.min(away, OFFLINE_MAX_HOURS * 3600);
+    const maxH = this.offlineHours();
+    const secs = Math.min(away, maxH * 3600);
     const visitors = Math.round(this.manager.totalAppeal() * this.economy.stage.visitorFactor * visitorMult);
     const income = visitors * INCOME_PER_VISITOR * secs * OFFLINE_RATE;
-    const wages = this.ops.wages * secs * OFFLINE_RATE;
+    const wages = (this.ops.wages + this.extraCostPerSec()) * secs * OFFLINE_RATE; // 環境保護区の差し引きの維持費も
     const net = Math.max(0, Math.floor(income - wages));
     const h = Math.floor(away / 3600);
     const m = Math.floor((away % 3600) / 60);
     this.mail.add({
       key: `offline:${savedAt}`, kind: 'offline', title: '留守中の報告', actionable: net > 0,
       body: `${h ? `${h}時間` : ''}${m}分の営業結果です。${net > 0 ? '収入を受け取ってください。' : ''}`,
-      data: { visitors, income: Math.floor(income), wages: Math.floor(wages), net, capped: away > OFFLINE_MAX_HOURS * 3600 ? OFFLINE_MAX_HOURS : 0 },
+      data: { visitors, income: Math.floor(income), wages: Math.floor(wages), net, capped: away > maxH * 3600 ? maxH : 0 },
     });
   }
 
