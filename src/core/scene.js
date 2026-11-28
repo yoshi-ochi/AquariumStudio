@@ -8,7 +8,7 @@ export class SceneManager {
   constructor(container) {
     this.container = container;
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true }); // stencil：水槽内の岩の切り口（tanks/clipCapPass.js）
     this.renderer.setPixelRatio(pixelRatio()); // スマホは 1.5 まで（core/quality.js）
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;

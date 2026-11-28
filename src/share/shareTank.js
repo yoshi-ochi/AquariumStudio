@@ -17,7 +17,7 @@ const H = 630;
 /** 写しから作り直した水槽を撮る（館内の描画とは別のレンダラー。水紋は使わない） */
 export async function shootTank(snap) {
   const stage = new TankStage(snap);
-  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, stencil: true }); // stencil：岩の切り口（tanks/clipCapPass.js）
   renderer.setPixelRatio(1);
   renderer.setSize(W, H);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
