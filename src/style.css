@@ -175,11 +175,13 @@ input[type=color] { width: 44px; height: 32px; border: none; padding: 0; backgro
 
 /* ---------- ヒント・トースト ---------- */
 #hint {
-  position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(16px + var(--safe-bottom)); max-width: 92vw;
+  position: fixed; left: 0; right: 0; width: fit-content; margin: 0 auto;
+  bottom: calc(16px + var(--safe-bottom)); max-width: min(92vw, 560px);
   padding: 6px 12px; border-radius: 12px; background: rgba(20, 40, 60, 0.7); color: #fff;
-  font-size: 12px; text-align: center; pointer-events: none; z-index: 12;
+  font-size: 12px; text-align: center; text-wrap: balance; pointer-events: none; z-index: 12;
+  transition: opacity .6s;
 }
+#hint.faded { opacity: 0; }
 body.editing #hint { bottom: calc(var(--editor-h) + 10px + var(--safe-bottom)); }
 #hint:empty { display: none; }
 #toast {
@@ -440,12 +442,12 @@ body:not([data-view=floor]) #side-actions, body:not([data-view=floor]) #goal-car
 #layout-picker { position: fixed; inset: 0; z-index: 120; overflow-y: auto; padding: calc(16px + var(--safe-top)) 12px calc(16px + var(--safe-bottom)); color: #fff; background: #0a2438; user-select: none; }
 #layout-picker[hidden] { display: none; }
 /* ログイン時の「新しく追加された生き物」 */
-#new-species { position: fixed; inset: 0; z-index: 125; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom)); background: rgba(6, 22, 36, 0.72); }
-.ns-box { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 720px; margin: auto 0; padding: 16px; color: #fff; background: #0f3550; border: 2px solid #2f7aa3; border-radius: 14px; }
+#new-species { position: fixed; inset: 0; z-index: 125; display: flex; align-items: center; justify-content: center; padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom)); background: rgba(6, 22, 36, 0.72); }
+.ns-box { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 720px; max-height: 100%; padding: 16px; color: #fff; background: #0f3550; border: 2px solid #2f7aa3; border-radius: 14px; }
 .ns-box h2 { margin: 0; font-size: 20px; }
 .ns-box h3 { margin: 6px 0 0; color: var(--gold); font-size: 15px; }
 .ns-lead { margin: 0; color: #a9d3e6; font-size: 13px; }
-.ns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 8px; max-height: 52dvh; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.ns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .ns-card { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px; background: #123f60; border-radius: 10px; }
 .ns-card .cthumb img { width: 64px; height: 48px; object-fit: contain; }
 .ns-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -458,6 +460,9 @@ body:not([data-view=floor]) #side-actions, body:not([data-view=floor]) #goal-car
 .ns-places li { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; background: #123f60; border-radius: 10px; }
 .ns-places small { color: #d9eef7; font-size: 12px; }
 .ns-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.ns-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ns-x { flex: none; width: 36px; min-height: 36px; padding: 0; color: #fff; background: transparent; border-color: #2f7aa3; border-radius: 50%; }
+.ns-body { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; margin: 0 -4px; padding: 0 4px; overflow-y: auto; overscroll-behavior: contain; }
 .lp-box { display: flex; flex-direction: column; gap: 10px; max-width: 760px; margin: 0 auto; }
 .lp-box h2 { margin: 0; font-size: 22px; }
 .lp-box p { margin: 0; color: #a9d3e6; font-size: 13px; }
@@ -813,3 +818,11 @@ button.lack { opacity: 0.55; }
 .st-bonus { align-self: flex-start; padding: 1px 8px; color: #8a5a00; background: #fff1c9; border-radius: 9px; font-size: 11px; font-style: normal; font-weight: 700; }
 .st-pack button { flex: none; width: 128px; }
 .gc-soon-note { align-self: flex-start; padding: 2px 10px; color: var(--muted); background: #eef4f8; border-radius: 10px; font-size: 12px; font-style: normal; font-weight: 700; }
+
+/* ---------- 操作性：右側のボタン列を小さく（館内を隠しすぎない） ---------- */
+#side-actions { gap: 5px; }
+#side-actions button { width: 50px; min-height: 46px; padding: 3px 2px; font-size: 10px; border-radius: 12px; }
+#side-actions .sa-ico { height: 20px; }
+#side-actions .sa-ico svg { width: 20px; height: 20px; }
+/* カタログ：持っていない水槽は値段を出す（押すと取引先） */
+.card .price .card-buy { color: var(--accent); font-weight: 700; }

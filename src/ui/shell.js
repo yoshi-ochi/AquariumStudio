@@ -83,7 +83,14 @@ export class AppShell {
     up.disabled = !next || !e.canAfford(next.upgradeCost);
   }
 
+  /** 画面下の操作ヒント。数秒で薄く消える（同じ文はもう一度出さない） */
   setHint(text) {
-    $('hint').textContent = text ?? '';
+    const el = $('hint');
+    text ??= '';
+    if (el.textContent === text) return;
+    el.textContent = text;
+    el.classList.remove('faded');
+    clearTimeout(this._hintTimer);
+    if (text) this._hintTimer = setTimeout(() => el.classList.add('faded'), 7000);
   }
 }
