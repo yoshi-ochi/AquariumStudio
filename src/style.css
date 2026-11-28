@@ -828,3 +828,52 @@ button.lack { opacity: 0.55; }
 .card .price .card-buy { color: var(--accent); font-weight: 700; }
 /* PC 幅：下部メニューのボタンは中央 720px に寄せる（背景は横いっぱい） */
 #bottom-nav { padding-inline: max(4px, calc((100vw - 720px) / 2)); }
+
+/* ---------- 掃除：要掃除・掃除中・きれいのタイル ---------- */
+.cl-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; }
+.cl-stats span { display: flex; flex-direction: column; padding: 4px 0; color: var(--muted); background: #f1f6fa; border-radius: 8px; font-size: 11px; }
+.cl-stats b { color: var(--text); font-size: 17px; }
+.cl-stats .bad b { color: var(--danger); }
+.cl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.cl-tile { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px; background: #fff; border: 1px solid var(--border); border-radius: 10px; }
+.cl-tile.need { border-color: #f0b4b4; background: #fff7f7; }
+.cl-tile.busy { background: #f1f6fa; }
+.cl-tile > b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.cl-tile small { color: var(--muted); font-size: 11px; }
+.cl-tile button { min-height: 30px; padding: 2px 4px; font-size: 11px; }
+.cl-bar { display: block; height: 4px; overflow: hidden; background: #e3edf3; border-radius: 2px; }
+.cl-bar > i { display: block; height: 100%; background: var(--ok); }
+.cl-bar.bad > i { background: var(--danger); }
+.gs-fold { width: 100%; margin-top: 4px; color: var(--muted); background: #f1f6fa; font-weight: 700; }
+
+/* ---------- アイテム：水槽の商品カード ---------- */
+.gs-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.gs-card { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 6px; background: #fff; border: 1px solid var(--border); border-radius: 10px; }
+.gs-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #e6f1f8; border-radius: 7px; }
+.gs-card > b { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.gs-card > small { color: var(--muted); font-size: 11px; }
+.gs-card button { margin-top: auto; min-height: 34px; }
+.gs-card.locked img { filter: grayscale(1) brightness(.85); }
+
+/* ---------- ショップ：ダイヤで買うアイテムのカード ---------- */
+.st-note { margin: -2px 2px 0; color: var(--muted); font-size: 11px; }
+.st-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.st-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 8px; background: #fff; border: 1px solid var(--border); border-radius: 10px; }
+.st-item > b { font-size: 13px; line-height: 1.3; }
+.st-item > small { color: var(--muted); font-size: 11px; }
+.st-item button { margin-top: auto; min-height: 34px; padding: 4px 6px; }
+
+/* ---------- 館内エリア：色見本つきのタイル ---------- */
+.zn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.zn-tile { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0; min-height: 0; padding: 0 8px 8px; overflow: hidden; color: var(--text); text-align: left; white-space: normal; background: #fff; border: 1px solid var(--border); border-radius: 10px; }
+.zn-tile.active { border-color: var(--accent); outline: 2px solid var(--accent); }
+.zn-tile > b { font-size: 13px; }
+.zn-tile > small { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 11px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.zn-tile button { margin-top: auto; min-height: 32px; padding: 4px 6px; font-size: 12px; }
+.zn-tile.locked, .zn-tile.building { background: #f6f9fb; }
+.zn-sw { display: block; height: 22px; margin: 0 -8px 4px; background: linear-gradient(var(--w) 0 45%, var(--f) 45% 100%); }
+.zn-sw.out { background: linear-gradient(#bfe6ff 0 45%, #8fbf6a 45% 100%); }
+.zn-sw.lock { background: repeating-linear-gradient(135deg, #dde5eb 0 6px, #eef3f6 6px 12px); }
+.zn-tag { margin-top: auto; color: var(--muted); font-size: 11px; font-weight: 700; }
+.zn-tile.active .zn-tag { color: var(--accent); }
+.zn-span { grid-column: 1 / -1; }

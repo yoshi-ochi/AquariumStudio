@@ -110,8 +110,13 @@ export class GameSheet {
     this.el.innerHTML = `${head('アイテム')}<div class="gs-tabs">${tabs}</div><div class="gs-list">${this[`_${this.view}`]()}</div>`;
   }
 
-  _row(def, info, button) {
-    return `<div class="gs-row"><img src="${this.previews.get(def.id) ?? ''}" alt=""><div class="gs-info"><b>${def.name}</b><small>${info}</small></div>${button}</div>`;
+  /** 水槽の商品カード（2〜3列の格子に並べる） */
+  _row(def, info, button, locked = false) {
+    return `<div class="gs-card ${locked ? 'locked' : ''}"><img src="${this.previews.get(def.id) ?? ''}" alt=""><b>${def.name}</b><small>${info}</small>${button}</div>`;
+  }
+
+  _cards(html) {
+    return html ? `<div class="gs-cards">${html}</div>` : '';
   }
 
   _creatures() {
@@ -126,11 +131,11 @@ export class GameSheet {
       return def ? this._row(def, `外注で製作中 ・ 残り <span data-until="${o.doneAt}">${this._left(o)}</span>`, '') : '';
     });
     const rows = owned.map((d) => this._row(d, `所持数 ${this.inventory.count(d.id)}`, `<button data-act="place" data-id="${d.id}" class="primary">設置</button>`));
-    return [...rows, ...orders].join('') || '<p class="gs-empty">水槽を持っていません。取引先からの購入か、外注で入手できます。</p>';
+    return this._cards([...rows, ...orders].join('')) || '<p class="gs-empty">水槽を持っていません。取引先からの購入か、外注で入手できます。</p>';
   }
 
   _supplier() {
-    return '<button data-act="open-build" class="primary tv-wide bd-open">🛠 水槽を建造する（形・サイズを自由に）</button>' + this._available((d) => this._row(d, `${yen(d.price)} ・ すぐ届く`, `<button data-act="buy" data-id="${d.id}" class="primary" ${this.economy.canAfford(d.price) ? '' : 'disabled'}>購入</button>`));
+    return '<button data-act="open-build" class="primary tv-wide bd-open">🛠 水槽を建造する（形・サイズを自由に）</button><p class="gs-empty">買った水槽はすぐ届きます。</p>' + this._available((d) => this._row(d, yen(d.price), `<button data-act="buy" data-id="${d.id}" class="primary" ${this.economy.canAfford(d.price) ? '' : 'disabled'}>購入</button>`));
   }
 
   _outsource() {
@@ -143,7 +148,7 @@ export class GameSheet {
   }
 
   _available(row) {
-    return TANK_DEFS.map((d) => (d.requiredStage > this._level ? this._row(d, `ステージ${d.requiredStage}で解放`, '') : row(d))).join('');
+    return this._cards(TANK_DEFS.map((d) => (d.requiredStage > this._level ? this._row(d, `🔒 ステージ${d.requiredStage}で解放`, '', true) : row(d))).join(''));
   }
 
   _left(o) {

@@ -20,7 +20,7 @@ export class ZoneView {
     const look = this.getLook(z.id);
     const indoor = z.type !== ZONE_TYPE.OUTDOOR;
     const color = (kind, label) => `<label class="zn-color">${label}<input type="color" data-field="zone-${kind}" data-id="${z.id}" value="${look[kind]}"></label>`;
-    return `<div class="gs-row wrap zn-edit"><div class="gs-info"><b>エリアの編集</b><small>元の名前：${esc(defaultZoneName(z.id))}</small></div>
+    return `<div class="gs-row wrap zn-edit zn-span"><div class="gs-info"><b>エリアの編集</b><small>元の名前：${esc(defaultZoneName(z.id))}</small></div>
       <div class="tv-name"><input id="zn-name" value="${esc(z.name)}" maxlength="${MAX_ZONE_NAME}" aria-label="エリア名"><button data-act="zone-rename" data-id="${z.id}" class="primary">名前を変更</button></div>
       <div class="zn-colors">${indoor ? `${color('floor', '床の色')}${color('wall', '壁の色')}${color('ceiling', '天井の色')}` : '<small>屋外エリアは色を変えられません</small>'}</div>
       <div class="gs-btns">${indoor ? `<button data-act="zone-color-reset" data-id="${z.id}">色を全体設定に戻す</button>` : ''}<button data-act="zone-edit-done">閉じる</button></div></div>`;
@@ -33,17 +33,22 @@ export class ZoneView {
     const wings = WING_FLOORS.filter((f) => isWing(f) && ZONES.some((z) => z.floor === f && unlocked.has(z.id)));
     const rows = [...PLAN_FLOORS, ...wings].map((floor) => {
       const items = ZONES.filter((z) => z.floor === floor && (!z.annex || unlocked.has(z.id))).map((z) => {
+        const outdoor = z.type === ZONE_TYPE.OUTDOOR;
         if (unlocked.has(z.id)) {
-          const row = `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small></div><button data-act="zone-edit" data-id="${z.id}">編集</button></div>`;
-          return this.editing === z.id ? row + this._editor(z) : row;
+          // 解放済み：床・壁の色見本つき。タップで名前と色の編集を下に開く
+          const look = this.getLook(z.id);
+          const swatch = outdoor ? '<i class="zn-sw out"></i>' : `<i class="zn-sw" style="--f:${look.floor};--w:${look.wall}"></i>`;
+          const tile = `<button class="zn-tile ${this.editing === z.id ? 'active' : ''}" data-act="zone-edit" data-id="${z.id}">${swatch}<b>${esc(z.name)}</b><small>${z.text}</small><span class="zn-tag">✎ 編集</span></button>`;
+          return this.editing === z.id ? tile + this._editor(z) : tile;
         }
         const lack = z.stage > level ? (z.wing ? `レベル${z.stage}で建設できます` : `ステージ${z.stage}で解放`) : z.requires && !unlocked.has(z.requires) ? `先に${esc(getZone(z.requires).name)}を解放` : '';
         const job = this.builder?.job('zone', z.id);
-        if (job) return `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small>${jobHtml(job)}</div>${boostButton(job)}</div>`;
+        const head = `<i class="zn-sw lock"></i><b>${esc(z.name)}</b><small>${z.text}</small>`;
+        if (job) return `<div class="zn-tile building">${head}${jobHtml(job)}${boostButton(job)}</div>`;
         const ok = !lack && this.economy.canAfford(z.cost);
-        return `<div class="gs-row"><div class="gs-info"><b>${esc(z.name)}</b><small>${z.text}</small>${lack ? `<small>${lack}</small>` : ''}</div><button data-act="zone-open" data-id="${z.id}" class="primary" ${ok ? '' : 'disabled'}>${z.wing ? (z.requires ? '増築 ' : '建設 ') : ''}${yen(z.cost)}${timeNote(zoneSeconds(z))}</button></div>`;
+        return `<div class="zn-tile locked">${head}${lack ? `<span class="zn-tag">🔒 ${lack}</span>` : ''}<button data-act="zone-open" data-id="${z.id}" class="primary" ${ok ? '' : 'disabled'}>${z.wing ? (z.requires ? '増築 ' : '建設 ') : ''}${yen(z.cost)}${timeNote(zoneSeconds(z))}</button></div>`;
       });
-      return `<h4 class="gs-sub">${floorLabel(floor)}</h4>${items.join('')}`;
+      return `<h4 class="gs-sub">${floorLabel(floor)}</h4><div class="zn-grid">${items.join('')}</div>`;
     });
     const pen = this.seaPen;
     return rows.join('') + '<p class="gs-empty">地下展示室・別館・屋外生け簀の増築は、レイアウト編集の「増築」タブから行えます。</p>';
