@@ -5,6 +5,7 @@ import { coin as yen } from './currency.js';
 import { fmtLeft } from '../management/buildTimes.js';
 
 const time = (s) => (s >= 60 ? `${Math.floor(s / 60)}分${s % 60 ? `${s % 60}秒` : ''}` : `${s}秒`);
+const TAB_ACT = /^(tab|[a-z]+-tab|zk-mode)$/;
 const TABS = [['stock', '所持品'], ['creatures', '生物'], ['supplier', '取引先'], ['outsource', '外注']];
 
 /** 今後追加する機能の案内 */
@@ -21,7 +22,9 @@ export class GameSheet {
     el.addEventListener('click', (e) => {
       if (e.target.matches('canvas[data-draw]')) return this.panels[this.view]?.view.draw?.(e) && this.render();
       const b = e.target.closest('button[data-act]');
-      if (b) this._act(b.dataset.act, b.dataset.id, b);
+      if (!b) return;
+      if (TAB_ACT.test(b.dataset.act)) this._top = true; // タブの切り替え（アイテム・メール・図鑑・イベント・水槽）
+      this._act(b.dataset.act, b.dataset.id, b);
     });
     // 色・数値の入力は再描画せずに各画面へ渡す
     el.addEventListener('input', (e) => (this.panels[this.view]?.view ?? (this.view === 'creatures' ? this.creatureView : null))?.input?.(e.target));
@@ -36,6 +39,7 @@ export class GameSheet {
   }
 
   openItems(tab = 'stock') {
+    this._top = true;
     this.view = tab;
     this.el.hidden = false;
     this.render();
@@ -47,7 +51,7 @@ export class GameSheet {
 
   /** panels のキー（expedition / clean / staff / shop）を開く */
   openPanel(id) {
-    if (this.view !== id) this.el.querySelector('.gs-list')?.scrollTo?.(0, 0); // 別の画面のスクロール位置を引き継がない
+    if (this.view !== id) this._top = true; // 別の画面を開いたら先頭から表示する
     this.view = id;
     this.el.hidden = false;
     this.render();
@@ -63,6 +67,7 @@ export class GameSheet {
   }
 
   openFeature(id) {
+    this._top = true;
     this.view = `feature:${id}`;
     this.el.hidden = false;
     this.render();
@@ -80,7 +85,9 @@ export class GameSheet {
     const full = this.view !== 'tank';
     this.el.classList.toggle('gs-full', full);
     document.body.classList.toggle('sheet-full', full);
-    const scroll = this.el.querySelector('.gs-list')?.scrollTop ?? 0;
+    // 同じ画面の更新（毎秒の再描画・ボタン操作）はスクロール位置を保つ。画面やタブを切り替えたときは先頭へ
+    const scroll = this._top ? 0 : this.el.querySelector('.gs-list')?.scrollTop ?? 0;
+    this._top = false;
     this._render();
     const list = this.el.querySelector('.gs-list');
     if (list) list.scrollTop = scroll;
