@@ -71,6 +71,8 @@ function octopus(c, { grid, solid }) {
       return [Math.cos(ang) * r + Math.cos(t) * w, 0.14 - v * 0.1 + Math.sin(v * 8 + k) * 0.02 + Math.sin(t) * w, Math.sin(ang) * r + Math.sin(t) * w, Math.sin(t) < 0 ? belly : fin];
     }));
   }
+  // イイダコ：腕の付け根の両側に金色の輪（眼状紋）
+  if (c.ocelli) for (const s of [-1, 1]) parts.push(solid(new THREE.TorusGeometry(0.03, 0.01, 5, 12), c.ocelli, at(0.15, 0.165, s * 0.15, Math.PI / 2 - s * 0.6)));
   parts.push(...eyes(solid, 0.1, 0.3, 0.09, 0.03));
   return parts;
 }

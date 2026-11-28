@@ -284,6 +284,7 @@ function fishParts(c, f) {
  *   height: かさの高さ / stripes: { n, hex } 放射状の縞 / spots: 水玉の色
  *   oral: { n, len, width, hex, club } 口腕（club = 太いこぶ状、無ければひらひらの帯）
  *   tents: { n, len, hex } かさの縁の触手 / filaments: { n, len, hex } 口腕から伸びる透明な付属器
+ *   tufts: { n, len, hex, tip, rim, rimHex } かさの表面（n本）と縁（rim本）に生える短い触手。先は tip の色
  */
 function jellyParts(c) {
   const { body, belly, fin: finC } = c.colors;
@@ -313,6 +314,21 @@ function jellyParts(c) {
       const m = new THREE.Matrix4().compose(p.addScaledVector(n, 0.004), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n), new THREE.Vector3(1, 0.15, 1));
       parts.push(solid(new THREE.CylinderGeometry(0.03 + (i % 3) * 0.008, 0.03 + (i % 3) * 0.008, 0.02, 8), J.spots, m));
     }
+  }
+  if (J.tufts) {
+    const T = J.tufts;
+    const tuft = (u, v, len, hex) => {
+      const [x, y, z] = bellAt(u, v);
+      const a = u * Math.PI * 2;
+      return grid(2, 4, (s, t) => {
+        const out = t * len;
+        const w = (s - 0.5) * 0.03;
+        return [x + Math.cos(a) * out * 0.8 - Math.sin(a) * w, y + out * 0.3 - out * out * 4, z + Math.sin(a) * out * 0.8 + Math.cos(a) * w, t > 0.5 ? T.tip : hex];
+      });
+    };
+    const cols = J.stripes?.n ?? 16;
+    for (let i = 0; i < T.n; i++) parts.push(tuft(Math.floor(((i * 0.618) % 1) * cols) / cols, 0.4 + ((i * 0.37) % 1) * 0.5, T.len, T.hex));
+    for (let i = 0; i < (T.rim ?? 0); i++) parts.push(tuft(i / T.rim, 1, T.len * 1.3, T.rimHex ?? T.hex));
   }
   const tents = J.tents ?? (J.oral ? null : { n: 12, len: 0.75, hex: finC });
   if (tents) {
