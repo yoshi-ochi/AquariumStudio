@@ -132,7 +132,8 @@ export class Room {
     this.cutPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 3.6);
     sceneMgr.renderer.localClippingEnabled = true;
     this.roomWallMat = new THREE.MeshStandardMaterial({ roughness: 0.95, clippingPlanes: [this.cutPlane] });
-    this.lockedFloorMat = new THREE.MeshStandardMaterial({ color: 0x11161b, roughness: 1 });
+    // 未解放の床：閉じていると分かる暗さに留める（真っ黒だと館内の大半が黒く沈む）
+    this.lockedFloorMat = new THREE.MeshStandardMaterial({ color: 0x4a5866, roughness: 1 });
     this.outdoorMat = new THREE.MeshStandardMaterial({ color: 0xd3cbb9, roughness: 1 });
     this.shutterMat = new THREE.MeshStandardMaterial({ map: stripeTexture(), color: 0x5a5f64, roughness: 0.8, side: THREE.DoubleSide });
     this.railMat = new THREE.MeshStandardMaterial({ color: 0xbfe3ee, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide });
