@@ -23,10 +23,16 @@ const STATES = {
   modeled: ['モデル完成', 'done'],
   modeling: ['制作中', 'work'],
   requested: ['制作依頼済み', 'req'],
+  hold: ['保留', 'hold'],
   ready: ['画像あり', 'ready'],
   wait: ['画像待ち', 'wait'],
 };
-const FILTERS = [['todo', '未完成'], ['wait', '画像待ち'], ['ready', '画像あり'], ['req', '依頼・制作中'], ['done', '完成・公開'], ['all', 'すべて']];
+const FILTERS = [['todo', '未完成'], ['wait', '画像待ち'], ['ready', '画像あり'], ['req', '依頼・制作中'], ['hold', '保留'], ['done', '完成・公開'], ['all', 'すべて']];
+/** 絞り込みに合うか。「未完成」は完成した種と保留の種を除く */
+const inFilter = (x, f) => {
+  const c = STATES[x.state][1];
+  return f === 'all' || (f === 'todo' ? c !== 'done' && c !== 'hold' : f === 'req' ? c === 'req' || c === 'work' : c === f);
+};
 const MAX_SIDE = 2000;
 const placeName = (id) => [...DESTINATIONS, ...HIDDEN_PLACES].find((d) => d.id === id)?.name ?? id;
 
@@ -53,6 +59,44 @@ export class ModelingTab {
     this.q = '';
     this.busy = false;
     this.error = '';
+    this.pasteKind = null; // 貼り付け先の欄（未指定なら空いている欄）
+    document.addEventListener('paste', (e) => this._onPaste(e));
+  }
+
+  /** 貼り付け先：選んだ欄が空き（または複数可）ならそこ、だめなら横→上→正面→その他の順で空いている欄 */
+  _pasteKind(x) {
+    const imgs = x.row?.images ?? [];
+    const free = ([kind, , , multi]) => multi || !imgs.some((i) => i.kind === kind);
+    const pick = KINDS.find((k) => k[0] === this.pasteKind);
+    return (pick && free(pick) ? pick : KINDS.find(free))[0];
+  }
+
+  /** Ctrl+V：モデル待ちタブで種を選んでいるときだけ受け付ける（メモ欄などへの文字の貼り付けは邪魔しない） */
+  _onPaste(e) {
+    if (!document.querySelector('.ad-edit [data-slot]') || this.busy) return;
+    const x = this._list().find((i) => i.id === this.sel);
+    if (!x || x.state === 'released' || x.state === 'modeled') return;
+    const files = [...(e.clipboardData?.items ?? [])].filter((i) => i.kind === 'file' && i.type.startsWith('image/')).map((i) => i.getAsFile());
+    if (!files.length) return;
+    e.preventDefault();
+    const kind = this._pasteKind(x);
+    this._upload(x, kind, KINDS.find((k) => k[0] === kind)[3] ? files : files.slice(0, 1));
+  }
+
+  /** 📋 ボタン：クリップボードの画像を読む（ブラウザが許可を聞くことがある） */
+  async _pasteButton(x, kind) {
+    try {
+      const items = await navigator.clipboard.read();
+      const blobs = [];
+      for (const it of items) {
+        const type = it.types.find((t) => t.startsWith('image/'));
+        if (type) blobs.push(await it.getType(type));
+      }
+      if (!blobs.length) return toast('クリップボードに画像がありません', 'error');
+      this._upload(x, kind, KINDS.find((k) => k[0] === kind)[3] ? blobs : blobs.slice(0, 1));
+    } catch {
+      toast('クリップボードを読めませんでした。Ctrl+V で貼り付けてください', 'error');
+    }
   }
 
   /** 一覧の項目 [{ id, name, places, planned, row, state }] */
@@ -63,7 +107,7 @@ export class ModelingTab {
     for (const x of out) {
       x.row = rows[x.id];
       const side = x.row?.images.some((i) => i.kind === 'side');
-      x.state = x.planned && RELEASES[x.id] ? 'released' : x.planned && isModeled(x.planned) ? 'modeled' : x.row?.status === 'modeling' ? 'modeling' : x.row?.status === 'requested' ? 'requested' : side ? 'ready' : 'wait';
+      x.state = x.planned && RELEASES[x.id] ? 'released' : x.planned && isModeled(x.planned) ? 'modeled' : x.row?.status === 'hold' ? 'hold' : x.row?.status === 'modeling' ? 'modeling' : x.row?.status === 'requested' ? 'requested' : side ? 'ready' : 'wait';
     }
     return out;
   }
@@ -76,8 +120,8 @@ export class ModelingTab {
     const all = this._list();
     const cls = (x) => STATES[x.state][1];
     const q = this.q.trim();
-    const shown = all.filter((x) => !q || x.name.includes(q) || x.id.includes(q) || x.planned?.sci?.toLowerCase().includes(q.toLowerCase())).filter((x) => this.filter === 'all' || (this.filter === 'todo' ? cls(x) !== 'done' : this.filter === 'req' ? cls(x) === 'req' || cls(x) === 'work' : cls(x) === this.filter));
-    const count = (f) => all.filter((x) => (f === 'all' ? true : f === 'todo' ? cls(x) !== 'done' : f === 'req' ? cls(x) === 'req' || cls(x) === 'work' : cls(x) === f)).length;
+    const shown = all.filter((x) => !q || x.name.includes(q) || x.id.includes(q) || x.planned?.sci?.toLowerCase().includes(q.toLowerCase())).filter((x) => inFilter(x, this.filter));
+    const count = (f) => all.filter((x) => inFilter(x, f)).length;
     const chips = FILTERS.map(([f, t]) => `<button data-filter="${f}" class="${this.filter === f ? 'active' : ''}">${t} ${count(f)}</button>`).join('');
     const items = shown.map((x) => {
       const side = x.row?.images.find((i) => i.kind === 'side');
@@ -98,24 +142,29 @@ export class ModelingTab {
   _editor(x) {
     const imgs = x.row?.images ?? [];
     const locked = x.state === 'released' || x.state === 'modeled';
+    const target = this._pasteKind(x);
     const slots = KINDS.map(([kind, label, hint, multi]) => {
       const list = imgs.filter((i) => i.kind === kind);
       const pics = list.map((i) => `<figure><img src="${esc(this.urls.get(i.path) ?? '')}" alt=""><button data-del="${esc(i.path)}" title="削除" ${this.busy ? 'disabled' : ''}>✕</button></figure>`).join('');
-      const add = multi || !list.length ? `<label class="ad-mup ${this.busy ? 'off' : ''}">＋ ${list.length ? '追加' : '画像を選ぶ'}<input type="file" accept="image/*" data-kind="${kind}" ${multi ? 'multiple' : ''} hidden ${this.busy ? 'disabled' : ''}></label>` : '';
-      return `<div class="ad-mslot"><h4>${label}${kind === 'side' ? ' <small>必須</small>' : ''}</h4><p class="ad-note">${hint}</p><div class="ad-mpics">${pics}${add}</div></div>`;
+      const add = multi || !list.length ? `<label class="ad-mup ${this.busy ? 'off' : ''}">＋ ${list.length ? '追加' : '画像を選ぶ'}<input type="file" accept="image/*" data-kind="${kind}" ${multi ? 'multiple' : ''} hidden ${this.busy ? 'disabled' : ''}></label>
+        <button class="ad-mup ad-mpaste" data-paste="${kind}" ${this.busy ? 'disabled' : ''}>📋 貼り付け</button>` : '';
+      return `<div class="ad-mslot ${kind === target ? 'paste' : ''}" data-slot="${kind}"><h4>${label}${kind === 'side' ? ' <small>必須</small>' : ''}</h4><p class="ad-note">${hint}</p><div class="ad-mpics">${pics}${add}</div></div>`;
     }).join('');
     const p = x.planned;
     const info = p ? `${p.sci ? `<p><em>${esc(p.sci)}</em></p>` : ''}<p class="ad-note">id ${esc(p.id)} ・ 全長 ${p.len}m ・ ${esc(x.places.join('・') || '採取地なし')}</p>${p.note ? `<p class="ad-note">${esc(p.note)}</p>` : ''}` : '<p class="ad-note">リスト外の種です。制作のときに採取地・データも決めます。</p>';
     const status = x.row?.status ?? 'draft';
     const act = locked
       ? `<p class="ad-note">モデルは完成しています（${STATES[x.state][0]}）。</p>`
+      : status === 'hold'
+        ? `<span class="ad-note">保留中です。「未完成」の一覧と制作の取り込みから外れています。</span><button id="ad-munhold" ${this.busy ? 'disabled' : ''}>保留を解く</button>`
       : status === 'draft'
         ? `<button id="ad-mreq" class="primary" ${imgs.some((i) => i.kind === 'side') && !this.busy ? '' : 'disabled'}>モデル制作へ</button>${imgs.some((i) => i.kind === 'side') ? '' : '<span class="ad-note">横からの画像を登録すると依頼できます</span>'}`
         : `<span class="ad-mst ${STATES[x.state][1]}">${STATES[x.state][0]}</span><button id="ad-mcancel" ${this.busy ? 'disabled' : ''}>依頼を取り下げる</button>`;
     return `<h3>${esc(x.name)} <i class="ad-mst ${STATES[x.state][1]}">${STATES[x.state][0]}</i></h3>${info}
+      <p class="ad-note">コピーした画像は Ctrl+V（Mac は ⌘V）で、枠の付いた欄に貼り付けられます。欄をクリックすると貼り付け先が変わります。</p>
       ${slots}
       <label class="ad-field wide"><span>制作メモ（体色・模様・雌雄など、伝えたいこと）</span><textarea id="ad-mmemo" rows="3">${esc(x.row?.memo ?? '')}</textarea></label>
-      <div class="ad-acts"><button id="ad-mmemo-save" ${this.busy ? 'disabled' : ''}>メモを保存</button>${act}${!p && !imgs.length ? '<button id="ad-mdrop" class="danger">この種を一覧から消す</button>' : ''}</div>
+      <div class="ad-acts"><button id="ad-mmemo-save" ${this.busy ? 'disabled' : ''}>メモを保存</button>${act}${!locked && status !== 'hold' ? `<button id="ad-mhold" ${this.busy ? 'disabled' : ''}>保留にする</button>` : ''}${!p && !imgs.length ? '<button id="ad-mdrop" class="danger">この種を一覧から消す</button>' : ''}</div>
       ${this.busy ? '<p class="ad-note">送信中…</p>' : ''}`;
   }
 
@@ -145,9 +194,16 @@ export class ModelingTab {
     if (!edit || !x) return;
     edit.querySelectorAll('input[type=file]').forEach((el) => el.addEventListener('change', () => this._upload(x, el.dataset.kind, [...el.files])));
     edit.querySelectorAll('[data-del]').forEach((el) => el.addEventListener('click', () => this._remove(x, el.dataset.del)));
+    edit.querySelectorAll('[data-slot]').forEach((el) => el.addEventListener('click', () => {
+      this.pasteKind = el.dataset.slot;
+      edit.querySelectorAll('[data-slot]').forEach((s) => s.classList.toggle('paste', s.dataset.slot === this._pasteKind(x)));
+    }));
+    edit.querySelectorAll('[data-paste]').forEach((el) => el.addEventListener('click', () => this._pasteButton(x, el.dataset.paste)));
     edit.querySelector('#ad-mmemo-save')?.addEventListener('click', () => this._save(x, { memo: edit.querySelector('#ad-mmemo').value }, 'メモを保存しました'));
     edit.querySelector('#ad-mreq')?.addEventListener('click', () => this._save(x, { status: 'requested', memo: edit.querySelector('#ad-mmemo').value }, `${x.name}をモデル制作に回しました`));
     edit.querySelector('#ad-mcancel')?.addEventListener('click', () => confirm('制作の依頼を取り下げますか？') && this._save(x, { status: 'draft' }, '依頼を取り下げました'));
+    edit.querySelector('#ad-mhold')?.addEventListener('click', () => this._save(x, { status: 'hold', memo: edit.querySelector('#ad-mmemo').value }, `${x.name}を保留にしました`));
+    edit.querySelector('#ad-munhold')?.addEventListener('click', () => this._save(x, { status: 'draft' }, '保留を解きました'));
     edit.querySelector('#ad-mdrop')?.addEventListener('click', () => this._drop(x));
   }
 
