@@ -164,6 +164,8 @@ export const PLANNED_REEF = [
   q('nishikiebi', 'ニシキエビ', 'Panulirus ornatus', 'lobster', 0.5, 3, 8, 0x4a8a8a, 0xd8e8e8, 0xf0c040, 'pots diving', 'reef palau gbr', '緑や青の美しい模様があるイセエビの仲間の最大種。'),
   q('akashimashirahige', 'アカシマシラヒゲエビ', 'Lysmata amboinensis', 'lobster', 0.06, 2, 3, 0xf0d040, 0xf8f0d0, 0xe8402a, 'diving', 'reef palau', '背中に赤と白の線が走る。魚の口の中まで掃除するクリーナーシュリンプ。'),
   q('furisodeebi', 'フリソデエビ', 'Hymenocera picta', 'lobster', 0.05, 3, 6, 0xf0ece4, 0xf8f4f0, 0x8a4ab8, 'diving', 'reef palau hawaii', '振袖のように平たいはさみを持つ。ヒトデだけを食べる。', { pat: 'spots', mark: 0xd85aa8 }),
+  // 組み立ての体（creatureSlug.js）
+  q('hohobenimo', 'ホホベニモウミウシ', 'Costasiella kuroshimae', 'leafslug', 0.01, 3, 5, 0x5c9e30, 0xf4f2e4, 0xf07aa0, 'diving', 'reef palau', '黒島で見つかった1cmに満たないウミウシ。食べた海藻の葉緑体を背中の突起にためこみ、光合成に使う。', { mark: 0x2a2440, model: true }),
   q('gosikiebi', 'ゴシキエビ', 'Panulirus versicolor', 'lobster', 0.4, 3, 7, 0x4a6aa8, 0xd8e0f0, 0xf0f0f0, 'pots diving', 'reef palau', '青い体に白い線と黒い帯が並ぶ、五色に輝くイセエビの仲間。', { pat: 'bands', bands: 6, mark: 0xf0f0f0 }),
   q('kinchakugani', 'キンチャクガニ', 'Lybia tessellata', 'crab', 0.02, 3, 5, 0xe8b8a0, 0xf8e0d0, 0xd8a090, 'diving', 'reef palau', 'はさみに小さなイソギンチャクを持ち、ポンポンのように振って身を守る。'),
   q('monhanashako', 'モンハナシャコ', 'Odontodactylus scyllarus', 'lobster', 0.15, 3, 6, 0x3a8a4a, 0x8ac8a0, 0xe8402a, 'diving', 'reef palau gbr', 'こぶし状の脚で貝殻を割るほどのパンチを繰り出す。目は16種類の光を見分ける。'),
