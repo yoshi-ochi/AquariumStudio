@@ -84,6 +84,7 @@ import { loadCreatureConfig } from './expedition/creatureConfig.js';
 import { installHoldRepeat } from './ui/holdRepeat.js';
 import { applyCreatureReset, CREATURE_RESET } from './online/betaReset.js';
 import { TankView } from './ui/tankView.js';
+import { TankShots } from './tanks/tankShots.js';
 import { BuildView } from './ui/buildView.js';
 import { MailView } from './ui/mailView.js';
 import { Tutorial } from './ui/tutorial.js';
@@ -134,6 +135,14 @@ async function boot() {
 
   // ---- コア -----------------------------------------------------------------
   const sceneMgr = new SceneManager($('viewport'));
+  // 水槽の一覧（掃除）に出す写真。撮れたら開いている一覧を描き直す（まとめて1回）
+  let shotRedraw = 0;
+  const tankShots = new TankShots(sceneMgr.renderer, {
+    onShot: () => {
+      clearTimeout(shotRedraw);
+      shotRedraw = setTimeout(() => gameSheet.view === 'clean' && gameSheet.render(), 200);
+    },
+  });
   const cameraCtl = new CameraController(sceneMgr.camera, sceneMgr.renderer.domElement);
   const economy = new Economy();
   const inventory = new Inventory();
@@ -716,6 +725,7 @@ async function boot() {
     if (interiorCam.busy) return;
     if (mode === 'hall-edit') return goHome();
     if (mode === 'interior-edit') {
+      if (interior.tank) tankShots.invalidate(interior.tank); // 中を変えたので写真を撮り直す
       interior.detach();
       if (interiorFrom === 'tank') {
         mode = 'tank';
@@ -1321,7 +1331,7 @@ async function boot() {
       if (online.user) await allianceApi.setLocation(p).catch((err) => console.error(err));
     },
   });
-  const cleanView = new CleanView({ manager, economy, ops, toast, getTanks: () => manager.tanks, onChanged: () => shell.update() });
+  const cleanView = new CleanView({ manager, economy, ops, toast, getTanks: () => manager.tanks, onChanged: () => shell.update(), thumb: (t) => tankShots.url(t) });
   const tankView = new TankView({
     manager, expeditions, economy, previews, toast, cleanView,
     careView: life.panels.care.view,
@@ -1618,9 +1628,10 @@ async function boot() {
     life.crowd.update(dt, economy.visitors, visiting ? 80 : ops.satisfaction);
     if (!visiting) ops.update(dt, opsContext, economy);
     customizer.update();
+    tankShots.update(); // 本描画の前に（隅に描いた写真を上書きする）
     sceneMgr.render();
   }
-  if (import.meta.env.DEV) Object.assign(window.__app ?? {}, { frame, setManual: (v) => (manual = v), setMode: (m) => shell.setMode(m), goHome: () => goHome(), gameSheet, mapPage });
+  if (import.meta.env.DEV) Object.assign(window.__app ?? {}, { frame, setManual: (v) => (manual = v), setMode: (m) => shell.setMode(m), goHome: () => goHome(), gameSheet, mapPage, tankShots });
 
   const wait = MIN_SPLASH_MS - (performance.now() - startedAt);
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -1676,6 +1687,7 @@ async function boot() {
   }
   await splash.hide();
   splashDone = true;
+  tankShots.request(manager.tanks); // 一覧の写真を先に撮っておく
   // ダイヤ：有償の残高と権利を読み、閉じている間の1日の評価・今日のログインボーナスを渡す
   await purchases.load();
   dailyReady = true;

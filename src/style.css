@@ -877,3 +877,5 @@ button.lack { opacity: 0.55; }
 .zn-tag { margin-top: auto; color: var(--muted); font-size: 11px; font-weight: 700; }
 .zn-tile.active .zn-tag { color: var(--accent); }
 .zn-span { grid-column: 1 / -1; }
+/* 掃除の水槽タイル：水槽の写真（tanks/tankShots.js） */
+.cl-img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: #dbe9f3; border-radius: 6px; }
