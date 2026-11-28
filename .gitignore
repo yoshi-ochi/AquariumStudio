@@ -1,6 +1,9 @@
 node_modules
 dist
-.claude
+.claude/*
+!.claude/skills/
+!.claude/launch.json
+!.claude/settings.json
 .env.local
 backup/
 reference/
@@ -11,3 +14,7 @@ dist-app
 ios/App/App/public
 ios/App/Pods
 ios/App/output
+# SNS の動画と音は大きいので入れない（台本と道具だけ入れる）
+docs/sns/**/*.mp4
+docs/sns/**/*.wav
+docs/sns/**/*.mov

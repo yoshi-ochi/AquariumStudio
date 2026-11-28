@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>モデル確認ビューア</title>
+    <link rel="stylesheet" href="./viewer.css" />
+  </head>
+  <body>
+    <aside id="mv-side">
+      <input id="mv-search" type="search" placeholder="和名・id で探す" autocomplete="off" />
+      <select id="mv-filter">
+        <option value="made">モデルあり（新しい順）</option>
+        <option value="assembled">組み立ての種</option>
+        <option value="wait">モデル待ち（仮の形）</option>
+        <option value="all">すべて</option>
+      </select>
+      <ul id="mv-list"></ul>
+    </aside>
+    <main id="mv-main">
+      <div id="mv-bar">
+        <span class="mv-group" id="mv-views">
+          <button data-view="side">横</button>
+          <button data-view="front">正面</button>
+          <button data-view="top">上</button>
+          <button data-view="bottom">下</button>
+          <button data-view="back">後ろ</button>
+          <button data-view="quarter">斜め</button>
+        </span>
+        <span class="mv-group">
+          <button id="mv-swim" aria-pressed="false">泳ぐ</button>
+          <button id="mv-spin" aria-pressed="false">回す</button>
+          <button id="mv-wire" aria-pressed="false">ワイヤー</button>
+          <button id="mv-ref" aria-pressed="true">参考画像</button>
+        </span>
+        <span class="mv-group" id="mv-bg">
+          <button data-bg="#0f3d55" title="水の色">■</button>
+          <button data-bg="#10161c" title="暗い">■</button>
+          <button data-bg="#7d8a94" title="灰色">■</button>
+          <button data-bg="#f2f4f5" title="明るい">■</button>
+        </span>
+      </div>
+      <div id="mv-stage">
+        <div id="mv-canvas"></div>
+        <div id="mv-refs"></div>
+      </div>
+      <div id="mv-info">左の一覧から選ぶ（←→ で前後、ドラッグで回転、ホイールで拡大、右ドラッグで移動）</div>
+    </main>
+    <script type="module" src="./viewer.js"></script>
+  </body>
+</html>

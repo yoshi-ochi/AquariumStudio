@@ -14,7 +14,8 @@ export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   envDir: ROOT, // ゲームと同じ .env.local（Supabase の URL・公開キー）
   base: './',
-  server: { port: 5181, strictPort: true, host: true, fs: { allow: [ROOT] } },
+  // PORT：デスクトップアプリが、既定のポートが使用中のときに割り当てる空きポート（複数のセッションで同時に開ける）
+  server: { port: Number(process.env.PORT) || 5181, strictPort: true, host: true, fs: { allow: [ROOT] } },
   preview: { port: 5181, host: true },
   optimizeDeps: { noDiscovery: true, include: [] },
   build: { outDir: OUT, emptyOutDir: true },

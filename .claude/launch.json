@@ -1,0 +1,103 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "dev-offline",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "-e",
+        "process.env.VITE_SUPABASE_URL='';process.env.VITE_SUPABASE_ANON_KEY='';import('vite').then(async v=>{const s=await v.createServer({server:{port:5174,strictPort:true}});await s.listen()})"
+      ],
+      "port": 5174
+    },
+    {
+      "name": "dev-offline-alt",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "-e",
+        "process.env.VITE_SUPABASE_URL='';process.env.VITE_SUPABASE_ANON_KEY='';import('vite').then(async v=>{const s=await v.createServer({server:{port:5176,strictPort:true}});await s.listen()})"
+      ],
+      "port": 5176
+    },
+    {
+      "name": "fish-intake",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tools/fish-intake/server.mjs"
+      ],
+      "port": 5180
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "admin"
+      ],
+      "port": 5181
+    },
+    {
+      "name": "caustics-tile-demo",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "../caustics-tile",
+        "run",
+        "preview",
+        "--",
+        "--port",
+        "5190",
+        "--strictPort"
+      ],
+      "port": 5190
+    },
+    {
+      "name": "app-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--mode",
+        "app",
+        "--port",
+        "5177",
+        "--strictPort"
+      ],
+      "port": 5177
+    },
+    {
+      "name": "thumb-receiver",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tools/thumbs/receive.mjs"
+      ],
+      "port": 5199
+    },
+    {
+      "name": "model-viewer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "viewer"
+      ],
+      "port": 5182
+    },
+    {
+      "name": "prod-web",
+      "url": "https://yoshi-ochi.github.io/AquariumStudio/"
+    },
+    {
+      "name": "prod-admin",
+      "url": "https://yoshi-ochi.github.io/AquariumStudio/admin/"
+    }
+  ]
+}

@@ -12,6 +12,8 @@ export default defineConfig(({ command, mode }) => {
     // 一部の環境（サンドボックス等）ではキャッシュへの書き込みが拒否されるため、
     // 依存の事前バンドルを行わない。three は ESM なのでそのまま読み込める。
     optimizeDeps: { noDiscovery: true, include: [] },
+    // PORT：デスクトップアプリが、既定のポートが使用中のときに割り当てる空きポート（複数のセッションで同時に開ける）
+    server: { port: Number(process.env.PORT) || 5173, strictPort: true },
     // ゲーム本体と、共有された水槽の閲覧ページ（share.html。ログインなしで1つの水槽を見る。アプリには入れない）
     build: {
       outDir: app ? 'dist-app' : 'dist',
