@@ -1,5 +1,6 @@
 import { currentEnvironment } from '../management/environment.js';
 import { icon } from './icons.js';
+import { moneyK } from './currency.js';
 
 const num = (n) => Math.floor(n).toLocaleString('ja-JP');
 
@@ -46,7 +47,8 @@ export class Hud {
     this.$('wlabel').textContent = env.weather.label;
     this.$('clock').textContent = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     this.$('visitors').textContent = num(e.visitors);
-    this.$('money').textContent = num(e.money);
+    this.$('money').textContent = moneyK(e.money);
+    this.$('money').parentElement.title = `${num(e.money)}コイン`;
     this.$('dia').textContent = num(this.wallet?.total ?? 0);
   }
 }
