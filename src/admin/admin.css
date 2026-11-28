@@ -171,3 +171,6 @@ i { font-style: normal; font-size: 11px; padding: 0 4px; border-radius: 4px; bac
 .ad-mup { display: grid; place-items: center; width: 120px; height: 84px; border: 1px dashed var(--accent); border-radius: 8px; color: var(--accent); cursor: pointer; font-size: 13px; }
 .ad-mup.off { opacity: 0.45; pointer-events: none; }
 textarea { resize: vertical; }
+.ad-mslot.paste { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.ad-mslot { cursor: pointer; }
+.ad-mpaste { background: transparent; font: inherit; }
