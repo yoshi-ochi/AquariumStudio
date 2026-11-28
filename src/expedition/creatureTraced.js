@@ -282,7 +282,7 @@ export function tracedParts(c, a) {
     disc(face, [x, y, z], eye.ring, 7, eye.iris, s);
     // 虹彩の中心の盛り上がりより手前に瞳と光を重ねる
     const lift = eye.ring * 0.04 + 0.002;
-    disc(face, [x, y, z + s * lift], eye.pupil, 6, 0x0a0c10, s);
+    disc(face, [x, y, z + s * lift], eye.pupil, 6, eye.pupilHex ?? 0x0a0c10, s);
     disc(face, [x + eye.pupil * 0.35, y + eye.pupil * 0.35, z + s * (lift + eye.pupil * 0.04 + 0.002)], eye.pupil * 0.32, 4, 0xffffff, s);
     const [m0, m1] = mouth.map((p) => P(p, s * aboveSurface(a, p)));
     face.tri(m0, m1, [m1[0], m1[1] - 0.005, m1[2]], 0x3a1608);
