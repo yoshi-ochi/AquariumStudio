@@ -1,6 +1,6 @@
 # モデル作成（魚類・ウミウシ・それ以外）
 
-最終更新：2026-11-28
+最終更新：2026-11-29
 
 ## 分け方（作り方が違うので Skill とセッションを3つに分ける）
 | 分類 | 作り方 | Skill | 主なファイル |
@@ -15,14 +15,16 @@
 - ウミウシは試作のホホベニモウミウシ（`hohobenimo`、三角形522枚）を公開済み。
 - 保留（ユーザーが解くまで作らない）：キタマクラ、キハダ、シノノメサカタザメ、セミエビ（トレースは `_gen/gen25_hold_semiebi.py`）、イイダコ。
 - 参考画像の差し替え待ち：クエ（青く斜め）、ソラスズメダイ（別種に見える）、サザナミヤッコ（斜め）、アカククリ（ぼやけ・緑かぶり）、ヘコアユ（2匹重なり）。
-- 未マージ：PR #97（管理者ツールで参考画像を貼り付けて登録）。
+- リストに無い種は、管理者ツールの「モデル待ち」タブで和名だけで仮登録できる。`npm run species:pull` が「情報が未補完」と出すので、モデルの前に情報を調べて `npm run species:add` で追加予定種に加える（手順は `docs/species-add.md`）。
+- 参考画像の貼り付け登録（PR #97 の内容）は main に入っている。
 
 ## 次にやること
 - 画像が届いた未作成の種を、「追加予定（採取地あり）」から順に作る（`npm run species:pull` で取り込む）。
+- 和名だけの種（`npm run species:add -- --pending`）は、情報を補ってから作る。補った値は報告に一覧で出す。
 
 ## 決まりごと（3分類に共通）
 - 参考画像が届いた種だけ作る。メイン画像はユーザーが選ぶ（Claude が選び直さない）。`memo.txt` は必ず読む。
-- 総称（属・科レベル）の種は作らない。他社ゲーム・作品の絵に見える画像はトレースしない（ユーザーに確認する）。
+- 総称（属・科レベル）の種は作らない（和名だけの仮登録が総称なら、情報を補わずに報告して止める）。他社ゲーム・作品の絵に見える画像はトレースしない（ユーザーに確認する）。
 - 形態の特徴（体形・模様・ひれ・雌雄差など）を毎回調べ、調べたことと反映したことを報告する。
 - 参考画像は計測にだけ使い、アプリに組み込まない（`reference/` は git 管理外）。
 - 確認は `model-viewer`（右のプレビューで全角度ドラッグ、参考画像と並べる）。ユーザーの確認をもらってから本番へ。
@@ -37,5 +39,6 @@
 ## 関連ファイル
 - 種のデータ：`src/expedition/speciesRoster.js`（予定種）、`speciesPlannedJapan.js`・`speciesPlannedReef.js`・`speciesPlannedWorld.js`、`speciesReleases.js`（公開日）
 - 組み立ての入口：`src/expedition/creatureBuilder.js`、行動は `behaviorData.js`
-- 取り込み：`tools/species-pull.mjs`、`tools/fish-intake/README.md`、管理者ツールの「モデル待ち」タブ
+- 取り込み：`tools/species-pull.mjs`、`tools/fish-intake/README.md`、管理者ツールの「モデル待ち」タブ（`src/admin/adminModeling.js`・`src/admin/modelingAdd.js`）
+- 和名だけの種の補完：`docs/species-add.md`、`tools/species-add.mjs`（検証と追記）、`tools/species-lib.mjs`、`src/admin/intakeNames.js`
 - 確認：`tools/model-viewer/`（`npm run viewer`、起動名 `model-viewer`）

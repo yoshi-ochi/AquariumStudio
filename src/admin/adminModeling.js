@@ -3,13 +3,15 @@ import { DESTINATIONS, HIDDEN_PLACES } from '../expedition/creatureData.js';
 import { isModeled } from '../expedition/speciesRelease.js';
 import { RELEASES } from '../expedition/speciesReleases.js';
 import { esc, toast } from './adminUi.js';
+import { addFormHtml, bindAddForm } from './modelingAdd.js';
 
 const GACHA_CAT = { fish: '魚類・古代魚', amphibian: '両生類', reptile: '爬虫類', bird: '鳥類' };
 
 /**
- * モデル待ちタブ：追加予定種（speciesRoster.js）とリスト外の種の一覧。参考画像（横・上・正面・その他）とメモを登録し、
+ * モデル待ちタブ：追加予定種（speciesRoster.js）と、和名だけで仮登録した種の一覧。参考画像（横・上・正面・その他）とメモを登録し、
  * 「モデル制作へ」で制作を依頼する。画像は Supabase の非公開ストレージ species-ref、状況は species_intake 表（supabase/species_intake.sql）。
  * PC 側は npm run species:pull で reference/fish/<和名>/ に取り込み、状況を「制作中」にする。
+ * 仮登録の種（id が c_ で始まる行）は、モデルを作るときに情報を調べて npm run species:add で追加予定種に加える。加えたあとは和名で行とつなぐ。
  */
 const BUCKET = 'species-ref';
 const KINDS = [
@@ -103,9 +105,14 @@ export class ModelingTab {
   _list() {
     const rows = this.rows ?? {};
     const out = PLANNED.map((p) => ({ id: p.id, name: p.name, planned: p, places: p.gacha ? [`卵ガチャ（${GACHA_CAT[p.gacha]}）`] : plannedPlaceIds(p).map(placeName) }));
-    for (const r of Object.values(rows)) if (!out.some((x) => x.id === r.id)) out.push({ id: r.id, name: r.name, places: [] });
+    for (const r of Object.values(rows)) {
+      if (out.some((x) => x.id === r.id)) continue;
+      const hit = out.find((x) => x.name === r.name); // 仮登録を補完して追加予定種になった種は、和名で行とつなぐ
+      if (!hit) out.push({ id: r.id, name: r.name, places: [], row: r });
+      else if (!rows[hit.id]) hit.row = r;
+    }
     for (const x of out) {
-      x.row = rows[x.id];
+      x.row ??= rows[x.id];
       const side = x.row?.images.some((i) => i.kind === 'side');
       x.state = x.planned && RELEASES[x.id] ? 'released' : x.planned && isModeled(x.planned) ? 'modeled' : x.row?.status === 'hold' ? 'hold' : x.row?.status === 'modeling' ? 'modeling' : x.row?.status === 'requested' ? 'requested' : side ? 'ready' : 'wait';
     }
@@ -128,14 +135,14 @@ export class ModelingTab {
       const thumb = side && this.urls.get(side.path) ? `<img src="${esc(this.urls.get(side.path))}" alt="">` : '<span>🐟</span>';
       const n = x.row?.images.length ?? 0;
       return `<li data-id="${esc(x.id)}" class="${this.sel === x.id ? 'sel' : ''}"><div class="ad-mthumb">${thumb}</div>
-        <div><b>${esc(x.name)}</b>${x.planned?.sci ? ` <em>${esc(x.planned.sci)}</em>` : ''}<small>${esc(x.planned ? x.places.join('・') || '採取地なし' : 'リスト外')}${n ? ` ・ 画像${n}枚` : ''}</small></div>
+        <div><b>${esc(x.name)}</b>${x.planned?.sci ? ` <em>${esc(x.planned.sci)}</em>` : ''}<small>${esc(x.planned ? x.places.join('・') || '採取地なし' : '仮登録（情報は未補完）')}${n ? ` ・ 画像${n}枚` : ''}</small></div>
         <i class="ad-mst ${cls(x)}">${STATES[x.state][0]}</i></li>`;
     }).join('');
     const cur = all.find((x) => x.id === this.sel);
     return `<div class="ad-split"><section class="ad-card"><h3>モデル待ちの魚種</h3>
       <p class="ad-note">参考画像を登録して「モデル制作へ」を押すと、制作の対象になります。モデルが出来た種は、次の公開で自動的にゲームへ加わります。</p>
-      <div class="ad-bar"><input id="ad-mq" placeholder="和名・学名で検索" value="${esc(this.q)}"><span>${shown.length}種</span></div><div class="ad-chips">${chips}</div><ul class="ad-mlist">${items || '<p class="ad-note">該当する種はありません。</p>'}</ul>
-      <div class="ad-acts"><button id="ad-mnew">＋ リスト外の種を追加</button></div></section>
+      ${addFormHtml(this)}
+      <div class="ad-bar"><input id="ad-mq" placeholder="和名・学名で検索" value="${esc(this.q)}"><span>${shown.length}種</span></div><div class="ad-chips">${chips}</div><ul class="ad-mlist">${items || '<p class="ad-note">該当する種はありません。</p>'}</ul></section>
       <section class="ad-card ad-edit">${cur ? this._editor(cur) : '<p class="ad-note">一覧の種を選ぶと、画像を登録できます。</p>'}</section></div>`;
   }
 
@@ -151,7 +158,7 @@ export class ModelingTab {
       return `<div class="ad-mslot ${kind === target ? 'paste' : ''}" data-slot="${kind}"><h4>${label}${kind === 'side' ? ' <small>必須</small>' : ''}</h4><p class="ad-note">${hint}</p><div class="ad-mpics">${pics}${add}</div></div>`;
     }).join('');
     const p = x.planned;
-    const info = p ? `${p.sci ? `<p><em>${esc(p.sci)}</em></p>` : ''}<p class="ad-note">id ${esc(p.id)} ・ 全長 ${p.len}m ・ ${esc(x.places.join('・') || '採取地なし')}</p>${p.note ? `<p class="ad-note">${esc(p.note)}</p>` : ''}` : '<p class="ad-note">リスト外の種です。制作のときに採取地・データも決めます。</p>';
+    const info = p ? `${p.sci ? `<p><em>${esc(p.sci)}</em></p>` : ''}<p class="ad-note">id ${esc(p.id)} ・ 全長 ${p.len}m ・ ${esc(x.places.join('・') || '採取地なし')}</p>${p.note ? `<p class="ad-note">${esc(p.note)}</p>` : ''}` : '<p class="ad-note">和名だけの仮登録です。ID・学名・体形・全長・レア度・採取地・解説は、モデルを作るときに調べて補います（補った値は報告されます。全長・レア度・採取地・解説などは、公開後に「魚種」タブで直せます）。</p>';
     const status = x.row?.status ?? 'draft';
     const act = locked
       ? `<p class="ad-note">モデルは完成しています（${STATES[x.state][0]}）。</p>`
@@ -188,7 +195,7 @@ export class ModelingTab {
       el.focus();
       el.setSelectionRange(el.value.length, el.value.length);
     };
-    root.querySelector('#ad-mnew')?.addEventListener('click', () => this._addCustom());
+    bindAddForm(root, this, { list: () => this._list(), add: (name) => this._addCustom(name), open: (id) => ((this.sel = id), (this.filter = 'all'), this.rerender()) });
     const edit = root.querySelector('.ad-edit');
     const x = this._list().find((i) => i.id === this.sel);
     if (!edit || !x) return;
@@ -231,10 +238,10 @@ export class ModelingTab {
 
   async _write(x, patch) {
     const { data: { user } } = await this.sb.auth.getUser();
-    const row = { id: x.id, name: x.name, status: x.row?.status ?? 'draft', images: x.row?.images ?? [], memo: x.row?.memo ?? '', ...patch, updated_at: new Date().toISOString(), updated_by: user.id };
+    const row = { id: x.row?.id ?? x.id, name: x.name, status: x.row?.status ?? 'draft', images: x.row?.images ?? [], memo: x.row?.memo ?? '', ...patch, updated_at: new Date().toISOString(), updated_by: user.id };
     const res = await this.sb.from('species_intake').upsert(row).select().single();
     if (res.error) throw res.error;
-    this.rows[x.id] = res.data;
+    this.rows[res.data.id] = res.data;
   }
 
   async _run(fn, done) {
@@ -278,14 +285,11 @@ export class ModelingTab {
     }, '画像を削除しました');
   }
 
-  _addCustom() {
-    const name = prompt('追加する種の和名')?.trim();
-    if (!name) return;
-    const hit = this._list().find((x) => x.name === name);
-    if (hit) return (this.sel = hit.id), this.rerender();
+  /** 和名だけの仮登録（重複は modelingAdd.js の欄で確かめてある） */
+  _addCustom(name) {
     const x = { id: `c_${Date.now().toString(36)}`, name };
     this.sel = x.id;
-    return this._save(x, {}, `${name}を追加しました`);
+    return this._save(x, {}, `${name}を仮登録しました。参考画像を登録してください`);
   }
 
   _drop(x) {
