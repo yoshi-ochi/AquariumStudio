@@ -78,7 +78,8 @@ export const STORE_IDS = {
   dia10500: 'aquastu.dia10500',
   dia22000: 'aquastu.dia22000',
   pass30: 'aquastu.pass30',
-  team1: 'aquastu.team1',
-  team2: 'aquastu.team2',
-  bigwoodSet: 'aquastu.bigwood',
+  // 非消耗型。最初に消耗型で作ってしまった aquastu.team1・team2・bigwood は使えない（App Store の商品IDは作り直せない）
+  team1: 'aquastu.unlock.team1',
+  team2: 'aquastu.unlock.team2',
+  bigwoodSet: 'aquastu.unlock.bigwood',
 };

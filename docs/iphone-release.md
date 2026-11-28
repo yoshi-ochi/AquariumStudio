@@ -29,10 +29,12 @@
 | aquastu.dia6200 | 消耗型 | ¥3,000 |
 | aquastu.dia10500 | 消耗型 | ¥4,900 |
 | aquastu.dia22000 | 消耗型 | ¥10,000 |
-| aquastu.pass30 | 非更新サブスクリプション（または消耗型） | ¥720 |
-| aquastu.team1 | 非消耗型 | ¥480 |
-| aquastu.team2 | 非消耗型 | ¥480 |
-| aquastu.bigwood | 非消耗型 | ¥480 |
+| aquastu.pass30 | 消耗型（期限はゲームのサーバーで管理） | ¥720 |
+| aquastu.unlock.team1 | 非消耗型 | ¥480 |
+| aquastu.unlock.team2 | 非消耗型 | ¥480 |
+| aquastu.unlock.bigwood | 非消耗型 | ¥480 |
+
+※ `aquastu.team1`・`aquastu.team2`・`aquastu.bigwood` は最初に消耗型で作ってしまったので使わない（App Store の商品IDは種類を変えられず、消しても同じIDを作り直せない）。送信前なら App Store Connect で削除しておく
 
 3. 有料アプリ契約・銀行口座・税務情報を済ませる（これが無いと課金をテストできない）
 
