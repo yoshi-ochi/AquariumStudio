@@ -1,8 +1,8 @@
-import { CATS, PRICE, PITY, MIN_SPECIES, machinesAt, isOpen, waitingOf, oddsOf } from '../gacha/gachaData.js';
+import { CATS, PRICE, PITY, machinesAt, isOpen, oddsOf } from '../gacha/gachaData.js';
 import { RARITY_NAME, getCreature } from '../expedition/creatureData.js';
 import { fmtLeft } from '../management/buildTimes.js';
 import { pickBoost } from './boostPicker.js';
-import { dia } from './currency.js';
+import { dia, diaBtn } from './currency.js';
 import { decorOdds } from '../decor/decor.js';
 
 const RARITY_COLOR = { 1: '#5cb85c', 2: '#3a8ad8', 3: '#9a5ad0', 4: '#d8a400' };
@@ -35,11 +35,11 @@ export class GachaView {
     const c = CATS[cat];
     const head = `<div class="st-head"><b>${egg(cat, 4)} ${c.name}</b><small>入れ替わりまで ${fmtLeft((until - now) / 1000)}</small></div><small>${c.text}</small>`;
     if (!isOpen(cat)) {
-      return `<div class="st-sum gc-machine">${head}<em class="gs-alert">準備中：モデル待ち ${waitingOf(cat)}種（${MIN_SPECIES}種そろうとガチャに並びます）</em></div>`;
+      return `<div class="st-sum gc-machine gc-soon">${head}<em class="gc-soon-note">近日登場 ・ 準備ができしだい引けるようになります</em></div>`;
     }
     const w = this.wallet;
     const left = this.gacha.pityLeft(cat);
-    const btn = (count, price) => `<button data-act="gc-pull" data-id="${cat}:${count}" class="primary" ${!this.busy && w.canAfford(price) ? '' : 'disabled'}>${count === 10 ? '10連' : '1回'} ${dia(price)}</button>`;
+    const btn = (count, price) => `<button ${diaBtn(w, price, 'gc-pull', `${cat}:${count}`, { busy: this.busy })}>${count === 10 ? '10連' : '1回'} ${dia(price)}</button>`;
     const odds = this.odds === cat ? this._odds(cat) : '';
     return `<div class="st-sum gc-machine">${head}
       <small>10連は${RARITY_NAME[3]}以上が1つ確定 ・ ${RARITY_NAME[4]}が出ずに${PITY}回引くと${RARITY_NAME[4]}が確定（あと${left}回）</small>
@@ -67,7 +67,7 @@ export class GachaView {
   /** 内装ガチャ（常設）：水槽台・説明プレート・天井照明のデザインと、観葉植物・和風の館内オブジェ */
   _decor() {
     const w = this.wallet;
-    const btn = (count, price) => `<button data-act="dc-pull" data-id="${count}" class="primary" ${!this.busy && w.canAfford(price) ? '' : 'disabled'}>${count === 10 ? '10連' : '1回'} ${dia(price)}</button>`;
+    const btn = (count, price) => `<button ${diaBtn(w, price, 'dc-pull', count, { busy: this.busy })}>${count === 10 ? '10連' : '1回'} ${dia(price)}</button>`;
     const odds = this.odds === 'decor' ? `<table class="gc-odds">${decorOdds().map((t) => `<tr><th colspan="2">${RARITY_NAME[t.rarity]} ${pct(t.rate)}</th></tr>${t.items.map((s) => `<tr><td>${s.name}</td><td>${pct(s.rate)}</td></tr>`).join('')}`).join('')}</table>` : '';
     const got = this.decorLast?.length ? `<ul class="dc-got">${this.decorLast.map((p) => `<li><b style="color:${RARITY_COLOR[p.rarity]}">${RARITY_NAME[p.rarity]}</b> ${p.name}${p.dup ? `（持っているので ${p.coins.toLocaleString('ja-JP')}コインに）` : ' NEW'}</li>`).join('')}</ul>` : '';
     return `<h4 class="gs-sub">内装ガチャ（いつでも）</h4><div class="st-sum gc-machine"><small>水槽台・説明プレート・天井照明のデザインと、観葉植物・和風の館内オブジェが出ます。出た物は何個でも使えます（置くときはコイン）。持っている物が出たらコインに替わります。</small>
