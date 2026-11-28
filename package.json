@@ -10,6 +10,8 @@
     "fish-intake": "node tools/fish-intake/server.mjs",
     "admin": "vite --config admin/vite.config.js",
     "admin:build": "vite build --config admin/vite.config.js",
+    "viewer": "vite --config tools/model-viewer/vite.config.js",
+    "docs:check": "node tools/docs-check.mjs",
     "species:release": "node tools/species-release.mjs",
     "species:pull": "node tools/species-pull.mjs",
     "share:deploy": "node tools/share-deploy.mjs",

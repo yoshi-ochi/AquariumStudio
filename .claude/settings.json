@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/tools/docs-check.mjs\" --hook",
+            "if": "Bash(gh pr create*)",
+            "timeout": 20,
+            "statusMessage": "資料の更新を確認中"
+          }
+        ]
+      }
+    ]
+  }
+}
