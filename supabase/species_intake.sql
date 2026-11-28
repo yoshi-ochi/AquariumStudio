@@ -12,6 +12,10 @@ create table if not exists public.species_intake (
   updated_by uuid references public.profiles on delete set null
 );
 
+-- 保留（hold）：管理者ツールで後回しにした種。未完成の一覧と species:pull の対象から外れる
+alter table public.species_intake drop constraint if exists species_intake_status_check;
+alter table public.species_intake add constraint species_intake_status_check check (status in ('draft', 'requested', 'modeling', 'hold'));
+
 alter table public.species_intake enable row level security;
 drop policy if exists "intake admin" on public.species_intake;
 create policy "intake admin" on public.species_intake for all to authenticated using (public.is_admin()) with check (public.is_admin());
