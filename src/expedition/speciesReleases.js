@@ -72,4 +72,6 @@ export const RELEASES = {
   biwakoonamazu: '2026-11-28',
   oikawa: '2026-11-28',
   akame: '2026-11-28',
+  // 2026-11-28
+  hohobenimo: '2026-11-28',
 };

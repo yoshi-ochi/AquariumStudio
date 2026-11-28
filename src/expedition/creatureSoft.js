@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { leafSlug } from './creatureSlug.js';
 
 /** 魚以外の体形（カニ・エビ・タコ・ヒラメ・タツノオトシゴ・チンアナゴ）。全長1に正規化 */
 const at = (x, y, z, rx = 0, ry = 0, rz = 0) =>
@@ -199,7 +200,7 @@ function horseshoe(c, { grid, solid }) {
   return parts;
 }
 
-const BUILDERS = { crab, lobster, octopus, flat, seahorse, garden, cuttle, horseshoe };
+const BUILDERS = { crab, lobster, octopus, flat, seahorse, garden, cuttle, horseshoe, leafslug: leafSlug };
 
 /** 該当する体形なら { parts, mode } を返す（mode 3 = 体をくねらせない） */
 export function extraSoftParts(c, helpers) {
@@ -208,6 +209,6 @@ export function extraSoftParts(c, helpers) {
 }
 
 /** 水槽の底付近で暮らす体形 */
-export const BENTHIC_FORMS = new Set(['crab', 'lobster', 'octopus', 'flat', 'garden', 'horseshoe']);
+export const BENTHIC_FORMS = new Set(['crab', 'lobster', 'octopus', 'flat', 'garden', 'horseshoe', 'leafslug']);
 /** その場からあまり動かない体形 */
 export const STATIONARY_FORMS = new Set(['seahorse', 'garden']);

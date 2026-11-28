@@ -78,6 +78,7 @@ const FORM_BEH = {
   squid: B('wander', 0.8, { burst: 4, every: 35, back: true, school: true }),
   cuttle: B('wander', 0.3, { pause: 0.5, layer: [0.05, 0.4], back: true }),
   horseshoe: B('walk', 0.15, { bury: 0.3 }),
+  leafslug: B('walk', 0.08), // ウミウシ：海藻の上をゆっくり這う
   turtle: B('cruise', 0.3, { layer: [0.2, 0.8], events: ['breathe', 'sleep'] }),
   whale: B('cruise', 1.0, { burst: 2.5, every: 40, layer: [0.3, 0.9], events: ['breathe'] }),
 };
@@ -225,5 +226,5 @@ export function behaviorOf(c) {
 }
 
 /** 体の中心から腹（接地面）までの高さ（全長比）。モデルの原点が底にある体形は 0 */
-export const GROUND = { crab: 0, lobster: 0, octopus: 0, flat: 0, garden: 0, horseshoe: 0, dumbo: 0.02, ray: 0.03, shark: 0.07, hammer: 0.07, eel: 0.04, turtle: 0.12, seahorse: 0.3 };
+export const GROUND = { crab: 0, lobster: 0, octopus: 0, flat: 0, garden: 0, horseshoe: 0, leafslug: 0, dumbo: 0.02, ray: 0.03, shark: 0.07, hammer: 0.07, eel: 0.04, turtle: 0.12, seahorse: 0.3 };
 export const groundOf = (c, beh) => beh.ground ?? GROUND[c.form] ?? 0.09;
