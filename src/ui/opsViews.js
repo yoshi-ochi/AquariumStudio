@@ -10,10 +10,13 @@ const span = (s) => {
   return s >= 60 ? `${Math.floor(s / 60)}分` : `${Math.max(0, Math.ceil(s))}秒`;
 };
 
-/** 水槽の掃除：要掃除・掃除中・きれいの3つに分け、2列のタイルで並べる。要掃除はまとめて職員に頼める */
+/** まとめて掃除が使える水族館レベル */
+export const BULK_CLEAN_LEVEL = 3;
+
+/** 水槽の掃除：要掃除・掃除中・きれいの3つに分け、水槽の写真つきタイルで並べる。要掃除はまとめて職員に頼める（Lv3から） */
 export class CleanView {
-  constructor({ manager, economy, ops, toast, getTanks, onChanged }) {
-    Object.assign(this, { manager, economy, ops, toast, getTanks, onChanged });
+  constructor({ manager, economy, ops, toast, getTanks, onChanged, thumb }) {
+    Object.assign(this, { manager, economy, ops, toast, getTanks, onChanged, thumb });
     this.showClean = false; // きれいな水槽の一覧を開いているか
   }
 
@@ -29,7 +32,10 @@ export class CleanView {
     const busy = tanks.filter(isCleaning);
     const clean = tanks.filter((t) => !isCleaning(t) && !needsCleaning(t, now));
     const plan = this._bulkPlan(need);
-    const bulk = need.length
+    const level = this.economy.stage.level;
+    const bulk = level < BULK_CLEAN_LEVEL
+      ? `<button class="tv-wide" disabled>🔒 まとめて掃除</button><small>水族館レベル${BULK_CLEAN_LEVEL}で解放（現在 Lv${level}）</small>`
+      : need.length
       ? `<button data-act="clean-all" class="primary tv-wide" ${plan.count ? '' : 'disabled'}>まとめて掃除 ${plan.count}基 ・ ${yen(plan.cost)}</button>
         ${plan.count < need.length ? `<small>${plan.why}</small>` : ''}`
       : '<small>掃除が必要な水槽はありません</small>';
@@ -69,15 +75,22 @@ export class CleanView {
 
   /** 水槽シート（tankView）用：1基分のタイル */
   _row(t, now) {
-    return this._tile(t, now);
+    return this._tile(t, now, false);
   }
 
-  _tile(t, now) {
+  /** 水槽の写真（撮るまでは無地の枠） */
+  _img(t) {
+    const url = this.thumb?.(t);
+    return url ? `<img class="cl-img" src="${url}" alt="" draggable="false">` : '<i class="cl-img"></i>';
+  }
+
+  _tile(t, now, img = true) {
     const spec = cleanSpec(t.userData.defId);
     const uid = t.userData.uid;
     const name = esc(tankLabel(this.manager, t));
+    const pic = img ? this._img(t) : '';
     if (isCleaning(t)) {
-      return `<div class="cl-tile busy"><b>${name}</b><small>掃除中 ・ 残り <span data-until="${t.userData.clean.until}">${span((t.userData.clean.until - now) / 1000)}</span></small></div>`;
+      return `<div class="cl-tile busy">${pic}<b>${name}</b><small>掃除中 ・ 残り <span data-until="${t.userData.clean.until}">${span((t.userData.clean.until - now) / 1000)}</span></small></div>`;
     }
     const dirt = dirtLevel(t, now);
     const need = dirt >= 1;
@@ -91,7 +104,7 @@ export class CleanView {
     if (spec.diver) {
       buttons.push(`<button data-act="clean-diver" data-id="${uid}" ${this.economy.canAfford(spec.diver.cost) ? '' : 'disabled'}>ダイバー ${yen(spec.diver.cost)}</button>`);
     }
-    return `<div class="cl-tile ${need ? 'need' : ''}"><b>${name}</b>${status}${bar}${buttons.join('')}</div>`;
+    return `<div class="cl-tile ${need ? 'need' : ''}">${pic}<b>${name}</b>${status}${bar}${buttons.join('')}</div>`;
   }
 
   act(act, id) {
@@ -100,6 +113,7 @@ export class CleanView {
       return true;
     }
     if (act === 'clean-all') {
+      if (this.economy.stage.level < BULK_CLEAN_LEVEL) return true;
       const now = Date.now();
       const { picks } = this._bulkPlan([...this.getTanks()].filter((t) => needsCleaning(t, now)).sort((a, b) => dirtLevel(b, now) - dirtLevel(a, now)));
       for (const t of picks) {
