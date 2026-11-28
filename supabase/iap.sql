@@ -75,13 +75,14 @@ begin
     end if;
     perform public.iap_add_paid(p_user, v_sign * 5000, 'iap:' || p_product);
     v_result := 'pass ' || v_sign;
-  elsif p_product in ('aquastu.team1', 'aquastu.team2') then
-    -- 調査隊の永久解放：1隊目・2隊目を別に記録し、合計を team に入れる（復元で二重にならない）
-    perform public.iap_set_count(p_user, replace(p_product, 'aquastu.', ''), greatest(0, v_sign));
+  elsif p_product in ('aquastu.unlock.team1', 'aquastu.unlock.team2') then
+    -- 調査隊の永久解放（非消耗型）：1隊目・2隊目を別に記録し、合計を team に入れる（復元で二重にならない）
+    -- 旧ID aquastu.team1・team2 は消耗型で作ってしまったため使わない
+    perform public.iap_set_count(p_user, replace(p_product, 'aquastu.unlock.', ''), greatest(0, v_sign));
     select count(*) filter (where count > 0) into v_cur from public.entitlements where user_id = p_user and product in ('team1', 'team2');
     perform public.iap_set_count(p_user, 'team', v_cur);
     v_result := 'team ' || v_cur;
-  elsif p_product = 'aquastu.bigwood' then
+  elsif p_product = 'aquastu.unlock.bigwood' then
     perform public.iap_set_count(p_user, 'bigwoodSet', greatest(0, v_sign));
     v_result := 'bigwood ' || v_sign;
   else
