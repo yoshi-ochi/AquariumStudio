@@ -47,6 +47,7 @@ export class Catalog {
       .join('');
     this.cardsEl.hidden = !!extra;
     if (!extra) this._renderCards();
+    this.cardsEl.scrollLeft = 0; // タブを替えたら先頭のカードから
     this.onTab?.(id, !!extra);
   }
 

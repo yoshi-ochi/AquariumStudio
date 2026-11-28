@@ -42,6 +42,7 @@ import { FriendPanel } from './ui/friendPanel.js';
 import { runLoginGate } from './ui/loginGate.js';
 import { showNewSpecies } from './ui/newSpecies.js';
 import { coin } from './ui/currency.js';
+import { watchScrollReset } from './ui/scrollReset.js';
 import { Hud } from './ui/hud.js';
 import { BottomNav } from './ui/bottomNav.js';
 import { GameSheet } from './ui/gameSheet.js';
@@ -1353,6 +1354,8 @@ async function boot() {
     syncMailBadge();
     if (gameSheet.view === 'mail') gameSheet.render();
   });
+  // スクロールする画面は開くたびに先頭から表示する
+  watchScrollReset(['editor', 'detail-panel', 'room-panel', 'build-panel', 'expand-panel', 'menu-sheet', 'friend-sheet', 'layout-picker', 'map-page', 'fishing-scene', 'offline-report']);
   const gameSheet = new GameSheet({
     el: $('game-sheet'), economy, inventory, expeditions, ops, previews, toast,
     panels: {
@@ -1617,7 +1620,7 @@ async function boot() {
     customizer.update();
     sceneMgr.render();
   }
-  if (import.meta.env.DEV) Object.assign(window.__app ?? {}, { frame, setManual: (v) => (manual = v), setMode: (m) => shell.setMode(m), goHome: () => goHome() });
+  if (import.meta.env.DEV) Object.assign(window.__app ?? {}, { frame, setManual: (v) => (manual = v), setMode: (m) => shell.setMode(m), goHome: () => goHome(), gameSheet, mapPage });
 
   const wait = MIN_SPLASH_MS - (performance.now() - startedAt);
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
