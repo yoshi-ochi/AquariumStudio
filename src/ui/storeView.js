@@ -7,6 +7,15 @@ import { icon } from './icons.js';
 
 const date = (t) => new Date(t).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const kindName = { catch: '採取倍', boost: '加速', nurse: '保育管理', event: 'イベントカード' };
+/** 種類ごとの説明（カードには名前・所持数・値段だけを出す） */
+const kindNote = {
+  catch: '遠征の成果を見てから使い、受け取る数を増やす（合同調査を除く）',
+  boost: '建築・遠征・繁殖（産卵・ふ化）・卵のふ化の残り時間を縮める',
+  nurse: '保育中の世話を、その時間ぶん自動で済ませる',
+  event: '館内イベントを1回開催できる',
+};
+/** カードの名前：見出しの種類名と重なる頭の部分を省く（「イベントカード：特別展」→「特別展」、「加速 1分」→「1分」） */
+const shortName = (it) => it.name.replace(/^(イベントカード：|加速 |保育管理 )/, '');
 
 /**
  * ショップ：ダイヤの財布・両替・毎日のダイヤ・工事・アイテム・館長パス・調査隊の永久解放・ダイヤのパック。
@@ -33,9 +42,8 @@ export class StoreView {
       <small>清掃完了 ${dia(EARN.clean)}/回 ・ 今日あと${d.cleanLeft}回 ・ 1日の評価 S ${EARN.daily.S}〜C ${EARN.daily.C}</small></div>`;
     const job = this.builder.construction.jobs[0];
     const work = `<h4 class="gs-sub">工事</h4>${job ? `<div class="gs-row"><div class="gs-info"><b>${job.label}</b>${jobHtml(job)}</div>${boostButton(job)}</div>` : '<p class="gs-empty">進めている工事はありません。増築・昇格・生け簀の工事は同時に1件です。</p>'}`;
-    const rows = ITEMS.map((it) => `<div class="gs-row"><div class="gs-info"><b>${it.name}</b><small>${it.text} ・ 所持 ${this.items.count(it.id)}</small></div>
-      <button ${diaBtn(w, it.price, 'st-item', it.id)}>${dia(it.price)}</button></div>`);
-    const groups = Object.keys(kindName).map((k) => `<h4 class="gs-sub">${kindName[k]}</h4>${rows.filter((_, i) => ITEMS[i].kind === k).join('')}`).join('');
+    const card = (it) => `<div class="st-item" title="${it.text}"><b>${shortName(it)}</b><small>所持 ${this.items.count(it.id)}</small><button ${diaBtn(w, it.price, 'st-item', it.id)}>${dia(it.price)}</button></div>`;
+    const groups = Object.keys(kindName).map((k) => `<h4 class="gs-sub">${kindName[k]}</h4><p class="st-note">${kindNote[k]}</p><div class="st-items">${ITEMS.filter((it) => it.kind === k).map(card).join('')}</div>`).join('');
     const buy = (id, yen, ok = true) => `<button data-act="st-buy" data-id="${id}" class="primary" ${canBuy && ok && !this.busy ? '' : 'disabled'}>${this.purchases.priceLabel(id, yen)}${dev ? '（テスト）' : ''}</button>`;
     const pass = `<h4 class="gs-sub">館長パス（${PASS.days}日）</h4><div class="gs-row"><div class="gs-info"><b>館長パス</b>
       <small>放置収入の上限${PASS.offlineHours}時間 ・ 調査隊+${PASS.teams}（期間中） ・ 採取倍${PASS.catchCards}枚 ・ ${PASS.dia.toLocaleString('ja-JP')}ダイヤ</small>

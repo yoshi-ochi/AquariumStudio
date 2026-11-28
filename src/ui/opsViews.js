@@ -10,10 +10,11 @@ const span = (s) => {
   return s >= 60 ? `${Math.floor(s / 60)}分` : `${Math.max(0, Math.ceil(s))}秒`;
 };
 
-/** 水槽の掃除 */
+/** 水槽の掃除：要掃除・掃除中・きれいの3つに分け、2列のタイルで並べる。要掃除はまとめて職員に頼める */
 export class CleanView {
   constructor({ manager, economy, ops, toast, getTanks, onChanged }) {
     Object.assign(this, { manager, economy, ops, toast, getTanks, onChanged });
+    this.showClean = false; // きれいな水槽の一覧を開いているか
   }
 
   get _free() {
@@ -23,32 +24,95 @@ export class CleanView {
   html() {
     const now = Date.now();
     const tanks = [...this.getTanks()].sort((a, b) => dirtLevel(b, now) - dirtLevel(a, now));
-    const rows = tanks.map((t) => this._row(t, now));
-    return `<p class="gs-empty">空いている清掃員 ${Math.max(0, this._free)}/${this.ops.staff.cleaner}人</p>${rows.join('') || '<p class="gs-empty">水槽がありません。</p>'}`;
+    if (!tanks.length) return '<p class="gs-empty">水槽がありません。</p>';
+    const need = tanks.filter((t) => needsCleaning(t, now));
+    const busy = tanks.filter(isCleaning);
+    const clean = tanks.filter((t) => !isCleaning(t) && !needsCleaning(t, now));
+    const plan = this._bulkPlan(need);
+    const bulk = need.length
+      ? `<button data-act="clean-all" class="primary tv-wide" ${plan.count ? '' : 'disabled'}>まとめて掃除 ${plan.count}基 ・ ${yen(plan.cost)}</button>
+        ${plan.count < need.length ? `<small>${plan.why}</small>` : ''}`
+      : '<small>掃除が必要な水槽はありません</small>';
+    const head = `<div class="st-sum cl-sum"><div class="cl-stats">
+        <span class="${need.length ? 'bad' : ''}"><b>${need.length}</b>要掃除</span><span><b>${busy.length}</b>掃除中</span><span><b>${clean.length}</b>きれい</span><span><b>${Math.max(0, this._free)}/${this.ops.staff.cleaner}</b>空き清掃員</span>
+      </div>${bulk}</div>`;
+    const grid = (list) => `<div class="cl-grid">${list.map((t) => this._tile(t, now)).join('')}</div>`;
+    const sec = (title, list) => (list.length ? `<h4 class="gs-sub">${title} ${list.length}基</h4>${grid(list)}` : '');
+    const cleanSec = clean.length
+      ? `<button data-act="clean-more" class="gs-fold">${this.showClean ? '▲' : '▼'} きれいな水槽 ${clean.length}基</button>${this.showClean ? grid(clean) : ''}`
+      : '';
+    return `${head}${sec('掃除が必要', need)}${sec('掃除中', busy)}${cleanSec}`;
   }
 
+  /** まとめて掃除：職員で頼める要掃除の水槽を、汚れている順に人数と所持金の範囲で選ぶ */
+  _bulkPlan(need) {
+    let free = this._free;
+    let money = this.economy.money;
+    const picks = [];
+    let lackStaff = false;
+    for (const t of need) {
+      const st = cleanSpec(t.userData.defId).staff;
+      if (!st) continue;
+      if (free < st.crew) {
+        lackStaff = true;
+        continue;
+      }
+      if (money < st.cost) continue;
+      free -= st.crew;
+      money -= st.cost;
+      picks.push(t);
+    }
+    const cost = picks.reduce((s, t) => s + cleanSpec(t.userData.defId).staff.cost, 0);
+    const why = lackStaff ? '清掃員が足りない分は、空いてから頼めます（スタッフで増やせます）' : 'ダイバーが必要な水槽は1基ずつ頼んでください';
+    return { picks, count: picks.length, cost, why };
+  }
+
+  /** 水槽シート（tankView）用：1基分のタイル */
   _row(t, now) {
+    return this._tile(t, now);
+  }
+
+  _tile(t, now) {
     const spec = cleanSpec(t.userData.defId);
     const uid = t.userData.uid;
     const name = esc(tankLabel(this.manager, t));
     if (isCleaning(t)) {
-      return `<div class="gs-row"><div class="gs-info"><b>${name}</b><small>掃除中 ・ 残り <span data-until="${t.userData.clean.until}">${span((t.userData.clean.until - now) / 1000)}</span></small></div></div>`;
+      return `<div class="cl-tile busy"><b>${name}</b><small>掃除中 ・ 残り <span data-until="${t.userData.clean.until}">${span((t.userData.clean.until - now) / 1000)}</span></small></div>`;
     }
-    const need = needsCleaning(t, now);
-    const left = (1 - dirtLevel(t, now)) * spec.interval;
-    const status = need ? '<em class="gs-alert">掃除が必要です</em>' : `次の掃除まで ${span(left)}`;
+    const dirt = dirtLevel(t, now);
+    const need = dirt >= 1;
+    const status = need ? '' : `<small>次まで ${span((1 - dirt) * spec.interval)}</small>`;
+    const bar = `<i class="cl-bar ${need ? 'bad' : ''}"><i style="width:${Math.min(100, Math.round(dirt * 100))}%"></i></i>`;
     const buttons = [];
     if (spec.staff) {
       const ok = this._free >= spec.staff.crew && this.economy.canAfford(spec.staff.cost);
-      buttons.push(`<button data-act="clean-staff" data-id="${uid}" class="primary" ${ok ? '' : 'disabled'}>職員${spec.staff.crew}人 ${yen(spec.staff.cost)}</button>`);
+      buttons.push(`<button data-act="clean-staff" data-id="${uid}" class="${need ? 'primary' : ''}" title="職員${spec.staff.crew}人で掃除" ${ok ? '' : 'disabled'}>職員${spec.staff.crew} ${yen(spec.staff.cost)}</button>`);
     }
     if (spec.diver) {
       buttons.push(`<button data-act="clean-diver" data-id="${uid}" ${this.economy.canAfford(spec.diver.cost) ? '' : 'disabled'}>ダイバー ${yen(spec.diver.cost)}</button>`);
     }
-    return `<div class="gs-row wrap"><div class="gs-info"><b>${name}</b><small>${status}</small></div><div class="gs-btns">${buttons.join('')}</div></div>`;
+    return `<div class="cl-tile ${need ? 'need' : ''}"><b>${name}</b>${status}${bar}${buttons.join('')}</div>`;
   }
 
   act(act, id) {
+    if (act === 'clean-more') {
+      this.showClean = !this.showClean;
+      return true;
+    }
+    if (act === 'clean-all') {
+      const now = Date.now();
+      const { picks } = this._bulkPlan([...this.getTanks()].filter((t) => needsCleaning(t, now)).sort((a, b) => dirtLevel(b, now) - dirtLevel(a, now)));
+      for (const t of picks) {
+        const st = cleanSpec(t.userData.defId).staff;
+        if (!this.economy.spend(st.cost)) break;
+        startCleaning(t, st.seconds, st.crew);
+      }
+      if (picks.length) {
+        this.toast(`${picks.length}基の掃除を始めました`);
+        this.onChanged();
+      }
+      return true;
+    }
     if (act !== 'clean-staff' && act !== 'clean-diver') return false;
     const tank = this.manager.objects.get(+id);
     if (!tank || isCleaning(tank)) return true;
