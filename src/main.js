@@ -41,6 +41,7 @@ import { AutoSave } from './online/autoSave.js';
 import { FriendPanel } from './ui/friendPanel.js';
 import { runLoginGate } from './ui/loginGate.js';
 import { showNewSpecies } from './ui/newSpecies.js';
+import { coin } from './ui/currency.js';
 import { Hud } from './ui/hud.js';
 import { BottomNav } from './ui/bottomNav.js';
 import { GameSheet } from './ui/gameSheet.js';
@@ -501,7 +502,8 @@ async function boot() {
       }
       active.startPlacement(id);
     },
-    priceLabel: (def) => (def.category === CATEGORY.TANK ? `所持 ${inventory.count(def.id)}` : null),
+    // 水槽：持っていれば所持数、無ければ値段（押すと取引先が開く）
+    priceLabel: (def) => (def.category !== CATEGORY.TANK ? null : inventory.count(def.id) > 0 ? `所持 ${inventory.count(def.id)}` : `<b class="card-buy">購入 ${coin(def.price)}</b>`),
     // 内装ガチャの物は出るまで並べない。大型流木はダイヤで解放してから置ける
     isOwned: (def) => decor.ownsDef(def),
     onUnlock: async (def) => {
@@ -1572,6 +1574,7 @@ async function boot() {
 
   const clock = new THREE.Clock();
   let splashDone = false; // スプラッシュを閉じてから（セーブ反映後に）チュートリアルを判定する
+  let introDone = false; // 起動時のお知らせ（新しい生き物）を閉じてからチュートリアルを出す（重ねない）
   let manual = false; // 開発用：録画中は時計を止め、frame() を外から1コマずつ呼ぶ
   let lastFrame = 0;
   sceneMgr.renderer.setAnimationLoop((t) => {
@@ -1607,7 +1610,7 @@ async function boot() {
     room.updateCut(sceneMgr.camera.position.distanceTo(cameraCtl.controls.target), dt);
     room.updateOcclusion(sceneMgr.camera.position, cameraCtl.controls.target, dt);
     life.crowd.setVisible(showVisitors && views.mode === 'floor' && mode !== 'interior-edit' && mode !== 'tank' && !mapPage.isOpen);
-    if (!visiting && splashDone) tutorial.check();
+    if (!visiting && introDone) tutorial.check();
     if (guide.active) guide.update(guideState(time), !visiting && splashDone);
     life.crowd.update(dt, economy.visitors, visiting ? 80 : ops.satisfaction);
     if (!visiting) ops.update(dt, opsContext, economy);
@@ -1676,7 +1679,8 @@ async function boot() {
   daily.catchUp();
   daily.tick();
   // 前回から追加された魚種・採取地を知らせる（他人の水族館を見ているときは出さない）
-  if (!visiting) showNewSpecies({ previews, uid: online.user?.id, onOpenMap: () => mapPage.open() }).catch((err) => console.warn(err));
+  if (!visiting) await showNewSpecies({ previews, uid: online.user?.id, onOpenMap: () => mapPage.open() }).catch((err) => console.warn(err));
+  introDone = true;
 }
 
 boot().catch((err) => {

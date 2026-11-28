@@ -60,10 +60,13 @@ export function showNewSpecies({ previews, uid, onOpenMap }) {
       .map((c) => `<li class="ns-card">${creatureThumb(previews, c.id)}<span class="ns-text"><b>${esc(c.name)}</b><small>${esc(placeOf(c.id))}</small><small class="ns-meta"><span class="ns-r r${c.rarity}">${RARITY_NAME[c.rarity]}</span>${day(c.released)} 追加</small></span></li>`)
       .join('');
     const placeHtml = places.map((d) => `<li><b>${esc(d.name)}</b><small>${esc(d.text)}</small></li>`).join('');
+    // 見出しと閉じるボタンは固定し、一覧だけをスクロールする（長い一覧でも閉じるボタンが見える）
     el.innerHTML = `<div class="ns-box">
-      <h2>${first ? '最近追加された生き物' : '新しく追加された生き物'}</h2>
-      ${species.length ? `<p class="ns-lead">${species.length}種が採取できるようになりました</p><ul class="ns-grid">${cards}</ul>` : ''}
-      ${places.length ? `<h3>新しい採取地</h3><ul class="ns-places">${placeHtml}</ul>` : ''}
+      <div class="ns-head"><h2>${first ? '最近追加された生き物' : '新しく追加された生き物'}</h2><button type="button" class="ns-x" data-act="close" aria-label="閉じる">✕</button></div>
+      <div class="ns-body">
+        ${species.length ? `<p class="ns-lead">${species.length}種が採取できるようになりました</p><ul class="ns-grid">${cards}</ul>` : ''}
+        ${places.length ? `<h3>新しい採取地 ${places.length}か所</h3><ul class="ns-places">${placeHtml}</ul>` : ''}
+      </div>
       <div class="ns-actions">${places.length && onOpenMap ? '<button type="button" data-act="map">地図で見る</button>' : ''}<button type="button" class="primary" data-act="close">閉じる</button></div>
     </div>`;
     const close = (act) => {
@@ -78,6 +81,6 @@ export function showNewSpecies({ previews, uid, onOpenMap }) {
       else if (e.target === el) close('close');
     });
     document.body.append(el);
-    el.querySelector('[data-act=close]').focus();
+    el.querySelector('.ns-actions [data-act=close]').focus({ preventScroll: true });
   });
 }
