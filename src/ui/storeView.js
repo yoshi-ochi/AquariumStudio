@@ -83,15 +83,20 @@ export class StoreView {
       this.purchases.restore().then(() => {
         this.toast('購入を復元しました');
         this.onChange?.();
-      }, (err) => this.toast(err.message, { error: true }));
+      }, (err) => this.toast(`復元できませんでした：${err?.message ?? err}`, { error: true, duration: 10000 }));
     } else if (act === 'st-buy') {
       if (this.busy) return true;
       this.busy = true;
+      if (this.purchases.mode === 'store') this.toast('App Store に接続しています…');
       this.purchases.buy(id).finally(() => (this.busy = false)).then((ok) => {
         if (ok === false) return this.onChange?.(); // やめた
         this.toast('購入しました');
         this.onChange?.();
-      }, (err) => this.toast(err.message, { error: true }));
+      }, (err) => {
+        // 原因が読めるように長めに出し、ボタンを押せる状態に戻す
+        this.toast(`購入できませんでした：${err?.message ?? err}`, { error: true, duration: 10000 });
+        this.onChange?.();
+      });
     } else return false;
     return true;
   }

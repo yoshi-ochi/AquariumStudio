@@ -30,6 +30,9 @@ function writeDev(v) {
   }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** 応答が無いまま止まらないように、決まった時間で失敗にする（どの段階で止まったかを画面に出す） */
+const withTimeout = (p, ms, label) =>
+  Promise.race([p, sleep(ms).then(() => { throw new Error(`${label}が${ms / 1000}秒たっても応答しません`); })]);
 const BIGWOOD_KEYS = () => INTERIOR_DEFS.filter((d) => d.unlock === 'dia').map((d) => objKey(d.id));
 
 export class Purchases {
@@ -59,10 +62,18 @@ export class Purchases {
   async _store() {
     if (this.rc) return this.rc;
     const uid = this.online?.user?.id;
-    if (!RC_KEY) throw new Error('App内課金の設定（VITE_REVENUECAT_IOS_KEY）がありません');
+    if (!RC_KEY) throw new Error('App内課金の設定（VITE_REVENUECAT_IOS_KEY）がありません。ビルドの環境変数を確認してください');
     if (!uid) throw new Error('購入するにはログインしてください');
-    const { Purchases: RC } = await import('@revenuecat/purchases-capacitor');
-    await RC.configure({ apiKey: RC_KEY, appUserID: uid });
+    // 起動時の読み込みと購入ボタンが同時に呼んでも、準備は1回だけ
+    this._rcReady ??= (async () => {
+      const { Purchases: RC } = await import('@revenuecat/purchases-capacitor');
+      await withTimeout(RC.configure({ apiKey: RC_KEY, appUserID: uid }), 15000, 'RevenueCat の準備');
+      return RC;
+    })().catch((err) => {
+      this._rcReady = null; // 次に押したときにやり直す
+      throw err;
+    });
+    const RC = await this._rcReady;
     this.rc = RC;
     this._loadPrices().catch((err) => console.warn('値段の読み込みに失敗', err.message));
     return RC;
@@ -128,9 +139,10 @@ export class Purchases {
     if (productId === TEAM_UNLOCK.id && this.wallet.teams >= TEAM_UNLOCK.max) throw new Error('これ以上解放できません');
     const RC = await this._store();
     const id = this.storeId(productId);
-    const { products } = await RC.getProducts({ productIdentifiers: [id] });
+    const { products } = await withTimeout(RC.getProducts({ productIdentifiers: [id] }), 20000, 'App Store からの商品の読み込み');
     const product = products?.[0];
-    if (!product) throw new Error('商品が見つかりません（App Store の設定を確認してください）');
+    // App Store が商品を返さない：有料アプリ契約が有効でない・商品が「送信準備完了」でない・IDが違う、のどれか
+    if (!product) throw new Error(`App Store に商品 ${id} がありません（有料アプリ契約と商品の状態を確認してください）`);
     try {
       await RC.purchaseStoreProduct({ product });
     } catch (err) {
