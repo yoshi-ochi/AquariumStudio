@@ -114,6 +114,7 @@ export function buildLiveRock(g, def, { seed = 1, shape = 0 } = {}) {
 
   const mesh = finish(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true })));
   mesh.name = 'rock';
+  mesh.userData.solid = true; // すき間なく閉じた形（tankClip.js：切り口をふたでふさげる）
   g.add(mesh);
 }
 

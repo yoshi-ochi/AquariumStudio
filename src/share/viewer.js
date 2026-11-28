@@ -79,7 +79,7 @@ async function start(snap) {
   }
   $('sv-msg').textContent = '';
   const view = $('sv-view');
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true }); // stencil：岩の切り口（tanks/clipCapPass.js）
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   view.appendChild(renderer.domElement);
