@@ -175,3 +175,7 @@ textarea { resize: vertical; }
 .ad-mslot.paste { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
 .ad-mslot { cursor: pointer; }
 .ad-mpaste { background: transparent; font: inherit; }
+.ad-mnew { margin: 8px 0; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; }
+.ad-mnew .ad-bar { margin-bottom: 0; }
+.ad-note.ok { color: var(--accent); }
+.ad-note.warn { color: var(--danger); }

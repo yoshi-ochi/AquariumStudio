@@ -12,7 +12,7 @@ npm run fish-intake
 - `reference/fish/<和名>/main.jpg` … メインの参考画像（モデルの輪郭・体色の基準）
 - `reference/fish/<和名>/ref-*.jpg` … 他の角度などの補助画像
 - `reference/fish/<和名>/memo.txt` … Claude への指示メモ
-- `reference/fish/_custom.json` … リスト外から追加した魚種
+- `reference/fish/_custom.json` … リスト外から追加した魚種（和名だけ。情報が未補完。補う手順は `docs/species-add.md`）
 - 以前の形式 `reference/fish/<和名>.png` もメイン画像として扱う
 
 ## 追加予定種と本番への公開

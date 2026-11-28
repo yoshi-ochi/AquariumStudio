@@ -14,6 +14,7 @@
     "docs:check": "node tools/docs-check.mjs",
     "species:release": "node tools/species-release.mjs",
     "species:pull": "node tools/species-pull.mjs",
+    "species:add": "node tools/species-add.mjs",
     "share:deploy": "node tools/share-deploy.mjs",
     "app:build": "vite build --mode app && cap sync ios",
     "app:ios": "cap open ios"

@@ -8,6 +8,7 @@
 | `docs/spec.md` | メインの仕様書（ゲームの機能・画面・フォルダの地図） |
 | `docs/monetization.md` | 通貨と課金の設計（コイン・ダイヤ・ガチャ・繁殖・保護区・段階） |
 | `docs/iphone-release.md` | iPhone アプリ版と App内課金の手順（外部サービスの設定） |
+| `docs/species-add.md` | 和名だけで仮登録した種の情報を補う手順（`npm run species:add`） |
 
 ## 領域ごとの資料（セッションはこの1つだけ読む）
 | 領域 | 資料 | Skill |
