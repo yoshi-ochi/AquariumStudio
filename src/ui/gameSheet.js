@@ -47,9 +47,19 @@ export class GameSheet {
 
   /** panels のキー（expedition / clean / staff / shop）を開く */
   openPanel(id) {
+    if (this.view !== id) this.el.querySelector('.gs-list')?.scrollTo?.(0, 0); // 別の画面のスクロール位置を引き継がない
     this.view = id;
     this.el.hidden = false;
     this.render();
+  }
+
+  /** ダイヤが足りないとき：ショップのダイヤ購入を開く（short は足りない数） */
+  openStore(short = 0) {
+    if (short > 0) this.toast(`ダイヤが${short.toLocaleString('ja-JP')}足りません`, { error: true });
+    this.openPanel('store');
+    const list = this.el.querySelector('.gs-list');
+    const packs = this.el.querySelector('#st-packs');
+    if (list && packs) list.scrollTop += packs.getBoundingClientRect().top - list.getBoundingClientRect().top - 8;
   }
 
   openFeature(id) {
@@ -150,6 +160,7 @@ export class GameSheet {
     if (act === 'close') return this.close();
     if (act === 'open-build') return this.openPanel('build');
     if (act === 'build-back') return this.openItems('stock');
+    if (act === 'go-store') return this.openStore(+id);
     if (act === 'tab') {
       this.view = id;
       this.creatureView.picking = null;

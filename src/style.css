@@ -802,3 +802,14 @@ body.editing #hud .hud-stat.money, body[data-mode=tank] #hud .hud-stat.money { g
 .rv-cell.sel { border-color: #ffb300; }
 .rv-icons { display: flex; gap: 2px; }
 .rv-icons img, .rv-icons .ct { width: 22px; height: 16px; object-fit: contain; }
+
+/* ---------- ショップ：ダイヤ購入・不足時の案内 ---------- */
+.hud-plus { display: grid; place-items: center; width: 15px; height: 15px; margin-left: 2px; color: #0f3550; background: #7fd8ff; border-radius: 50%; font-size: 12px; font-style: normal; font-weight: 800; line-height: 1; }
+button.lack { opacity: 0.55; }
+.st-pack { padding: 8px 10px; }
+.st-pack-ico { flex: none; display: grid; place-items: center; width: 40px; height: 40px; color: #2b8fd6; background: #e6f4ff; border-radius: 10px; }
+.st-pack .gs-info b { font-size: 17px; }
+.st-pack .gs-info b small { margin-left: 3px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.st-bonus { align-self: flex-start; padding: 1px 8px; color: #8a5a00; background: #fff1c9; border-radius: 9px; font-size: 11px; font-style: normal; font-weight: 700; }
+.st-pack button { flex: none; width: 128px; }
+.gc-soon-note { align-self: flex-start; padding: 2px 10px; color: var(--muted); background: #eef4f8; border-radius: 10px; font-size: 12px; font-style: normal; font-weight: 700; }

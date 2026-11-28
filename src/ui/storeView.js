@@ -1,8 +1,9 @@
 import { ITEMS, PACKS, PASS, TEAM_UNLOCK, EXCHANGE, EARN, getItem } from '../management/walletData.js';
 import { jobHtml, boostButton } from '../building/builder.js';
-import { coin, dia } from './currency.js';
+import { coin, dia, diaBtn } from './currency.js';
 import { BIGWOOD_SET } from '../decor/decorData.js';
 import { INTERIOR_DEFS } from '../tanks/tankData.js';
+import { icon } from './icons.js';
 
 const date = (t) => new Date(t).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const kindName = { catch: '採取倍', boost: '加速', nurse: '保育管理', event: 'イベントカード' };
@@ -21,7 +22,7 @@ export class StoreView {
     const mode = this.purchases.mode;
     const dev = mode === 'dev';
     const canBuy = mode === 'store' || dev;
-    const ex = (units) => `<button data-act="st-exchange" data-id="${units}" ${w.canAfford(EXCHANGE.dia * units) ? '' : 'disabled'}>${dia(EXCHANGE.dia * units)} → ${coin(EXCHANGE.coin * units)}</button>`;
+    const ex = (units) => `<button ${diaBtn(w, EXCHANGE.dia * units, 'st-exchange', units, { cls: '' })}>${dia(EXCHANGE.dia * units)} → ${coin(EXCHANGE.coin * units)}</button>`;
     const wallet = `<div class="st-sum"><div class="st-head"><b>ダイヤ ${dia(w.total)}</b><small>無償 ${w.free.toLocaleString('ja-JP')} ・ 有償 ${w.paid.toLocaleString('ja-JP')}</small></div>
       <small>使うときは無償ダイヤから先に減ります。ダイヤはコインに両替できます（コインはダイヤにできません）。</small>
       <div class="gs-btns">${ex(1)}${ex(10)}</div></div>`;
@@ -33,7 +34,7 @@ export class StoreView {
     const job = this.builder.construction.jobs[0];
     const work = `<h4 class="gs-sub">工事</h4>${job ? `<div class="gs-row"><div class="gs-info"><b>${job.label}</b>${jobHtml(job)}</div>${boostButton(job)}</div>` : '<p class="gs-empty">進めている工事はありません。増築・昇格・生け簀の工事は同時に1件です。</p>'}`;
     const rows = ITEMS.map((it) => `<div class="gs-row"><div class="gs-info"><b>${it.name}</b><small>${it.text} ・ 所持 ${this.items.count(it.id)}</small></div>
-      <button data-act="st-item" data-id="${it.id}" class="primary" ${w.canAfford(it.price) ? '' : 'disabled'}>${dia(it.price)}</button></div>`);
+      <button ${diaBtn(w, it.price, 'st-item', it.id)}>${dia(it.price)}</button></div>`);
     const groups = Object.keys(kindName).map((k) => `<h4 class="gs-sub">${kindName[k]}</h4>${rows.filter((_, i) => ITEMS[i].kind === k).join('')}`).join('');
     const buy = (id, yen, ok = true) => `<button data-act="st-buy" data-id="${id}" class="primary" ${canBuy && ok && !this.busy ? '' : 'disabled'}>${this.purchases.priceLabel(id, yen)}${dev ? '（テスト）' : ''}</button>`;
     const pass = `<h4 class="gs-sub">館長パス（${PASS.days}日）</h4><div class="gs-row"><div class="gs-info"><b>館長パス</b>
@@ -43,14 +44,21 @@ export class StoreView {
     const woodOwned = INTERIOR_DEFS.filter((d) => d.unlock === 'dia');
     const woodLeft = woodOwned.filter((d) => !this.purchases.decor?.ownsDef(d)).length;
     const wood = `<div class="gs-row"><div class="gs-info"><b>大型流木セット</b><small>大型流木5形（枝分かれ・根張り・アーチ・倒木・ねじれ）をまとめて解放。1形ずつならカタログから${BIGWOOD_SET.dia ?? 300}ダイヤ ・ 未解放 ${woodLeft}/${woodOwned.length}</small></div>${buy(BIGWOOD_SET.id, BIGWOOD_SET.yen, woodLeft > 0)}</div>`;
-    const packs = PACKS.map((p) => `<div class="gs-row"><div class="gs-info"><b>${dia(p.dia)}</b></div>${buy(p.id, p.yen)}</div>`).join('');
+    // 一番小さいパックの単価を基準にした「お得」の割合
+    const base = PACKS[0].dia / PACKS[0].yen;
+    const packs = PACKS.map((p) => {
+      const bonus = Math.round(((p.dia / p.yen) / base - 1) * 100);
+      return `<div class="gs-row st-pack"><span class="st-pack-ico">${icon('gem', 26)}</span><div class="gs-info"><b>${p.dia.toLocaleString('ja-JP')}<small>ダイヤ</small></b>${bonus >= 1 ? `<em class="st-bonus">${bonus}%お得</em>` : ''}</div>${buy(p.id, p.yen)}</div>`;
+    }).join('');
     const note = dev
       ? '<p class="gs-empty">開発中のテスト購入です（この端末にだけ記録され、お金はかかりません）。</p>'
       : mode === 'store'
         ? '<p class="gs-empty">購入した有償ダイヤ・パス・解放はアカウントに記録されます。</p>'
         : '<p class="gs-empty">購入はiPhoneアプリ版で行えます。買った分はこの画面にも反映されます。</p>';
     const restore = mode === 'store' ? '<button data-act="st-restore" class="tv-wide">購入を復元</button>' : '';
-    return `${wallet}${daily}${work}${groups}${pass}${teams}${wood}<h4 class="gs-sub">ダイヤ</h4>${note}${packs}${restore}`;
+    // 並び：財布 → ダイヤ購入 → パス・解放 → 毎日のダイヤ → 工事 → ダイヤで買うアイテム
+    const buyDia = `<h4 class="gs-sub" id="st-packs">ダイヤを買う</h4>${note}${packs}${restore}`;
+    return `${wallet}${buyDia}${pass}${teams}${wood}${daily}${work}${groups}`;
   }
 
   act(act, id) {

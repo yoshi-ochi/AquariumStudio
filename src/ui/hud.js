@@ -14,7 +14,7 @@ export class Hud {
       <div class="hud-clock" id="hud-clock"></div>
       <div class="hud-stat" aria-label="来館者数">${icon('people', 17)}<b id="hud-visitors"></b><small>人</small></div>
       <div class="hud-stat money" aria-label="コイン">${icon('coin', 17)}<b id="hud-money"></b></div>
-      <button class="hud-stat gem" id="hud-gem" aria-label="ダイヤ（ショップを開く）">${icon('gem', 17)}<b id="hud-dia"></b></button>`;
+      <button class="hud-stat gem" id="hud-gem" aria-label="ダイヤ（ショップを開く）">${icon('gem', 17)}<b id="hud-dia"></b><i class="hud-plus" aria-hidden="true">+</i></button>`;
     el.querySelector('#hud-account').addEventListener('click', onAccount);
     el.querySelector('#hud-gem').addEventListener('click', () => onStore?.());
     wallet?.addEventListener('change', () => this.update());
